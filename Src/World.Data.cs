@@ -106,6 +106,7 @@ namespace FFS.Libraries.StaticEcs {
     public struct HeuristicChunk {
         internal AtomicMask NotEmptyBlocks;
         internal AtomicMask FullBlocks;
+        internal ushort UsedSegmentsMask;
     }
     #endregion
 
@@ -293,6 +294,8 @@ namespace FFS.Libraries.StaticEcs {
             private uint _multiStorageResizersCount;
             private Action[] _multiStorageResetters;
             private uint _multiStorageResettersCount;
+            private Action<uint>[] _multiStorageChunkResetters;
+            private uint _multiStorageChunkResettersCount;
 
             // QUERY
             private readonly QueryData[] _queriesToUpdateOnDisable;
@@ -310,6 +313,7 @@ namespace FFS.Libraries.StaticEcs {
             internal byte QueryMode; // 0 - None, 1 - Strict, 2 - Flexible
             private (uint, uint)[] _currentEntitiesRangeMainThread;
             [ThreadStatic] private static (uint, uint)[] _currentEntitiesRangeOtherThread;
+            private QueryData[] _activeQueryDataMainThread;
             #endif
 
             // CONFIG
@@ -325,6 +329,9 @@ namespace FFS.Libraries.StaticEcs {
             private int _createdTrackingSegmentsPoolCount;
             internal ulong[][] CreatedTrackingHistoryChunks;
             internal ulong[][][] CreatedTrackingHistorySegments;
+
+            // SYSTEMS
+            internal List<SystemsHandle> RegisteredSystems;
 
             // STATE
             internal ulong CurrentTick;
@@ -384,6 +391,7 @@ namespace FFS.Libraries.StaticEcs {
                 _blockerDestroy = 0;
                 _blockerDisable = 0;
                 _blockerEnable = 0;
+                _activeQueryDataMainThread = null;
                 #endif
                 
                 MultiThreadActive = false;
@@ -421,6 +429,9 @@ namespace FFS.Libraries.StaticEcs {
                 _deleteEventMigratorByGuid = new Dictionary<Guid, EcsEventDeleteMigrationReader>();
                 _poolsCountEvents = default;
 
+                // SYSTEMS
+                RegisteredSystems = new List<SystemsHandle>();
+
                 // CHUNKS
                 SegmentsMaskCache = Const.DataMasks;
                 HeuristicChunks = null;
@@ -438,7 +449,9 @@ namespace FFS.Libraries.StaticEcs {
                 _multiStorageResizers = null;
                 _multiStorageResizersCount = 0;
                 _multiStorageResetters = null;
+                _multiStorageChunkResetters = null;
                 _multiStorageResettersCount = 0;
+                _multiStorageChunkResettersCount = 0;
 
                 // ENTITY TYPE RESETTERS
                 EntityTypeResetters = null;
@@ -633,7 +646,7 @@ namespace FFS.Libraries.StaticEcs {
 
                 for (var i = 0; i < BitMaskComponents.Length; i++) {
                     Array.Clear(BitMaskComponents[i], 0, BitMaskComponents[i].Length);
-                }
+                    }
 
                 for (var i = 0; i < EntitiesSegments.Length; i++) {
                     ref var segment = ref EntitiesSegments[i];
@@ -643,12 +656,12 @@ namespace FFS.Libraries.StaticEcs {
                         for (var v = 0; v < versions.Length; v++) {
                             var ver = (ushort)(versions[v] + 1);
                             versions[v] = ver == 0 ? (ushort)1 : ver;
-                        }
+                }
                     }
                     segment.ClusterId = EntitiesSegment.InvalidCluster;
                     segment.EntityType = EntitiesSegment.NoEntityType;
 
-                    if (TrackCreated) {
+                if (TrackCreated) {
                         if (TrackingBufferSize > 0) {
                             var totalSlots = TrackingBufferSize + 1;
                             for (var slot = 0; slot < totalSlots; slot++) {
@@ -733,6 +746,15 @@ namespace FFS.Libraries.StaticEcs {
                 }
                 _multiStorageResetters[_multiStorageResettersCount++] = resetter;
             }
+
+            [MethodImpl(AggressiveInlining)]
+            internal void RegisterMultiStorageChunkResetter(Action<uint> resetter) {
+                _multiStorageChunkResetters ??= new Action<uint>[16];
+                if (_multiStorageChunkResettersCount == _multiStorageChunkResetters.Length) {
+                    Array.Resize(ref _multiStorageChunkResetters, (int)(_multiStorageChunkResettersCount << 1));
+                }
+                _multiStorageChunkResetters[_multiStorageChunkResettersCount++] = resetter;
+            }
             #endregion
 
             #region TRACKING
@@ -806,6 +828,35 @@ namespace FFS.Libraries.StaticEcs {
                     result |= CreatedTrackingHistoryChunks[(int)((toTick - i) % totalSlots)][chunkIdx];
                 }
                 return result;
+            }
+
+            [MethodImpl(AggressiveInlining)]
+            public readonly bool HasCreated(Entity entity) {
+                #if FFS_ECS_DEBUG
+                AssertTrackCreated();
+                AssertEntityIsNotDestroyedAndLoaded(WorldTypeName, entity);
+                #endif
+                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
+                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
+                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
+                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
+                if (TrackingBufferSize > 0) {
+                    return (CreatedMaskHistory(CurrentLastTick, CurrentTick, segmentIdx, segmentBlockIdx) & blockEntityMask) != 0;
+                }
+                return (CreatedMask(segmentIdx, segmentBlockIdx) & blockEntityMask) != 0;
+            }
+
+            [MethodImpl(AggressiveInlining)]
+            public readonly bool HasCreated(Entity entity, ulong fromTick) {
+                #if FFS_ECS_DEBUG
+                AssertTrackCreated();
+                AssertEntityIsNotDestroyedAndLoaded(WorldTypeName, entity);
+                #endif
+                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
+                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
+                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
+                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
+                return (CreatedMaskHistory(fromTick, CurrentTick, segmentIdx, segmentBlockIdx) & blockEntityMask) != 0;
             }
 
             [MethodImpl(AggressiveInlining)]
@@ -1398,6 +1449,7 @@ namespace FFS.Libraries.StaticEcs {
                 if (entitiesMask == 0) {
                     var chunkBlockMask = 1UL << (segmentBlocksOffset + segmentBlockIdx);
                     heuristic.NotEmptyBlocks.Value |= chunkBlockMask;
+                    heuristic.UsedSegmentsMask |= (ushort)(1 << segmentInChunk);
                     ref var loaded = ref HeuristicLoadedChunks[chunkIdx];
                     if (loaded.Value == 0) {
                         cluster.LoadedChunks[cluster.LoadedChunksCount++] = chunkIdx;
@@ -1526,6 +1578,7 @@ namespace FFS.Libraries.StaticEcs {
                 if (entitiesMask == 0) {
                     var chunkBlockMask = 1UL << chunkBlockIdx;
                     heuristic.NotEmptyBlocks.Value |= chunkBlockMask;
+                    heuristic.UsedSegmentsMask |= (ushort)(1 << (chunkBlockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT));
                     segment.EntityType = entityType;
                     #if FFS_ECS_BURST
                     LifecycleHandle.OnSegmentEntityTypeChanged(segmentIdx, entityType);
@@ -1631,6 +1684,7 @@ namespace FFS.Libraries.StaticEcs {
                 if (entitiesMask == 0) {
                     var chunkBlockMask = 1UL << chunkBlockIdx;
                     HeuristicChunks[chunkIdx].NotEmptyBlocks.Value |= chunkBlockMask;
+                    HeuristicChunks[chunkIdx].UsedSegmentsMask |= (ushort)(1 << (chunkBlockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT));
                     ref var loaded = ref HeuristicLoadedChunks[chunkIdx];
                     if (loaded.Value == 0) {
                         ref var cluster = ref Clusters[gid.ClusterId];
@@ -1707,6 +1761,7 @@ namespace FFS.Libraries.StaticEcs {
                 if (entitiesMask == 0) {
                     var chunkBlockMask = 1UL << (segmentBlocksOffset + segmentBlockIdx);
                     heuristic.NotEmptyBlocks.Value |= chunkBlockMask;
+                    heuristic.UsedSegmentsMask |= (ushort)(1 << segmentInChunk);
                     ref var loaded = ref HeuristicLoadedChunks[chunkIdx];
                     if (loaded.Value == 0) {
                         cluster.LoadedChunks[cluster.LoadedChunksCount++] = chunkIdx;
@@ -2749,7 +2804,7 @@ namespace FFS.Libraries.StaticEcs {
                 for (var s = 0; s < Const.SEGMENTS_IN_CHUNK; s++) {
                     var segIdx = baseSegIdx + s;
                     var segType = EntitiesSegments[segIdx].EntityType;
-                    if (cluster.FreeSegmentByType[segType] == segIdx) {
+                    if (segType != ushort.MaxValue && cluster.FreeSegmentByType[segType] == segIdx) {
                         cluster.FreeSegmentByType[segType] = EntitiesSegment.Invalid;
                     }
                 }
@@ -2823,11 +2878,45 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             internal void Write(ref BinaryPackWriter writer, ChunkWritingStrategy strategy, ReadOnlySpan<ushort> clustersToWrite, ref TempChunksData tempChunks, bool fullWorld) {
                 clustersToWrite = GetActiveClustersIfEmpty(clustersToWrite);
-                
+
+                writer.WriteUlong(CurrentTick);
+                writer.WriteUlong(CurrentLastTick);
+                writer.WriteByte(TrackingBufferSize);
+
                 writer.WriteInt(HeuristicChunks.Length);
                 writer.WriteInt(Clusters.Length);
                 writer.WriteInt(clustersToWrite.Length);
-                
+
+                writer.WriteBool(TrackCreated);
+                if (TrackCreated) {
+                    var bufferSize = TrackingBufferSize;
+                    var totalSlots = bufferSize + 1;
+                    for (var slot = 0; slot < totalSlots; slot++) {
+                        ulong[] chunksArr;
+                        ulong[][] segmentsArr;
+                        if (bufferSize == 0) {
+                            chunksArr = CreatedTrackingChunks;
+                            segmentsArr = CreatedTrackingSegments;
+                        } else {
+                            chunksArr = CreatedTrackingHistoryChunks[slot];
+                            segmentsArr = CreatedTrackingHistorySegments[slot];
+                        }
+                        writer.WriteArrayUnmanaged(chunksArr, 0, chunksArr.Length);
+
+                        uint nonNullCount = 0;
+                        for (var s = 0; s < segmentsArr.Length; s++) {
+                            if (segmentsArr[s] != null) nonNullCount++;
+                        }
+                        writer.WriteUint(nonNullCount);
+                        for (uint s = 0; s < segmentsArr.Length; s++) {
+                            if (segmentsArr[s] != null) {
+                                writer.WriteUint(s);
+                                writer.WriteArrayUnmanaged(segmentsArr[s], 0, Const.BLOCKS_IN_SEGMENT);
+                            }
+                        }
+                    }
+                }
+
                 for (var i = 0; i < clustersToWrite.Length; i++) {
                     var clusterId = clustersToWrite[i];
                     ref var cluster = ref Clusters[clusterId];
@@ -2857,28 +2946,34 @@ namespace FFS.Libraries.StaticEcs {
                 for (var i = 0; i < tempChunks.ChunksCount; i++) {
                     var chunkIdx = tempChunks.Chunks[i];
                     writer.WriteUint(chunkIdx);
-                    WriteDataChunk(ref writer, chunkIdx);
+                    WriteDataChunk(ref writer, chunkIdx, true);
                 }
             }
 
             [MethodImpl(AggressiveInlining)]
             internal void Read(ref BinaryPackReader reader, bool fullWorld, bool hardReset = false) {
+                var savedTick = reader.ReadUlong();
+                var savedLastTick = reader.ReadUlong();
+                var savedBufferSize = reader.ReadByte();
+
                 var chunksCapacity = reader.ReadInt();
                 var clustersCapacity = reader.ReadInt();
                 var clustersCount = reader.ReadInt();
 
-                if (IsWorldInitialized) {
-                    if (hardReset) {
-                        HardResetInternal();
-                    } else {
-                        var oldClustersCount = ActiveClustersCount - 1;
-                        for (var i = oldClustersCount; i >= 0; i--) {
-                            FreeClusterInternal(ActiveClusters[i]);
-                        }
-                    }
+                if (hardReset) {
+                    HardResetInternal();
                 } else {
-                    InitializeInternal((uint) chunksCapacity);
+                    var oldClustersCount = ActiveClustersCount - 1;
+                    for (var i = oldClustersCount; i >= 0; i--) {
+                        FreeClusterInternal(ActiveClusters[i]);
+                    }
                 }
+
+                if (savedBufferSize != TrackingBufferSize) {
+                    throw new StaticEcsException($"World<{typeof(TWorld)}>", "Data.Read", $"TrackingBufferSize mismatch: saved={savedBufferSize}, current={TrackingBufferSize}");
+                }
+                CurrentTick = savedTick;
+                CurrentLastTick = savedLastTick;
 
                 if (chunksCapacity > HeuristicChunks.Length) {
                     ResizeWorld((uint) chunksCapacity);
@@ -2887,7 +2982,46 @@ namespace FFS.Libraries.StaticEcs {
                 if (clustersCapacity > Clusters.Length) {
                     ResizeClusters(clustersCapacity);
                 }
-                
+
+                var savedTrackCreated = reader.ReadBool();
+                if (savedTrackCreated != TrackCreated) {
+                    throw new StaticEcsException($"World<{typeof(TWorld)}>", "Data.Read", $"TrackCreated mismatch: saved={savedTrackCreated}, current={TrackCreated}");
+                }
+                if (TrackCreated) {
+                    var bufferSize = TrackingBufferSize;
+                    var totalSlots = bufferSize + 1;
+                    for (var slot = 0; slot < totalSlots; slot++) {
+                        ulong[] chunksArr;
+                        ulong[][] segmentsArr;
+                        if (bufferSize == 0) {
+                            chunksArr = CreatedTrackingChunks;
+                            segmentsArr = CreatedTrackingSegments;
+                        } else {
+                            chunksArr = CreatedTrackingHistoryChunks[slot];
+                            segmentsArr = CreatedTrackingHistorySegments[slot];
+                        }
+                        reader.ReadArrayUnmanaged(ref chunksArr, 0);
+                        if (bufferSize == 0) {
+                            CreatedTrackingChunks = chunksArr;
+                        } else {
+                            CreatedTrackingHistoryChunks[slot] = chunksArr;
+                        }
+
+                        var nonNullCount = reader.ReadUint();
+                        for (var i = 0; i < nonNullCount; i++) {
+                            var segIdx = reader.ReadUint();
+                            ref var segRef = ref segmentsArr[segIdx];
+                            segRef ??= AllocateCreatedTrackingSegment();
+                            reader.ReadArrayUnmanaged(ref segRef, 0);
+                        }
+                    }
+                    if (bufferSize > 0) {
+                        var writeSlot = (int)((CurrentTick + 1) % (ulong)(bufferSize + 1));
+                        CreatedTrackingChunks = CreatedTrackingHistoryChunks[writeSlot];
+                        CreatedTrackingSegments = CreatedTrackingHistorySegments[writeSlot];
+                    }
+                }
+
                 for (var i = 0; i < clustersCount; i++) {
                     var clusterId = reader.ReadUshort();
                     var disabled = reader.ReadBool();
@@ -2947,25 +3081,32 @@ namespace FFS.Libraries.StaticEcs {
                 writer.WriteUlong(heuristic.NotEmptyBlocks.Value);
                 writer.WriteUlong(heuristic.FullBlocks.Value);
                 writer.WriteUshort(EntitiesSegments[baseSegmentIdx].ClusterId);
+                writer.WriteUshort(heuristic.UsedSegmentsMask);
 
                 if (heuristic.NotEmptyBlocks.Value != 0) {
+                    var notEmpty = heuristic.NotEmptyBlocks.Value;
                     for (var s = 0; s < Const.SEGMENTS_IN_CHUNK; s++) {
-                        writer.WriteArrayUnmanaged(EntitiesSegments[baseSegmentIdx + s].Masks, 0, Const.BLOCKS_IN_SEGMENT * 2);
+                        if ((notEmpty & SegmentsMaskCache[s]) != 0) {
+                            writer.WriteArrayUnmanaged(EntitiesSegments[baseSegmentIdx + s].Masks, 0, Const.BLOCKS_IN_SEGMENT * 2);
+                        }
                     }
                     if (fullWorld) {
-                        writer.WriteUlong(HeuristicLoadedChunks[chunkIdx].Value);
+                        var loaded = HeuristicLoadedChunks[chunkIdx].Value;
+                        writer.WriteUlong(loaded);
                         for (var s = 0; s < Const.SEGMENTS_IN_CHUNK; s++) {
-                            writer.WriteArrayUnmanaged(EntitiesSegments[baseSegmentIdx + s].Masks, Const.BLOCKS_IN_SEGMENT * 2, Const.BLOCKS_IN_SEGMENT);
+                            if ((loaded & SegmentsMaskCache[s]) != 0) {
+                                writer.WriteArrayUnmanaged(EntitiesSegments[baseSegmentIdx + s].Masks, Const.BLOCKS_IN_SEGMENT * 2, Const.BLOCKS_IN_SEGMENT);
+                            }
                         }
                     }
                 }
 
-                for (var s = 0; s < Const.SEGMENTS_IN_CHUNK; s++) {
-                    writer.WriteArrayUnmanaged(EntitiesSegments[baseSegmentIdx + s].Versions, 0, Const.ENTITIES_IN_SEGMENT);
-                }
-
-                for (var s = 0; s < Const.SEGMENTS_IN_CHUNK; s++) {
-                    writer.WriteUshort(EntitiesSegments[baseSegmentIdx + s].EntityType);
+                var remainingUsedMask = heuristic.UsedSegmentsMask;
+                while (remainingUsedMask != 0) {
+                    var segmentInChunk = Utils.Lsb(remainingUsedMask);
+                    remainingUsedMask &= (ushort)(remainingUsedMask - 1);
+                    writer.WriteArrayUnmanaged(EntitiesSegments[baseSegmentIdx + segmentInChunk].Versions, 0, Const.ENTITIES_IN_SEGMENT);
+                    writer.WriteUshort(EntitiesSegments[baseSegmentIdx + segmentInChunk].EntityType);
                 }
             }
 
@@ -2978,30 +3119,39 @@ namespace FFS.Libraries.StaticEcs {
                 heuristic.NotEmptyBlocks.Value = reader.ReadUlong();
                 heuristic.FullBlocks.Value = reader.ReadUlong();
                 var clusterId = reader.ReadUshort();
+                var usedMask = reader.ReadUshort();
                 SetChunkSegmentsCluster(chunkIdx, clusterId, selfOwner);
+                heuristic.UsedSegmentsMask = usedMask;
                 HeuristicLoadedChunks[chunkIdx].Value = 0;
 
                 if (heuristic.NotEmptyBlocks.Value != 0) {
+                    var notEmpty = heuristic.NotEmptyBlocks.Value;
                     for (var s = 0; s < Const.SEGMENTS_IN_CHUNK; s++) {
-                        reader.ReadArrayUnmanaged(ref EntitiesSegments[baseSegmentIdx + s].Masks, 0);
+                        if ((notEmpty & SegmentsMaskCache[s]) != 0) {
+                            reader.ReadArrayUnmanaged(ref EntitiesSegments[baseSegmentIdx + s].Masks, 0);
+                        }
                     }
                     if (fullWorld) {
-                        HeuristicLoadedChunks[chunkIdx].Value = reader.ReadUlong();
+                        var loaded = reader.ReadUlong();
+                        HeuristicLoadedChunks[chunkIdx].Value = loaded;
                         for (var s = 0; s < Const.SEGMENTS_IN_CHUNK; s++) {
-                            reader.ReadArrayUnmanaged(ref EntitiesSegments[baseSegmentIdx + s].Masks, Const.BLOCKS_IN_SEGMENT * 2);
+                            if ((loaded & SegmentsMaskCache[s]) != 0) {
+                                reader.ReadArrayUnmanaged(ref EntitiesSegments[baseSegmentIdx + s].Masks, Const.BLOCKS_IN_SEGMENT * 2);
+                            }
                         }
                     }
                 }
 
-                for (var s = 0; s < Const.SEGMENTS_IN_CHUNK; s++) {
-                    reader.ReadArrayUnmanaged(ref EntitiesSegments[baseSegmentIdx + s].Versions);
-                }
-
-                for (var s = 0; s < Const.SEGMENTS_IN_CHUNK; s++) {
-                    var et = reader.ReadUshort();
-                    EntitiesSegments[baseSegmentIdx + s].EntityType = et;
+                var remainingUsedMask = usedMask;
+                while (remainingUsedMask != 0) {
+                    var segmentInChunk = Utils.Lsb(remainingUsedMask);
+                    remainingUsedMask &= (ushort)(remainingUsedMask - 1);
+                    ref var usedSegment = ref EntitiesSegments[baseSegmentIdx + segmentInChunk];
+                    reader.ReadArrayUnmanaged(ref usedSegment.Versions);
+                    var entityType = reader.ReadUshort();
+                    usedSegment.EntityType = entityType;
                     #if FFS_ECS_BURST
-                    LifecycleHandle.OnSegmentEntityTypeChanged((uint)(baseSegmentIdx + s), et);
+                    LifecycleHandle.OnSegmentEntityTypeChanged((uint)(baseSegmentIdx + segmentInChunk), entityType);
                     #endif
                 }
 
@@ -3021,7 +3171,7 @@ namespace FFS.Libraries.StaticEcs {
             }
             
             [MethodImpl(AggressiveInlining)]
-            internal void WriteDataChunk(ref BinaryPackWriter writer, uint chunkIdx) {
+            internal void WriteDataChunk(ref BinaryPackWriter writer, uint chunkIdx, bool withTracking) {
                var hasEntities = HasEntitiesInChunk(chunkIdx);
                writer.WriteBool(hasEntities);
 
@@ -3034,7 +3184,7 @@ namespace FFS.Libraries.StaticEcs {
 
                    if (hasEntities) {
                        var sizePosition = writer.MakePoint(sizeof(uint));
-                       pool.WriteChunk(ref writer, chunkIdx);
+                       pool.WriteChunk(ref writer, chunkIdx, withTracking);
                        writer.WriteUintAt(sizePosition, writer.Position - (sizePosition + sizeof(uint)));
                    }
                }
@@ -3165,13 +3315,25 @@ namespace FFS.Libraries.StaticEcs {
 
             [MethodImpl(AggressiveInlining)]
             internal readonly bool IsNotCurrentQueryEntity(Entity entity) {
+                var id = entity.IdWithOffset;
                 for (var i = 0; i < QueryDataCount; i++) {
                     if (MultiThreadActive) {
-                        if (entity.IdWithOffset < _currentEntitiesRangeOtherThread[i].Item1) return true;
-                        if (entity.IdWithOffset > _currentEntitiesRangeOtherThread[i].Item2) return true;
+                        if (id < _currentEntitiesRangeOtherThread[i].Item1) return true;
+                        if (id > _currentEntitiesRangeOtherThread[i].Item2) return true;
                     } else {
-                        if (entity.IdWithOffset < _currentEntitiesRangeMainThread[i].Item1) return true;
-                        if (entity.IdWithOffset > _currentEntitiesRangeMainThread[i].Item2) return true;
+                        ref readonly var range = ref _currentEntitiesRangeMainThread[i];
+                        if (id >= range.Item1 && id <= range.Item2) continue;
+
+                        if (_activeQueryDataMainThread == null) continue;
+                        var blocks = _activeQueryDataMainThread[i].Blocks;
+                        if (blocks == null) continue;
+
+                        var localId = id - Const.ENTITY_ID_OFFSET;
+                        var globalBlockIdx = localId >> Const.ENTITIES_IN_BLOCK_SHIFT;
+                        if (globalBlockIdx >= (uint) blocks.Length) continue;
+
+                        var bit = 1UL << (int) (localId & Const.ENTITIES_IN_BLOCK_MASK);
+                        if ((blocks[globalBlockIdx].EntitiesMask & bit) != 0) return true;
                     }
                 }
 
@@ -3189,6 +3351,13 @@ namespace FFS.Libraries.StaticEcs {
                 var data = new QueryData {
                     Blocks = ArrayPool<BlockMaskCache>.Shared.Rent(HeuristicChunks.Length << Const.BLOCKS_IN_CHUNK_SHIFT),
                 };
+                #if FFS_ECS_DEBUG
+                Array.Clear(data.Blocks, 0, data.Blocks.Length);
+                if (!MultiThreadActive) {
+                    _activeQueryDataMainThread ??= new QueryData[Const.MAX_NESTED_QUERY + 1];
+                    _activeQueryDataMainThread[QueryDataCount - 1] = data;
+                }
+                #endif
                 return data;
             }
             
@@ -3197,6 +3366,9 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 if (QueryDataCount == 0) throw new StaticEcsException("Unexpected error");
                 SetCurrentQueryEntity(default, default);
+                if (!MultiThreadActive && _activeQueryDataMainThread != null) {
+                    _activeQueryDataMainThread[QueryDataCount - 1] = default;
+                }
                 #endif
                 ArrayPool<BlockMaskCache>.Shared.Return(data.Blocks);
                 QueryDataCount--;
@@ -3315,14 +3487,23 @@ namespace FFS.Libraries.StaticEcs {
                     Array.Resize(ref _guidsComponents, _poolsCountComponents << 1);
                 }
 
+                #if FFS_ECS_DEBUG
+                Components<T>.instance = new Components<T>(_poolsCountComponents, typeConfig, isTag, typeName);
+                #else
                 Components<T>.Instance = new Components<T>(_poolsCountComponents, typeConfig, isTag, typeName);
+                #endif
                 Components<T>.Handle = ComponentsHandle.Create<TWorld, T>();
                 _poolsComponents[_poolsCountComponents] = Components<T>.Handle;
                 _guidsComponents[_poolsCountComponents++] = typeConfig.Guid!.Value;
 
-                if (typeConfig.TrackAdded!.Value || typeConfig.TrackDeleted!.Value
+                #if FFS_ECS_DEBUG
+                ref var registeredComponents = ref Components<T>.instance;
+                #else
+                ref var registeredComponents = ref Components<T>.Instance;
+                #endif
+                if (registeredComponents.TrackAdded || registeredComponents.TrackDeleted
                     #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                    || (!isTag && typeConfig.TrackChanged!.Value)
+                    || registeredComponents.TrackChanged
                     #endif
                     ) {
                     if (_trackingComponentIndicesCount == _trackingComponentIndices.Length) {
@@ -3724,36 +3905,55 @@ namespace FFS.Libraries.StaticEcs {
         internal static ReadOnlySpan<EventsHandle> _GetAllEventsHandles() => Data.Instance.GetAllEventsHandles();
         #endregion
 
+        #region SYSTEMS_HANDLES
+        [MethodImpl(AggressiveInlining)]
+        internal static IReadOnlyList<SystemsHandle> _GetAllSystemsHandles() => Data.Instance.RegisteredSystems;
+
+        [MethodImpl(AggressiveInlining)]
+        internal static bool _TryGetSystemsHandle(Type systemsType, out SystemsHandle handle) {
+            var entries = Data.Instance.RegisteredSystems;
+            for (var i = 0; i < entries.Count; i++) {
+                var entry = entries[i];
+                if (entry.SystemsType == systemsType) {
+                    handle = entry;
+                    return true;
+                }
+            }
+            handle = default;
+            return false;
+        }
+        #endregion
+
         #region RESOURCES
         [MethodImpl(AggressiveInlining)]
-        internal static bool _HasResource(Type type) => ResourcesData.Instance.HasRaw(type);
+        internal static bool _HasResource(Type type) => ResourcesData<TWorld>.Instance.HasRaw(type);
 
         [MethodImpl(AggressiveInlining)]
-        internal static bool _HasResourceByKey(string key) => NamedResources.Has(key);
+        internal static bool _HasResourceByKey(string key) => NamedResources<TWorld>.Has(key);
 
         [MethodImpl(AggressiveInlining)]
-        internal static object _GetResource(Type type) => ResourcesData.Instance.GetRaw(type);
+        internal static IResource _GetResource(Type type) => ResourcesData<TWorld>.Instance.GetRaw(type);
 
         [MethodImpl(AggressiveInlining)]
-        internal static object _GetResourceByKey(string key) => NamedResources.GetRaw(key);
+        internal static IResource _GetResourceByKey(string key) => NamedResources<TWorld>.GetRaw(key);
 
         [MethodImpl(AggressiveInlining)]
-        internal static void _RemoveResource(Type type) => ResourcesData.Instance.RemoveRaw(type);
+        internal static void _RemoveResource(Type type) => ResourcesData<TWorld>.Instance.RemoveRaw(type);
 
         [MethodImpl(AggressiveInlining)]
-        internal static void _RemoveResourceByKey(string key) => NamedResources.Remove(key);
+        internal static void _RemoveResourceByKey(string key) => NamedResources<TWorld>.Remove(key);
 
         [MethodImpl(AggressiveInlining)]
-        internal static void _SetResource(Type type, object value, bool clearOnDestroy) => ResourcesData.Instance.SetRaw(type, value, clearOnDestroy);
+        internal static void _SetResource(Type type, IResource value, bool clearOnDestroy) => ResourcesData<TWorld>.Instance.SetRaw(type, value, clearOnDestroy);
 
         [MethodImpl(AggressiveInlining)]
-        internal static void _SetResourceByKey(string key, object value, bool clearOnDestroy) => NamedResources.Set(key, value, clearOnDestroy);
+        internal static void _SetResourceByKey(string key, IResource value, bool clearOnDestroy) => NamedResources<TWorld>.SetRaw(key, value);
 
         [MethodImpl(AggressiveInlining)]
-        internal static IReadOnlyCollection<string> _GetAllResourcesKeys() => NamedResources.Values.Keys;
+        internal static IReadOnlyCollection<string> _GetAllResourcesKeys() => NamedResources<TWorld>.Values.Keys;
 
         [MethodImpl(AggressiveInlining)]
-        internal static IReadOnlyCollection<Type> _GetAllResourcesTypes() => ResourcesData.Instance.GetAllGetSetRemoveValuesMethods().Keys;
+        internal static IReadOnlyCollection<Type> _GetAllResourcesTypes() => ResourcesData<TWorld>.Instance.GetAllGetSetRemoveValuesMethods().Keys;
         #endregion
         #endregion
 
@@ -3826,7 +4026,7 @@ namespace FFS.Libraries.StaticEcs {
         public delegate*<void> _OnDestroy;
         public delegate*<int, void> _OnClusterRegistered;                      // clusterId
         public delegate*<uint, int, bool, void> _OnSetChunkSegmentsCluster;    // chunkIdx, clusterId, selfOwner
-        public delegate*<uint, byte, void> _OnSegmentEntityTypeChanged;        // segmentIdx, entityType
+        public delegate*<uint, ushort, void> _OnSegmentEntityTypeChanged;        // segmentIdx, entityType
         public delegate*<int, void> _OnClusterValuesChanged;                   // clusterId
         public delegate*<int, void> _OnClusterArraysResized;                   // clusterId
         public delegate*<void> _OnActiveClustersChanged;
@@ -3858,7 +4058,7 @@ namespace FFS.Libraries.StaticEcs {
         }
 
         [MethodImpl(AggressiveInlining)]
-        public readonly void OnSegmentEntityTypeChanged(uint segmentIdx, byte entityType) {
+        public readonly void OnSegmentEntityTypeChanged(uint segmentIdx, ushort entityType) {
             if (_OnSegmentEntityTypeChanged != null) _OnSegmentEntityTypeChanged(segmentIdx, entityType);
         }
 

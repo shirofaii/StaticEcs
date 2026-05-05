@@ -4,6 +4,137 @@ parent: EN
 nav_order: 5
 ---
 
+# Migration from 2.2.0 to 2.2.1
+
+## Snapshot loaders: gzip autodetected, `byteSizeHint` removed
+
+All standalone snapshot loaders — `LoadWorldSnapshot` / `LoadClusterSnapshot` / `LoadChunkSnapshot` / `LoadEventsSnapshot` / `LoadResourcesSnapshot` / `LoadSystemsSnapshot` / `RestoreFromGIDStoreSnapshot` — no longer take `gzip` or `byteSizeHint` parameters. Gzip is autodetected from the byte stream (RFC 1952 magic `0x1F 0x8B`) and the buffer size is read from the snapshot's 10-byte header (`ushort` format version + `ulong` payload size). All public `(ref BinaryPackWriter)` / `(BinaryPackReader)` overloads of `Create*Snapshot` / `Load*Snapshot` / `RestoreFromGIDStoreSnapshot` (events / resources / systems / GID-store) now write and consume that same header — composite scenarios that wrap one of these calls into a custom writer will see 10 extra bytes per block. The embedded serialization inside a world snapshot still uses an internal header-less path and is unchanged.
+
+```csharp
+// Before (2.2.0)
+W.Serializer.LoadWorldSnapshot(bytes, gzip: true, hardReset: true);
+W.Serializer.LoadWorldSnapshot("world.bin", gzip: true, byteSizeHint: 1_000_000, hardReset: true);
+W.Serializer.LoadClusterSnapshot(bytes, gzip: true, entitiesAsNew);
+W.Serializer.LoadChunkSnapshot("chunk.bin", gzip: true, byteSizeHint: 0);
+W.Serializer.LoadEventsSnapshot(bytes, gzip: true);
+W.Serializer.LoadEventsSnapshot("events.bin", gzip: true, byteSizeHint: 4096);
+W.Serializer.LoadResourcesSnapshot(bytes, gzip: true);
+W.Serializer.LoadResourcesSnapshot("resources.bin", gzip: true, byteSizeHint: 4096);
+W.Serializer.LoadSystemsSnapshot(bytes, gzip: true);
+W.Serializer.LoadSystemsSnapshot("systems.bin", gzip: true, byteSizeHint: 4096);
+W.Serializer.RestoreFromGIDStoreSnapshot(bytes, gzip: true, hardReset: true);
+W.Serializer.RestoreFromGIDStoreSnapshot("gid.bin", gzip: true, byteSizeHint: 0, hardReset: true);
+
+// After (2.2.1)
+W.Serializer.LoadWorldSnapshot(bytes, hardReset: true);
+W.Serializer.LoadWorldSnapshot("world.bin", hardReset: true);
+W.Serializer.LoadClusterSnapshot(bytes, entitiesAsNew);
+W.Serializer.LoadChunkSnapshot("chunk.bin");
+W.Serializer.LoadEventsSnapshot(bytes);
+W.Serializer.LoadEventsSnapshot("events.bin");
+W.Serializer.LoadResourcesSnapshot(bytes);
+W.Serializer.LoadResourcesSnapshot("resources.bin");
+W.Serializer.LoadSystemsSnapshot(bytes);
+W.Serializer.LoadSystemsSnapshot("systems.bin");
+W.Serializer.RestoreFromGIDStoreSnapshot(bytes, hardReset: true);
+W.Serializer.RestoreFromGIDStoreSnapshot("gid.bin", hardReset: true);
+```
+
+## `LoadClusterSnapshot` validates target chunks
+
+Loading a cluster snapshot with `entitiesAsNew: false` into chunks that already contain active entities now throws `StaticEcsException` instead of silently corrupting state. Unload or destroy the entities in the target chunks before loading:
+
+```csharp
+ReadOnlySpan<ushort> targetClusters = stackalloc ushort[] { clusterId };
+W.Query().BatchUnload(EntityStatusType.Any, clusters: targetClusters);
+W.Serializer.LoadClusterSnapshot(snapshot); // entitiesAsNew: false
+```
+
+## Snapshot format version bumped to 2
+
+The world / cluster / chunk snapshot layout changed (sparse per-segment serialization gated by `UsedSegmentsMask`, sparse per-mask event-page serialization). `SnapshotFormatVersion` is now `2`. Snapshots produced by 2.2.0 cannot be loaded by 2.2.1 — re-save them once with a 2.2.0 build, then load in 2.2.1, or regenerate from authoritative game state.
+
+## StaticPack dependency: 1.1.0 → 1.2.5
+
+The `FFS.StaticPack` package reference was bumped to `1.2.5`. If you reference StaticPack directly from your projects, update the version. The new APIs `BinaryPackReader.RentAndFillFromBytes` / `RentAndFillFromFile` / `BinaryPackWriter.ForceWriteUnmanaged` / `BinaryPackReader.ForceReadUnmanaged` power the simplifications above.
+
+___
+
+# Migration from 2.1.x to 2.2.0
+
+## Resources now require `IResource`
+
+Every resource type — singleton (`Resource<T>` / `World<TWorld>.SetResource<T>` / `Systems<TS>.SetResource<T>`) and named (`NamedResource<T>` / keyed overloads) — must now implement the new marker interface `IResource`. Without the marker, all resource API call sites fail to compile.
+
+```csharp
+// Before
+public class GameConfig { public float Gravity; }
+
+// After
+public class GameConfig : IResource { public float Gravity; }
+```
+
+The type-erased `WorldHandle` API also tightened: `GetResource(Type)` / `GetResource(string)` now return `IResource` instead of `object`, and `SetResource(Type, ..., bool)` / `SetResource(string, ..., bool)` accept `IResource` instead of `object`. Existing call sites that already pass a value of an `IResource`-implementing type compile unchanged; loose `object` plumbing must be retyped.
+
+## Disable/Enable is now opt-in via `IDisableable`
+
+In 2.1.x every `IComponent` unconditionally allocated a per-component disabled bitmask (4 ulong per segment of memory) and exposed `entity.Disable<T>()`/`Enable<T>()`/`HasDisabled<T>()`/`HasEnabled<T>()` plus the `*Disabled` query filters for any component type. In 2.2.0 this becomes opt-in via the new marker interface `IDisableable`.
+
+**Breaking change**: any component that was being toggled with `Disable<T>()`/`Enable<T>()`, queried via `*Disabled` filters, or used with `HasDisabled<T>()`/`HasEnabled<T>()` must now declare `IDisableable`. Without the marker, those call sites do not compile.
+
+```csharp
+// Before
+public struct Health : IComponent { public float Value; }
+
+// After (only if you actually use Disable/Enable / *Disabled filters on this type)
+public struct Health : IComponent, IDisableable { public float Value; }
+```
+
+The `Disable*`/`Enable*`/`Has*Disabled`/`Has*Enabled` methods on the entity, the `Components<T>.Disable/Enable/HasDisabled/HasEnabled` instance methods, and the `AllOnlyDisabled`/`AllWithDisabled`/`NoneWithDisabled`/`AnyOnlyDisabled`/`AnyWithDisabled` filters all constrain `T : struct, IComponent, IDisableable`.
+
+Built-in component-shaped types — `Multi<TValue>`, `Link<TLinkType>`, `Links<TLinkType>` — already implement `IDisableable`, so code that toggles relations or multi-components keeps working unchanged.
+
+### Memory and serialization impact
+
+- Components without `IDisableable` no longer allocate the disabled half of the per-component mask segment — `Components<T>.EntitiesMaskSegments` allocates 4 ulong per segment instead of 8 (50% less mask memory for those types).
+- Per-entity snapshot writers no longer set the high `DisabledBit` of the component-size word for non-`IDisableable` types. Per-chunk snapshots no longer write the disabled mask ulong per non-empty block for those types.
+- Snapshot format is **self-describing**: `WriteChunk` writes the `HasDisable` flag of the type at write time, `ReadChunk` reads it from the stream. Toggling `IDisableable` on a type between snapshot write and read is safe — old snapshots from non-`IDisableable` types load correctly into a now-`IDisableable` type (all instances become enabled), and vice versa (the disabled-mask ulong is consumed but ignored).
+
+### Built-in opt-in markers
+
+- `IDisableable` is added in 2.2.0 (this section).
+- The existing tracking markers — `ITrackableAdded`, `ITrackableDeleted`, `ITrackableChanged` — already follow the same pattern; nothing changes for them.
+
+___
+
+## Flexible query mode semantics narrowed
+
+In 2.1.x `QueryMode.Flexible` / `EntitiesFlexible()` patched the cached snapshot bitmask live via an internal `OnCacheUpdate` callback whenever a filtered-type mutation happened on another snapshot entity, lifting the *same* blockers that fire in Strict (`Delete<T>`/`Disable<T>` for `All<T>`, `Add<T>`/`Set<T>`/`Enable<T>` for `None<T>`, etc.). That mechanism has been removed in 2.2.0.
+
+In 2.2.0 Flexible's only remaining freedom over Strict is entity-level `Destroy`, `Disable`, `Enable` on other snapshot entities — still tolerated, and still correctly excluded from the remainder of the iteration via cached-bitmask updates. All filter-type blockers that 2.1.x Flexible used to lift via `OnCacheUpdate` now apply in Flexible too — asserted in DEBUG the same way as in Strict (precise per filter type, see [Queries — QueryMode](features/query.md#querymode)).
+
+Short form: **Flexible = Strict + entity-level `Destroy`/`Disable`/`Enable` on other snapshot entities allowed.**
+
+> Note: in 2.2.0 the strict / flexible asserts are scoped to the **iteration snapshot** — the bitmask of entities matching the filter at the moment iteration starts. Entities outside the snapshot — created during iteration or not matching the filter — are NOT blocked. Code that previously had to defer `entity.Add<T>()` / `entity.Set<T>()` on a freshly-created entity until after the loop can now perform it inline.
+
+Code that in Flexible iteration was doing `other.Delete<T>()` / `other.Add<T>()` / `other.Enable<T>()` / `other.Disable<T>()` for a filtered `T` must be rewritten in one of the following ways:
+- destroy or toggle the whole entity instead — `other.Destroy()` / `other.Disable()` / `other.Enable()` — if that matches the intent;
+- collect the affected entities into a buffer during the loop and apply the component mutations after the `foreach`;
+- split the logic into a separate pass over the world.
+
+### Removed public API
+
+- `IQueryFilter.PushQueryData<TWorld>(QueryData)` — removed
+- `IQueryFilter.PopQueryData<TWorld>()` — removed
+- `IQueryFilter.Assert<TWorld>()` — removed
+- `OnCacheUpdate` delegate — removed
+- `QueryData.BatchUpdate` method — removed
+- `QueryData.OnCacheUpdate` field — removed
+
+See also: [Queries — QueryMode](features/query.md#querymode), [Pitfalls](pitfalls.md#query-errors).
+
+___
+
 # Migration from 1.2.x to 2.0.0
 
 Version 2.0.0 is a complete framework restructuring. Virtually all user code will require changes.
