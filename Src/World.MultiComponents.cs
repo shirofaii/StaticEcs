@@ -202,6 +202,26 @@ namespace FFS.Libraries.StaticEcs {
                 return ref Resources<TWorld, MultiValueStorage<TValue>>.Value.Segments[SegmentIdx][Offset + Count - 1];
             }
 
+            /// <summary>
+            /// Read-only counterpart to <see cref="First"/>. Returns a <c>ref readonly</c> view of the
+            /// first element. 
+            /// </summary>
+            [MethodImpl(AggressiveInlining)]
+            public readonly ref readonly TValue GetFirst() => ref First();
+
+            /// <summary>
+            /// Read-only counterpart to <see cref="Last"/>. See <see cref="GetFirst"/> for the rationale.
+            /// </summary>
+            [MethodImpl(AggressiveInlining)]
+            public readonly ref readonly TValue GetLast() => ref Last();
+
+            /// <summary>
+            /// Read-only counterpart to the <c>this[int]</c> indexer. Returns a <c>ref readonly</c> view
+            /// of the element at <paramref name="idx"/>. See <see cref="GetFirst"/> for the rationale.
+            /// </summary>
+            [MethodImpl(AggressiveInlining)]
+            public readonly ref readonly TValue Get(int idx) => ref this[idx];
+
             #region ADD
             /// <summary>
             /// Appends one element to the end of the collection. Grows capacity automatically if full.
@@ -1032,8 +1052,8 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             /// <param name="idx">Zero-based index. Must be in range [0, <see cref="Length"/>).</param>
             /// <exception cref="StaticEcsException">Thrown in debug builds if <paramref name="idx"/> is out of range.</exception>
-            public readonly TValue this[int idx] {
-                [MethodImpl(AggressiveInlining)] get => Multi[idx];
+            public readonly ref readonly TValue this[int idx] {
+                [MethodImpl(AggressiveInlining)] get => ref Multi.Get(idx);
             }
 
             /// <inheritdoc cref="Multi{TValue}.AsReadOnlySpan"/>
@@ -1046,8 +1066,8 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             /// <exception cref="StaticEcsException">Thrown in debug builds if the collection is empty.</exception>
             [MethodImpl(AggressiveInlining)]
-            public readonly TValue First() {
-                return Multi.First();
+            public readonly ref readonly TValue First() {
+                return ref Multi.GetFirst();
             }
 
             /// <summary>
@@ -1055,8 +1075,8 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             /// <exception cref="StaticEcsException">Thrown in debug builds if the collection is empty.</exception>
             [MethodImpl(AggressiveInlining)]
-            public readonly TValue Last() {
-                return Multi.Last();
+            public readonly ref readonly TValue Last() {
+                return ref Multi.GetLast();
             }
 
             /// <inheritdoc cref="Multi{TValue}.IndexOf"/>
@@ -1171,6 +1191,15 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             public ref TValue Current {
+                [MethodImpl(AggressiveInlining)] get => ref _segment[_index];
+            }
+
+            /// <summary>
+            /// Read-only counterpart to <see cref="Current"/>. Returns a <c>ref readonly</c> view of
+            /// the current element. The <c>RO</c> suffix signals an explicit opt-in to a snapshot/copy
+            /// at the call-site — the StaticEcs Roslyn analyzer (FFSECS0010) intentionally skips it.
+            /// </summary>
+            public ref readonly TValue CurrentRO {
                 [MethodImpl(AggressiveInlining)] get => ref _segment[_index];
             }
 

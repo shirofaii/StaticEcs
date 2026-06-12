@@ -373,6 +373,21 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             public static ComponentsHandle Handle;
 
+            /// <summary>
+            /// Safe registration check that does not throw when the type is not yet registered.
+            /// Returns <c>true</c> after <c>Types().Component&lt;T&gt;()</c> / <c>Tag&lt;T&gt;()</c> has been called
+            /// for this world, and <c>false</c> before registration and after <c>World&lt;TWorld&gt;.Destroy()</c>.
+            /// Unlike <see cref="Instance"/>, this property never asserts and can be called in any world state.
+            /// </summary>
+            public static bool IsTypeRegistered {
+                [MethodImpl(AggressiveInlining)]
+                #if FFS_ECS_DEBUG
+                get => instance.IsRegistered;
+                #else
+                get => Instance.IsRegistered;
+                #endif
+            }
+
             #if UNITY_2022_1_OR_NEWER
             [UnityEngine.Scripting.Preserve]
             #endif
@@ -396,7 +411,7 @@ namespace FFS.Libraries.StaticEcs {
                 }
 
                 
-                Data.Instance.RegisterComponentOrTagTypeInternal(config, isTag, typeof(T).Name);
+                Data.Instance.RegisterComponentOrTagTypeInternal(config, isTag, typeof(INonSerializable).IsAssignableFrom(typeof(T)), typeof(T).Name);
             }
 
             internal HeuristicChunk[] HeuristicChunks;
@@ -407,6 +422,15 @@ namespace FFS.Libraries.StaticEcs {
             /// Whether this storage represents a tag type (no data, no enable/disable, no change tracking).
             /// </summary>
             public readonly bool IsTag;
+
+            /// <summary>
+            /// When <c>true</c>, data of this component/tag type is excluded from all world snapshot
+            /// serialization (Add/Set/Has/Query/lifecycle still work as usual).
+            /// Set automatically when the component implements <see cref="INonSerializable"/>;
+            /// for <see cref="Link{T}"/>, <see cref="Links{T}"/> and <see cref="Multi{TValue}"/>
+            /// inherited from the user's <c>T</c>/<c>TValue</c>.
+            /// </summary>
+            public readonly bool NonSerializable;
 
             #if FFS_ECS_DEBUG
             /// <summary>
@@ -1963,9 +1987,10 @@ namespace FFS.Libraries.StaticEcs {
             #if NET5_0_OR_GREATER
             [UnconditionalSuppressMessage("AOT", "IL2091", Justification = "Component metadata is preserved by the registration path.")]
             #endif
-            internal Components(ushort componentId, ComponentTypeConfig<T> config, bool isTag, string typeName) {
+            internal Components(ushort componentId, ComponentTypeConfig<T> config, bool isTag, bool nonSerializable, string typeName) {
                 TypeName = typeName;
                 IsTag = isTag;
+                NonSerializable = nonSerializable;
                 DynamicId = componentId;
                 _idDiv = (ushort) (DynamicId >> Const.U64_SHIFT);
                 _idMask = 1UL << (DynamicId & Const.U64_MASK);
@@ -2276,12 +2301,12 @@ namespace FFS.Libraries.StaticEcs {
                     if (IsTag) {
                         builder.AppendLine(TypeName);
                     } else {
-                        if (HasDisabled(entity)) {
+                        if (HasDisable && HasDisabled(entity)) {
                             builder.Append("[Disabled] ");
                         }
                         builder.Append(TypeName);
                         builder.Append(" ( ");
-                        builder.Append(Ref(entity));
+                        builder.Append(Read(entity));
                         builder.AppendLine(" )");
                     }
                 }
@@ -3337,7 +3362,7 @@ namespace FFS.Libraries.StaticEcs {
                 if (HasWrite) {
                     Ref(entity).Write(ref writer, entity);
                 } else if (Unmanaged) {
-                    writer.ForceWriteUnmanaged(in Ref(entity));
+                    writer.ForceWriteUnmanaged(in Read(entity));
                 }
                 #if FFS_ECS_DEBUG
                 else {
@@ -3409,7 +3434,10 @@ namespace FFS.Libraries.StaticEcs {
             internal static void _Resize(uint chunksCapacity, ulong[][] chunkHeuristicMask) => Instance.Resize(chunksCapacity, chunkHeuristicMask);
 
             [MethodImpl(AggressiveInlining)]
-            internal static void _Destroy() => Instance.DestroyInternal();
+            internal static void _Destroy() {
+                Instance.DestroyInternal();
+                Handle = default;
+            }
 
             [MethodImpl(AggressiveInlining)]
             internal static void _HardReset() => Instance.HardResetInternal();
@@ -3487,7 +3515,7 @@ namespace FFS.Libraries.StaticEcs {
             internal static bool _TryGetRaw(uint eid, out IComponentOrTag value) {
                 var entity = new Entity(eid);
                 if (Instance.Has(entity)) {
-                    value = Instance.IsTag ? default : Instance.Ref(entity);
+                    value = Instance.IsTag ? default : Instance.Read(entity);
                     return true;
                 }
 

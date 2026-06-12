@@ -5,11 +5,12 @@
   <a href="./README_RU.md"><img src="https://img.shields.io/badge/RU-Русский-blue?style=flat-square" alt="Русский"></a>
   <a href="./README_ZH.md"><img src="https://img.shields.io/badge/ZH-中文-blue?style=flat-square" alt="中文"></a>
   <br><br>
-  <img src="https://img.shields.io/badge/version-2.2.4-blue?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.2.8-blue?style=for-the-badge" alt="Version">
   <a href="https://www.nuget.org/packages/FFS.StaticEcs/"><img src="https://img.shields.io/badge/NuGet-FFS.StaticEcs-004880?style=for-the-badge&logo=nuget" alt="NuGet"></a>
   <a href="https://felid-force-studios.github.io/StaticEcs/zh/"><img src="https://img.shields.io/badge/Docs-文档-blueviolet?style=for-the-badge" alt="文档"></a>
   <a href="https://gist.github.com/blackbone/6d254a684cf580441bf58690ad9485c3"><img src="https://img.shields.io/badge/Benchmarks-基准测试-green?style=for-the-badge" alt="基准测试"></a>
   <a href="https://github.com/Felid-Force-Studios/StaticEcs-Unity"><img src="https://img.shields.io/badge/Unity-模块-orange?style=for-the-badge&logo=unity" alt="Unity 模块"></a>
+  <a href="https://github.com/Felid-Force-Studios/StaticEcs-Analyzer"><img src="https://img.shields.io/badge/分析器-Roslyn-9b59b6?style=for-the-badge" alt="Roslyn 分析器"></a>
   <a href="https://github.com/Felid-Force-Studios/StaticEcs-Showcase"><img src="https://img.shields.io/badge/Showcase-示例-yellow?style=for-the-badge" alt="Showcase"></a>
   <br><br>
   <a href="https://felid-force-studios.github.io/StaticEcs/zh/migrationguide.html"><img src="https://img.shields.io/badge/迁移指南-2.0.0-red?style=for-the-badge" alt="迁移指南"></a>
@@ -62,7 +63,10 @@
   * [编译器指令](https://felid-force-studios.github.io/StaticEcs/zh/features/compilerdirectives.html)
 * [性能](https://felid-force-studios.github.io/StaticEcs/zh/performance.html)
 * [Unity 集成](https://felid-force-studios.github.io/StaticEcs/zh/unityintegrations.html)
+* [Roslyn 分析器](https://github.com/Felid-Force-Studios/StaticEcs-Analyzer)
 * [AI Agent 集成](#ai-agent-集成)
+* [路线图](#路线图)
+* [社区项目与参考](#社区项目与参考)
 * [许可证](#许可证)
 
 
@@ -100,14 +104,6 @@
   ```
   包：[FFS.StaticEcs](https://www.nuget.org/packages/FFS.StaticEcs/) · [FFS.StaticEcs.Debug](https://www.nuget.org/packages/FFS.StaticEcs.Debug/)
 
-# AI Agent 集成
-如果您使用 AI 编码助手（Claude Code、Cursor、Copilot 等）与 StaticEcs：
-- **llms.txt**：将代理指向 [`https://felid-force-studios.github.io/StaticEcs/llms.txt`](https://felid-force-studios.github.io/StaticEcs/llms.txt) 获取简洁的 AI 可读参考
-- **完整上下文**：[`https://felid-force-studios.github.io/StaticEcs/llms-full.txt`](https://felid-force-studios.github.io/StaticEcs/llms-full.txt) 获取完整文档
-- **Claude Code**：将 [CLAUDE.md 代码片段](https://felid-force-studios.github.io/StaticEcs/zh/aiagentguide.html)复制到项目的 `CLAUDE.md` 中
-- **常见问题**：参见[常见错误指南](https://felid-force-studios.github.io/StaticEcs/zh/pitfalls.html)
-
-
 # 概念
 StaticEcs — 一种基于倒排分层位图模型的新型 ECS 架构。
 与依赖原型或稀疏集的传统 ECS 框架不同，该设计引入了倒排索引结构，其中每个组件类型拥有实体位图，而不是实体存储组件掩码。
@@ -135,6 +131,8 @@ StaticEcs 消除了这两个问题：每个实体占据分段数组中的固定�
 > - 该框架为私有项目需求而创建，并以开源形式发布。
 
 # 快速开始
+> 💡 编译期检查请安装 [`FFS.StaticEcs.Analyzers`](https://github.com/Felid-Force-Studios/StaticEcs-Analyzer) —— 独立的 NuGet / UPM 包，包含 Roslyn 分析器与代码修复套件。
+
 ```csharp
 using FFS.Libraries.StaticEcs;
 
@@ -213,6 +211,36 @@ public class Program {
     }
 }
 ```
+
+# AI Agent 集成
+如果您使用 AI 编码助手（Claude Code、Cursor、Copilot 等）与 StaticEcs：
+- **llms.txt**：将代理指向 [`https://felid-force-studios.github.io/StaticEcs/llms.txt`](https://felid-force-studios.github.io/StaticEcs/llms.txt) 获取简洁的 AI 可读参考
+- **完整上下文**：[`https://felid-force-studios.github.io/StaticEcs/llms-full.txt`](https://felid-force-studios.github.io/StaticEcs/llms-full.txt) 获取完整文档
+- **Claude Code**：将 [CLAUDE.md 代码片段](https://felid-force-studios.github.io/StaticEcs/zh/aiagentguide.html)复制到项目的 `CLAUDE.md` 中
+- **常见问题**：参见[常见错误指南](https://felid-force-studios.github.io/StaticEcs/zh/pitfalls.html)
+
+
+# 路线图
+StaticEcs 的核心功能已基本完成。当前开发重点集中在两个方向：
+- **扩展 Unity Burst 支持** —— 公开 API 的大部分将可在 Burst 编译的代码路径中使用。
+- **维护与稳定性** —— 缺陷修复、性能微调以及小幅体验改进。
+
+近期不计划新增大型功能。如果您遇到 bug、有疑问或改进建议，欢迎[提交 issue](https://github.com/Felid-Force-Studios/StaticEcs/issues)或[发起 pull request](https://github.com/Felid-Force-Studios/StaticEcs/pulls)。非常欢迎社区贡献。
+
+
+# 社区项目与参考
+
+<p>
+  <a href="https://github.com/d4nilevi4/StaticTopDownShooter"><img src="https://raw.githubusercontent.com/d4nilevi4/StaticTopDownShooter/main/preview/preview.webp" alt="StaticTopDownShooter" width="320" align="left" hspace="12"></a>
+  <strong><a href="https://github.com/d4nilevi4/StaticTopDownShooter">StaticTopDownShooter</a></strong>，作者 <a href="https://github.com/d4nilevi4">@d4nilevi4</a>。2D 俯视角射击游戏，Unity 6，基于 StaticEcs。敌人采用 Utility AI 寻找掩体并还击。
+  <br clear="left">
+</p>
+
+<p>
+  <a href="https://github.com/d4nilevi4/StaticEngine"><img src="https://raw.githubusercontent.com/d4nilevi4/StaticEngine/main/GravitySimulation/PREVIEW/preview_without_grid.webp" alt="StaticEngine" width="320" align="left" hspace="12"></a>
+  <strong><a href="https://github.com/d4nilevi4/StaticEngine">StaticEngine</a></strong>，作者 <a href="https://github.com/d4nilevi4">@d4nilevi4</a>。受 Bevy 启发的实验性 C#/.NET 10 游戏引擎。技术栈：StaticEcs + Raylib-cs。
+  <br clear="left">
+</p>
 
 # 许可证
 [MIT license](https://github.com/Felid-Force-Studios/StaticEcs/blob/master/LICENSE.md)
