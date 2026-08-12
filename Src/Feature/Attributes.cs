@@ -4,7 +4,6 @@ namespace FFS.Libraries.StaticEcs {
 // required for codegen
     
 // Component types
-public class TagAttribute : Attribute { }
 public class CmpAttribute : Attribute { }
 public class MulAttribute : Attribute { }
 public class EvtAttribute : Attribute { }
