@@ -497,7 +497,20 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
                 #endif
-                
+                return HasUnchecked(entity);
+            }
+
+            #if FFS_ECS_DEBUG
+            [MethodImpl(NoInlining)]
+            private readonly void AccessFailed(Entity entity, [CallerMemberName] string method = "") {
+                AssertIsNotTag<T>(ComponentsTypeName, method);
+                AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity, method);
+                AssertEntityHasComponent<T>(ComponentsTypeName, entity, method);
+            }
+            #endif
+
+            [MethodImpl(AggressiveInlining)]
+            internal readonly bool HasUnchecked(Entity entity) {
                 var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
                 var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
                 var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
@@ -651,9 +664,7 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             public readonly ref T Ref(Entity entity) {
                 #if FFS_ECS_DEBUG
-                AssertIsNotTag<T>(ComponentsTypeName);
-                AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                AssertEntityHasComponent<T>(ComponentsTypeName, entity);
+                if (IsTag || !HasUnchecked(entity) || !Data.Instance.EntityIsLoaded(entity)) AccessFailed(entity);
                 #endif
 
                 var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
@@ -670,9 +681,7 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             public readonly ref readonly T Read(Entity entity) {
                 #if FFS_ECS_DEBUG
-                AssertIsNotTag<T>(ComponentsTypeName);
-                AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                AssertEntityHasComponent<T>(ComponentsTypeName, entity);
+                if (IsTag || !HasUnchecked(entity) || !Data.Instance.EntityIsLoaded(entity)) AccessFailed(entity);
                 #endif
 
                 var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;

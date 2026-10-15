@@ -306,73 +306,145 @@ namespace FFS.Libraries.StaticEcs {
         internal static readonly string WorldTypeName = $"World<{typeof(TWorld)}>"; 
         internal static readonly string EntityTypeName = $"World<{typeof(TWorld)}>.Entity"; 
 
+        [MethodImpl(AggressiveInlining)]
         internal static void Assert(string type, bool state, string message, [CallerMemberName] string method = "") {
+            if (!state) AssertFailed(type, state, message, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertFailed(string type, bool state, string message, string method) {
             if (!state) {
                 throw new StaticEcsException(type, method, message);
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertRegisteredEvent<T>(string type, [CallerMemberName] string method = "") where T : struct, IEvent {
+            if (!Events<T>.Instance.Initialized) AssertRegisteredEventFailed<T>(type, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertRegisteredEventFailed<T>(string type, string method) where T : struct, IEvent {
             if (!Events<T>.Instance.Initialized) {
                 throw new StaticEcsException(type, method, $"Event {typeof(T).GenericName()} is not registered.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertWorldIsInitialized(string type, [CallerMemberName] string method = "") {
+            if (Data.Instance.WorldStatus != WorldStatus.Initialized) AssertWorldIsInitializedFailed(type, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertWorldIsInitializedFailed(string type, string method) {
             if (Data.Instance.WorldStatus != WorldStatus.Initialized) {
                 throw new StaticEcsException(type, method, "World not initialized.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertWorldIsIndependent(string type, [CallerMemberName] string method = "") {
+            if (!IsIndependent) AssertWorldIsIndependentFailed(type, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertWorldIsIndependentFailed(string type, string method) {
             if (!IsIndependent) {
                 throw new StaticEcsException(type, method, "World not Independent.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertWorldIsDependent(string type, [CallerMemberName] string method = "") {
+            if (IsIndependent) AssertWorldIsDependentFailed(type, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertWorldIsDependentFailed(string type, string method) {
             if (IsIndependent) {
                 throw new StaticEcsException(type, method, "World not Dependent.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertWorldIsCreatedOrInitialized(string type, [CallerMemberName] string method = "") {
+            if (Data.Instance.WorldStatus != WorldStatus.Created && Data.Instance.WorldStatus != WorldStatus.Initialized) AssertWorldIsCreatedOrInitializedFailed(type, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertWorldIsCreatedOrInitializedFailed(string type, string method) {
             if (Data.Instance.WorldStatus != WorldStatus.Created && Data.Instance.WorldStatus != WorldStatus.Initialized) {
                 throw new StaticEcsException(type, method, "World not created or initialized.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertWorldIsCreated(string type, [CallerMemberName] string method = "") {
+            if (Data.Instance.WorldStatus != WorldStatus.Created) AssertWorldIsCreatedFailed(type, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertWorldIsCreatedFailed(string type, string method) {
             if (Data.Instance.WorldStatus != WorldStatus.Created) {
                 throw new StaticEcsException(type, method, "World not created.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertWorldIsNotCreated(string type, [CallerMemberName] string method = "") {
+            if (Data.Instance.WorldStatus != WorldStatus.NotCreated) AssertWorldIsNotCreatedFailed(type, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertWorldIsNotCreatedFailed(string type, string method) {
             if (Data.Instance.WorldStatus != WorldStatus.NotCreated) {
                 throw new StaticEcsException(type, method, "World already created.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertNotRegisteredComponent<T>(string type, [CallerMemberName] string method = "") where T : struct, IComponentOrTag {
+            if (Components<T>.instance.IsRegistered) AssertNotRegisteredComponentFailed<T>(type, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertNotRegisteredComponentFailed<T>(string type, string method) where T : struct, IComponentOrTag {
             if (Components<T>.instance.IsRegistered) {
                 throw new StaticEcsException(type, method, $"Component {typeof(T).GenericName()} already registered.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertIsTag<T>(string type, [CallerMemberName] string method = "") where T : struct, IComponentOrTag {
+            if (!Components<T>.Instance.IsTag) AssertIsTagFailed<T>(type, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertIsTagFailed<T>(string type, string method) where T : struct, IComponentOrTag {
             if (!Components<T>.Instance.IsTag) {
                 throw new StaticEcsException(type, method, $"Type {typeof(T).GenericName()} is not a tag.");
             }
         }
 
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertIsNotTag<T>(string type, [CallerMemberName] string method = "") where T : struct, IComponentOrTag {
+            if (Components<T>.Instance.IsTag) AssertIsNotTagFailed<T>(type, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertIsNotTagFailed<T>(string type, string method) where T : struct, IComponentOrTag {
             if (Components<T>.Instance.IsTag) {
                 throw new StaticEcsException(type, method, $"Type {typeof(T).GenericName()} is a tag, not a component.");
             }
         }
 
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertInternalSetValueIsDefault<T>(T value, string type, [CallerMemberName] string method = "") where T : struct, IComponentOrTag {
+            if (Components<T>.Instance.IsInternal && !System.Collections.Generic.EqualityComparer<T>.Default.Equals(value, default)) AssertInternalSetValueIsDefaultFailed<T>(value, type, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertInternalSetValueIsDefaultFailed<T>(T value, string type, string method) where T : struct, IComponentOrTag {
             if (Components<T>.Instance.IsInternal && !System.Collections.Generic.EqualityComparer<T>.Default.Equals(value, default)) {
                 throw new StaticEcsException(type, method,
                     $"Cannot Set non-default value of internal handle component {typeof(T).GenericName()}. "
@@ -383,20 +455,38 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
 
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertComponentDisableable<T>(string type, [CallerMemberName] string method = "") where T : struct, IComponentOrTag {
+            if (!Components<T>.Instance.HasDisable) AssertComponentDisableableFailed<T>(type, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertComponentDisableableFailed<T>(string type, string method) where T : struct, IComponentOrTag {
             if (!Components<T>.Instance.HasDisable) {
                 throw new StaticEcsException(type, method, $"Component {typeof(T).GenericName()} does not implement IDisableable.");
             }
         }
 
 
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertNotRegisteredEvent<T>(string type, [CallerMemberName] string method = "") where T : struct, IEvent {
+            if (Events<T>.Instance.Initialized) AssertNotRegisteredEventFailed<T>(type, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertNotRegisteredEventFailed<T>(string type, string method) where T : struct, IEvent {
             if (Events<T>.Instance.Initialized) {
                 throw new StaticEcsException(type, method, $"Event {typeof(T).GenericName()} already registered.");
             }
         }
 
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertEntityIsNotDestroyedAndLoaded(string type, Entity entity, [CallerMemberName] string method = "") {
+            if ((entity.IsDestroyed) || (!Data.Instance.EntityIsLoaded(entity))) AssertEntityIsNotDestroyedAndLoadedFailed(type, entity, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertEntityIsNotDestroyedAndLoadedFailed(string type, Entity entity, string method) {
             if (entity.IsDestroyed) {
                 throw new StaticEcsException(type, method, $"Cannot access destroyed {entity}.");
             }
@@ -405,97 +495,193 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertEntityIsLoaded(string type, Entity entity, [CallerMemberName] string method = "") {
+            if (!Data.Instance.EntityIsLoaded(entity)) AssertEntityIsLoadedFailed(type, entity, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertEntityIsLoadedFailed(string type, Entity entity, string method) {
             if (!Data.Instance.EntityIsLoaded(entity)) {
                 throw new StaticEcsException(type, method, $"Cannot access not loaded {entity}.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertEntityIsNotLoaded(string type, Entity entity, [CallerMemberName] string method = "") {
+            if (Data.Instance.EntityIsLoaded(entity)) AssertEntityIsNotLoadedFailed(type, entity, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertEntityIsNotLoadedFailed(string type, Entity entity, string method) {
             if (Data.Instance.EntityIsLoaded(entity)) {
                 throw new StaticEcsException(type, method, $"Cannot access loaded {entity}.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertEntityHasComponent<T>(string type, Entity entity, [CallerMemberName] string method = "") where T : struct, IComponentOrTag {
+            if (!Components<T>.Instance.HasUnchecked(entity)) AssertEntityHasComponentFailed<T>(type, entity, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertEntityHasComponentFailed<T>(string type, Entity entity, string method) where T : struct, IComponentOrTag {
             if (!Components<T>.Instance.Has(entity)) {
                 throw new StaticEcsException(type, method, $"Component `{typeof(T).GenericName()}` is missing on {entity}.");
             }
         }
 
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertEntityNotHasComponent<T>(string type, Entity entity, [CallerMemberName] string method = "") where T : struct, IComponentOrTag {
+            if (Components<T>.Instance.HasUnchecked(entity)) AssertEntityNotHasComponentFailed<T>(type, entity, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertEntityNotHasComponentFailed<T>(string type, Entity entity, string method) where T : struct, IComponentOrTag {
             if (Components<T>.Instance.Has(entity)) {
                 throw new StaticEcsException(type, method, $"Component `{typeof(T).GenericName()}` already exists on {entity}.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertNotBlockedByQuery(string type, Entity entity, int blocker, [CallerMemberName] string method = "") {
+            if (blocker > 0 && Data.Instance.IsNotCurrentQueryEntity(entity)) AssertNotBlockedByQueryFailed(type, entity, blocker, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertNotBlockedByQueryFailed(string type, Entity entity, int blocker, string method) {
             if (blocker > 0 && Data.Instance.IsNotCurrentQueryEntity(entity)) {
                 throw new StaticEcsException(type, method, $"Operation is blocked, it is forbidden to modify a non-current {entity} that belongs to the iteration snapshot in a {nameof(QueryMode)}{QueryMode.Strict} query (entities created mid-iteration or not matching the filter are allowed); use {nameof(QueryMode)}{QueryMode.Flexible} for entity-level destroy/disable/enable on other snapshot entities.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertSameQueryMode(string type, byte mode, [CallerMemberName] string method = "") {
+            if (Data.Instance.QueryMode != 0 && mode != Data.Instance.QueryMode) AssertSameQueryModeFailed(type, mode, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertSameQueryModeFailed(string type, byte mode, string method) {
             if (Data.Instance.QueryMode != 0 && mode != Data.Instance.QueryMode) {
                 throw new StaticEcsException(type, method, "Nested iterators must have the same QueryMode as the outer iterator");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertQueryNotActive(string type, [CallerMemberName] string method = "") {
+            if (Data.Instance.QueryDataCount != 0) AssertQueryNotActiveFailed(type, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertQueryNotActiveFailed(string type, string method) {
             if (Data.Instance.QueryDataCount != 0) {
                 throw new StaticEcsException(type, method, "Not available within the query");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertGidIsActive(string type, EntityGID gid, [CallerMemberName] string method = "") {
+            if (gid.Status<TWorld>() != GIDStatus.Active) AssertGidIsActiveFailed(type, gid, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertGidIsActiveFailed(string type, EntityGID gid, string method) {
             if (gid.Status<TWorld>() != GIDStatus.Active) {
                 throw new StaticEcsException(type, method, $"EntityGID ID: {gid.Id}, Version {gid.Version}, ClusterId {gid.ClusterId}. Not actual or not loaded.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertGidIsNotActive(string type, EntityGID gid, [CallerMemberName] string method = "") {
+            if (gid.Status<TWorld>() == GIDStatus.Active) AssertGidIsNotActiveFailed(type, gid, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertGidIsNotActiveFailed(string type, EntityGID gid, string method) {
             if (gid.Status<TWorld>() == GIDStatus.Active) {
                 throw new StaticEcsException(type, method, $"EntityGID ID: {gid.Id}, Version {gid.Version}, ClusterId {gid.ClusterId}. Already registered.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertGidIsNotLoaded(string type, EntityGID gid, [CallerMemberName] string method = "") {
+            if (gid.Status<TWorld>() != GIDStatus.NotLoaded) AssertGidIsNotLoadedFailed(type, gid, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertGidIsNotLoadedFailed(string type, EntityGID gid, string method) {
             if (gid.Status<TWorld>() != GIDStatus.NotLoaded) {
                 throw new StaticEcsException(type, method, $"EntityGID ID: {gid.Id}, Version {gid.Version}, ClusterId {gid.ClusterId}. Not actual or already loaded.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertClusterIsRegistered(string type, ushort clusterId, [CallerMemberName] string method = "") {
+            if (!Data.Instance.ClusterIsRegisteredInternal(clusterId)) AssertClusterIsRegisteredFailed(type, clusterId, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertClusterIsRegisteredFailed(string type, ushort clusterId, string method) {
             if (!Data.Instance.ClusterIsRegisteredInternal(clusterId)) {
                 throw new StaticEcsException(type, method, $"ClusterId {clusterId} not registered.");
             }
         }
 
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertEntityTypeIsRegistered(string type, byte entityType, [CallerMemberName] string method = "") {
+            if (!Data.Instance.EntityTypes[entityType].Registered) AssertEntityTypeIsRegisteredFailed(type, entityType, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertEntityTypeIsRegisteredFailed(string type, byte entityType, string method) {
             if (!Data.Instance.EntityTypes[entityType].Registered) {
                 throw new StaticEcsException(type, method, $"EntityType {entityType} not registered.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertClusterIsNotRegistered(string type, ushort clusterId, [CallerMemberName] string method = "") {
+            if (Data.Instance.ClusterIsRegisteredInternal(clusterId)) AssertClusterIsNotRegisteredFailed(type, clusterId, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertClusterIsNotRegisteredFailed(string type, ushort clusterId, string method) {
             if (Data.Instance.ClusterIsRegisteredInternal(clusterId)) {
                 throw new StaticEcsException(type, method, $"ClusterId {clusterId} already registered.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertChunkIsRegistered(string type, uint chunkIdx, [CallerMemberName] string method = "") {
+            if (!Data.Instance.ChunkIsRegisteredInternal(chunkIdx)) AssertChunkIsRegisteredFailed(type, chunkIdx, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertChunkIsRegisteredFailed(string type, uint chunkIdx, string method) {
             if (!Data.Instance.ChunkIsRegisteredInternal(chunkIdx)) {
                 throw new StaticEcsException(type, method, $"Chunk {chunkIdx} not registered.");
             }
         }
         
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertChunkIsNotRegistered(string type, uint chunkIdx, [CallerMemberName] string method = "") {
+            if (Data.Instance.ChunkIsRegisteredInternal(chunkIdx)) AssertChunkIsNotRegisteredFailed(type, chunkIdx, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertChunkIsNotRegisteredFailed(string type, uint chunkIdx, string method) {
             if (Data.Instance.ChunkIsRegisteredInternal(chunkIdx)) {
                 throw new StaticEcsException(type, method, $"Chunk {chunkIdx} already registered.");
             }
         }
 
+        [MethodImpl(AggressiveInlining)]
         internal static void AssertGuidNotEmpty(string type, Guid guid, string typeName, [CallerMemberName] string method = "") {
+            if (guid.Equals(Guid.Empty)) AssertGuidNotEmptyFailed(type, guid, typeName, method);
+        }
+
+        [MethodImpl(NoInlining)]
+        private static void AssertGuidNotEmptyFailed(string type, Guid guid, string typeName, string method) {
             if (guid.Equals(Guid.Empty)) {
                 throw new StaticEcsException(type, method, $"`{typeName}` GUID can't be empty. Set valid value or leave it uninitialized.");
             }
