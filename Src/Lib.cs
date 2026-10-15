@@ -20,7 +20,6 @@ using Unity.IL2CPP.CompilerServices;
 [assembly: InternalsVisibleTo("FFS.StaticEcs.Unity")]
 [assembly: InternalsVisibleTo("FFS.StaticEcs.Unity.Editor")]
 
-
 namespace FFS.Libraries.StaticEcs {
 
     /// <summary>
@@ -61,10 +60,6 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
     public unsafe struct Block<T> where T : unmanaged {
-        #if FFS_ECS_BURST
-        [Unity.Collections.LowLevel.Unsafe.NativeDisableUnsafePtrRestriction]
-        [Unity.Burst.NoAlias]
-        #endif
         public T* Ptr;
         #if FFS_ECS_DEBUG
         public uint Count;
@@ -94,10 +89,6 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
     public unsafe struct BlockR<T> where T : unmanaged {
-        #if FFS_ECS_BURST
-        [Unity.Collections.LowLevel.Unsafe.NativeDisableUnsafePtrRestriction]
-        [Unity.Burst.NoAlias]
-        #endif
         public readonly T* Ptr;
         #if FFS_ECS_DEBUG
         public uint Count;
@@ -466,7 +457,6 @@ namespace FFS.Libraries.StaticEcs {
                 throw new StaticEcsException(type, method, $"Component {typeof(T).GenericName()} does not implement IDisableable.");
             }
         }
-
 
         [MethodImpl(AggressiveInlining)]
         internal static void AssertNotRegisteredEvent<T>(string type, [CallerMemberName] string method = "") where T : struct, IEvent {

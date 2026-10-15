@@ -360,15 +360,6 @@ namespace FFS.Libraries.StaticEcs {
         public void Block<TWorld>(int val) where TWorld : struct, IWorldType;
         #endif
 
-        #if FFS_ECS_BURST
-        #if FFS_ECS_DEBUG
-        public void BurstBlock<TWorld>(int val) where TWorld : struct, IWorldType {} // TODO
-        #endif
-        
-        public ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType;
-
-        public ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType;
-        #endif
     }
 
     /// <summary>

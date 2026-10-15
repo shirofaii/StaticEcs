@@ -63,17 +63,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx);
-        }
-        #endif
     }
 
     /// <inheritdoc cref="All{T0}"/>
@@ -108,19 +97,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx);
-        }
-        #endif
     }
 
     /// <inheritdoc cref="All{T0}"/>
@@ -159,21 +135,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx);
-        }
-        #endif
     }
 
     /// <inheritdoc cref="All{T0}"/>
@@ -216,23 +177,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx);
-        }
-        #endif
     }
 
     /// <inheritdoc cref="All{T0}"/>
@@ -279,25 +223,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T4>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T4>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx);
-        }
-        #endif
     }
 
     /// <inheritdoc cref="All{T0}"/>
@@ -348,27 +273,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T4>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T5>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T4>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T5>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx);
-        }
-        #endif
     }
 
     /// <inheritdoc cref="All{T0}"/>
@@ -423,29 +327,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T4>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T5>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T6>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T4>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T5>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T6>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx);
-        }
-        #endif
     }
 
     /// <inheritdoc cref="All{T0}"/>
@@ -504,31 +385,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T4>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T5>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T6>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & BurstView<TWorld>.ComponentMasks<T7>.SharedValue.Data.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T4>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T5>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T6>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & BurstView<TWorld>.ComponentMasks<T7>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx);
-        }
-        #endif
     }
     #endregion
 
@@ -575,17 +431,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ~BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx);
-        }
-        #endif
     }
 
     /// <inheritdoc cref="None{T0}"/>
@@ -620,19 +465,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ~BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx);
-        }
-        #endif
     }
 
     /// <inheritdoc cref="None{T0}"/>
@@ -671,21 +503,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ~BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx);
-        }
-        #endif
     }
 
     /// <inheritdoc cref="None{T0}"/>
@@ -728,23 +545,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ~BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx);
-        }
-        #endif
     }
 
     /// <inheritdoc cref="None{T0}"/>
@@ -791,25 +591,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T4>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ~BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T4>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx);
-        }
-        #endif
     }
 
     /// <inheritdoc cref="None{T0}"/>
@@ -860,27 +641,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T4>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T5>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ~BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T4>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T5>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx);
-        }
-        #endif
     }
 
     /// <inheritdoc cref="None{T0}"/>
@@ -935,29 +695,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T4>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T5>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T6>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ~BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T4>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T5>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T6>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx);
-        }
-        #endif
     }
 
     /// <inheritdoc cref="None{T0}"/>
@@ -1016,31 +753,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T4>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T5>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T6>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~BurstView<TWorld>.ComponentMasks<T7>.SharedValue.Data.HeuristicChunks[chunkIdx].FullBlocks.Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ~BurstView<TWorld>.ComponentMasks<T0>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T1>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T2>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T3>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T4>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T5>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T6>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~BurstView<TWorld>.ComponentMasks<T7>.SharedValue.Data.EnabledMask(segmentIdx, segmentBlockIdx);
-        }
-        #endif
     }
     #endregion
 

@@ -44,17 +44,6 @@ namespace FFS.Libraries.StaticEcs {
         public void Block<TWorld>(int val) where TWorld : struct, IWorldType { }
         #endif
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Data.Instance.EntityTypes[World<TWorld>.EntityTypeInfo<T0>.Instance.Id].HeuristicChunks[chunkIdx].Value;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ulong.MaxValue;
-        }
-        #endif
     }
     #endregion
 

@@ -417,9 +417,6 @@ namespace FFS.Libraries.StaticEcs {
             internal readonly byte SegmentMaskLen;
             internal readonly T DefaultValue;
 
-            #if FFS_ECS_BURST
-            internal ComponentLifecycleHandle<T> LifecycleHandle;
-            #endif
             internal ulong[][] _chunkHeuristicWorldMask;
             internal readonly ulong[] _segmentsMaskCache;
             internal T[][] _componentsPool;
@@ -446,7 +443,6 @@ namespace FFS.Libraries.StaticEcs {
 
             private IPackArrayStrategy<T> _readWriteArrayStrategy;
             private IPackArrayStrategyResettable _resettableStrategy;
-
 
             /// <summary>
             /// Stable serialization identifier for this component type, as specified in
@@ -519,7 +515,6 @@ namespace FFS.Libraries.StaticEcs {
                 var maskSegment = EntitiesMaskSegments[segmentIdx];
                 return maskSegment != null && (maskSegment[segmentBlockIdx] & blockEntityMask) != 0;
             }
-
 
             /// <summary>
             /// Checks whether the entity has component <typeparamref name="T"/> in the disabled state.
@@ -688,7 +683,6 @@ namespace FFS.Libraries.StaticEcs {
                 return ref ComponentSegments[entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT][entityId & Const.ENTITIES_IN_SEGMENT_MASK];
             }
 
-
             /// <summary>
             /// Ensures entity has component <typeparamref name="T"/> and returns a mutable reference to it.
             /// If the component already exists, returns the existing value without modification and without
@@ -853,7 +847,6 @@ namespace FFS.Libraries.StaticEcs {
                 else if (HasOnDelete) {
                     CallOnDelete(ref component, entity, HookReason.Default);
                 }
-
 
                 component = value;
 
@@ -1536,9 +1529,6 @@ namespace FFS.Libraries.StaticEcs {
 
                         _segmentsPool[_segmentsPoolCount++] = maskSegment;
 
-                        #if FFS_ECS_BURST
-                        LifecycleHandle.OnSegmentPooled(segmentIdx);
-                        #endif
                     }
                 }
             }
@@ -1612,10 +1602,6 @@ namespace FFS.Libraries.StaticEcs {
                 _segmentsPool = null;
                 _chunkHeuristicWorldMaskLen = 0;
 
-                #if FFS_ECS_BURST
-                LifecycleHandle = default;
-                #endif
-
                 #if FFS_ECS_TRACE
                 Utils.Trace($"Registered {TypeName}:\n"
                             + $"IsTag {IsTag}\n"
@@ -1663,16 +1649,10 @@ namespace FFS.Libraries.StaticEcs {
                     component.OnInitialize<TWorld>();
                 }
                 
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnInitialize(segmentsCapacity);
-                #endif
             }
 
             [MethodImpl(AggressiveInlining)]
             internal void DestroyInternal() {
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnDestroy();
-                #endif
                 this = default;
             }
 
@@ -1716,9 +1696,6 @@ namespace FFS.Libraries.StaticEcs {
                 masks = null;
                 _segmentsPoolCount++;
 
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnSegmentPooled((uint)segIdx);
-                #endif
             }
 
             [MethodImpl(AggressiveInlining)]
@@ -1734,9 +1711,6 @@ namespace FFS.Libraries.StaticEcs {
                     Array.Resize(ref _componentsPool, (int)segmentsCapacity);
                 }
 
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnResize(segmentsCapacity);
-                #endif
             }
 
             [MethodImpl(AggressiveInlining)]
@@ -1796,9 +1770,6 @@ namespace FFS.Libraries.StaticEcs {
 
                     _segmentsPool[poolIdx] = null;
 
-                    #if FFS_ECS_BURST
-                    LifecycleHandle.OnSegmentCreated(segmentIdx, masks, comps, true);
-                    #endif
                     return (masks, comps);
                 }
 
@@ -1811,9 +1782,6 @@ namespace FFS.Libraries.StaticEcs {
 
                 masks = new ulong[SegmentMaskLen];
 
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnSegmentCreated(segmentIdx, masks, comps, false);
-                #endif
                 return (masks, comps);
             }
 
@@ -1829,9 +1797,6 @@ namespace FFS.Libraries.StaticEcs {
                 }
                 _segmentsPool[poolIdx] = maskSegment;
 
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnSegmentPooled(segmentIdx);
-                #endif
             }
 
             #region QUERY
@@ -1850,7 +1815,6 @@ namespace FFS.Libraries.StaticEcs {
                 var masks = EntitiesMaskSegments[segmentIdx];
                 return masks != null ? masks[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT] : 0UL;
             }
-
 
             [MethodImpl(AggressiveInlining)]
             internal readonly ulong AnyMask(uint segmentIdx, int segmentBlockIdx) {
@@ -2286,7 +2250,6 @@ namespace FFS.Libraries.StaticEcs {
                 }
             }
 
-
             [MethodImpl(AggressiveInlining)]
             internal static int _CalculateCapacity() => Instance.CalculateCapacity();
 
@@ -2535,41 +2498,4 @@ namespace FFS.Libraries.StaticEcs {
     #endregion
     
 
-    #if ENABLE_IL2CPP
-    [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
-    [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
-    #endif
-    [StructLayout(LayoutKind.Sequential)]
-    public unsafe struct ComponentLifecycleHandle<T> where T : struct {
-        public delegate*<uint, ulong[], T[], bool, void> _OnSegmentCreated;
-        public delegate*<uint, void> _OnSegmentPooled;
-        public delegate*<uint, void> _OnResize;
-        public delegate*<uint, void> _OnInitialize;
-        public delegate*<void> _OnDestroy;
-
-        [MethodImpl(AggressiveInlining)]
-        public void OnSegmentCreated(uint segmentIdx, ulong[] masks, T[] comps, bool fromPool) {
-            if (_OnSegmentCreated != null) _OnSegmentCreated(segmentIdx, masks, comps, fromPool);
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public void OnSegmentPooled(uint segmentIdx) {
-            if (_OnSegmentPooled != null) _OnSegmentPooled(segmentIdx);
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public void OnResize(uint newSegmentsCapacity) {
-            if (_OnResize != null) _OnResize(newSegmentsCapacity);
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public void OnInitialize(uint segmentsCapacity) {
-            if (_OnInitialize != null) _OnInitialize(segmentsCapacity);
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public void OnDestroy() {
-            if (_OnDestroy != null) _OnDestroy();
-        }
-    }
 }

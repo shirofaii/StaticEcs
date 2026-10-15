@@ -278,9 +278,6 @@ namespace FFS.Libraries.StaticEcs {
             private readonly ushort[] _versionEntitiesTemplate;
             internal readonly ulong[] SegmentsMaskCache;
             
-            #if FFS_ECS_BURST
-            internal WorldLifecycleHandle LifecycleHandle;
-            #endif
 
             // CHUNKS
             internal HeuristicChunk[] HeuristicChunks;
@@ -457,9 +454,6 @@ namespace FFS.Libraries.StaticEcs {
                 EntityTypeResetters = null;
                 EntityTypeResettersCount = 0;
 
-                #if FFS_ECS_BURST
-                LifecycleHandle = default;
-                #endif
                 
                 RegisterEntityTypeInternal<Default>();
             }
@@ -502,10 +496,6 @@ namespace FFS.Libraries.StaticEcs {
                         EntityTypes[i].HeuristicChunks = new ChunkMask[chunksCapacity];
                     }
                 }
-
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnInitialize(segmentsCapacity);
-                #endif
 
                 // CREATED TRACKING
 
@@ -562,10 +552,6 @@ namespace FFS.Libraries.StaticEcs {
                     _multiStorageResizers[i](segmentsCapacity);
                 }
 
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnResize(segmentsCapacity, oldSegmentsCapacity);
-                #endif
-
                 for (uint i = 0, iMax = _poolsCountComponents; i < iMax; i++) {
                     _poolsComponents[i].Resize(chunksCapacity, BitMaskComponents);
                 }
@@ -583,11 +569,6 @@ namespace FFS.Libraries.StaticEcs {
                 for (var i = 0; i < EntityTypeResettersCount; i++) {
                     EntityTypeResetters[i]();
                 }
-
-
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnDestroy();
-                #endif
 
                 Instance = default;
             }
@@ -639,9 +620,6 @@ namespace FFS.Libraries.StaticEcs {
                     cluster.LoadedChunksCount = 0;
                     cluster.Registered = false;
                     cluster.Disabled = false;
-                    #if FFS_ECS_BURST
-                    LifecycleHandle.OnClusterValuesChanged(ActiveClusters[i]);
-                    #endif
                 }
                 ActiveClustersCount = 0;
 
@@ -1081,22 +1059,13 @@ namespace FFS.Libraries.StaticEcs {
                     segmentIdx = chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT;
                     SetChunkSegmentsCluster(chunkIdx, clusterId, true);
                     EntitiesSegments[segmentIdx].EntityType = entityType;
-                    #if FFS_ECS_BURST
-                    LifecycleHandle.OnSegmentEntityTypeChanged(segmentIdx, entityType);
-                    #endif
                     cluster.FreeSegmentByType[entityType] = (int) segmentIdx;
                     if (cluster.ChunksCount == cluster.Chunks.Length) {
                         Array.Resize(ref cluster.Chunks, (int) (cluster.ChunksCount << 1));
                         Array.Resize(ref cluster.LoadedChunks, (int) (cluster.ChunksCount << 1));
-                        #if FFS_ECS_BURST
-                        LifecycleHandle.OnClusterArraysResized(clusterId);
-                        #endif
                     }
 
                     cluster.Chunks[cluster.ChunksCount++] = chunkIdx;
-                    #if FFS_ECS_BURST
-                    LifecycleHandle.OnClusterValuesChanged(clusterId);
-                    #endif
                 }
                 return true;
             }
@@ -1150,9 +1119,6 @@ namespace FFS.Libraries.StaticEcs {
                     ref var loaded = ref HeuristicLoadedChunks[chunkIdx];
                     if (loaded.Value == 0) {
                         cluster.LoadedChunks[cluster.LoadedChunksCount++] = chunkIdx;
-                        #if FFS_ECS_BURST
-                        LifecycleHandle.OnClusterValuesChanged(clusterId);
-                        #endif
                     }
                     loaded.Value |= chunkBlockMask;
                     EntityTypes[entityType].HeuristicChunks[chunkIdx].Value |= chunkBlockMask;
@@ -1269,15 +1235,9 @@ namespace FFS.Libraries.StaticEcs {
                     heuristic.NotEmptyBlocks.Value |= chunkBlockMask;
                     heuristic.UsedSegmentsMask |= (ushort)(1 << (chunkBlockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT));
                     segment.EntityType = entityType;
-                    #if FFS_ECS_BURST
-                    LifecycleHandle.OnSegmentEntityTypeChanged(segmentIdx, entityType);
-                    #endif
                     ref var loaded = ref HeuristicLoadedChunks[chunkIdx];
                     if (loaded.Value == 0) {
                         Clusters[segment.ClusterId].LoadedChunks[Clusters[segment.ClusterId].LoadedChunksCount++] = chunkIdx;
-                        #if FFS_ECS_BURST
-                        LifecycleHandle.OnClusterValuesChanged(segment.ClusterId);
-                        #endif
                     }
                     loaded.Value |= chunkBlockMask;
                     EntityTypes[entityType].HeuristicChunks[chunkIdx].Value |= chunkBlockMask;
@@ -1361,9 +1321,6 @@ namespace FFS.Libraries.StaticEcs {
                 }
                 #endif
                 segment.EntityType = entityType;
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnSegmentEntityTypeChanged(segmentIdx, entityType);
-                #endif
                 ref var entitiesMask = ref segment.Masks[segmentBlockIdx];
                 if (entitiesMask == 0) {
                     var chunkBlockMask = 1UL << chunkBlockIdx;
@@ -1373,9 +1330,6 @@ namespace FFS.Libraries.StaticEcs {
                     if (loaded.Value == 0) {
                         ref var cluster = ref Clusters[gid.ClusterId];
                         cluster.LoadedChunks[cluster.LoadedChunksCount++] = chunkIdx;
-                        #if FFS_ECS_BURST
-                        LifecycleHandle.OnClusterValuesChanged(gid.ClusterId);
-                        #endif
                     }
                     loaded.Value |= chunkBlockMask;
                     EntityTypes[entityType].HeuristicChunks[chunkIdx].Value |= chunkBlockMask;
@@ -1444,9 +1398,6 @@ namespace FFS.Libraries.StaticEcs {
                     ref var loaded = ref HeuristicLoadedChunks[chunkIdx];
                     if (loaded.Value == 0) {
                         cluster.LoadedChunks[cluster.LoadedChunksCount++] = chunkIdx;
-                        #if FFS_ECS_BURST
-                        LifecycleHandle.OnClusterValuesChanged(clusterId);
-                        #endif
                     }
                     loaded.Value |= chunkBlockMask;
                     EntityTypes[entityType].HeuristicChunks[chunkIdx].Value |= chunkBlockMask;
@@ -1604,9 +1555,6 @@ namespace FFS.Libraries.StaticEcs {
                 if (loaded.Value == 0) {
                     ref var cluster = ref Clusters[gid.ClusterId];
                     cluster.LoadedChunks[cluster.LoadedChunksCount++] = chunkIdx;
-                    #if FFS_ECS_BURST
-                    LifecycleHandle.OnClusterValuesChanged(gid.ClusterId);
-                    #endif
                 }
 
                 ref var masks = ref segment.Masks[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT * 2];  // Loaded entities mask
@@ -1987,9 +1935,6 @@ namespace FFS.Libraries.StaticEcs {
                         seg.EntityType = EntitiesSegment.NoEntityType;
                     }
                 }
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnSetChunkSegmentsCluster(chunkIdx, clusterId, selfOwner);
-                #endif
             }
             #endregion
 
@@ -2015,10 +1960,6 @@ namespace FFS.Libraries.StaticEcs {
                 Clusters[clusterId].Registered = true;
                 ActiveClusters[ActiveClustersCount++] = clusterId;
 
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnClusterRegistered(clusterId);
-                LifecycleHandle.OnActiveClustersChanged();
-                #endif
             }
             
             [MethodImpl(AggressiveInlining)]
@@ -2035,9 +1976,6 @@ namespace FFS.Libraries.StaticEcs {
 
                 Array.Resize(ref Clusters, newClustersCapacity);
                 Array.Resize(ref ActiveClusters, newClustersCapacity);
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnActiveClustersChanged();
-                #endif
 
                 for (var i = oldClustersCapacity; i < newClustersCapacity; i++) {
                     ref var cluster = ref Clusters[i];
@@ -2060,9 +1998,6 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
 
                 Clusters[clusterId].Disabled = !active;
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnClusterValuesChanged(clusterId);
-                #endif
             }
 
             [MethodImpl(AggressiveInlining)]
@@ -2112,18 +2047,12 @@ namespace FFS.Libraries.StaticEcs {
                             break;
                         }
                     }
-                    #if FFS_ECS_BURST
-                    LifecycleHandle.OnActiveClustersChanged();
-                    #endif
 
                     Array.Fill(cluster.FreeSegmentByType, EntitiesSegment.Invalid);
                     cluster.ChunksCount = 0;
                     cluster.LoadedChunksCount = 0;
                     cluster.Registered = false;
                     cluster.Disabled = false;
-                    #if FFS_ECS_BURST
-                    LifecycleHandle.OnClusterValuesChanged(clusterId);
-                    #endif
                     return true;
                 }
 
@@ -2188,15 +2117,9 @@ namespace FFS.Libraries.StaticEcs {
                 if (cluster.ChunksCount == cluster.Chunks.Length) {
                     Array.Resize(ref cluster.Chunks, (int) (cluster.ChunksCount << 1));
                     Array.Resize(ref cluster.LoadedChunks, (int) (cluster.ChunksCount << 1));
-                    #if FFS_ECS_BURST
-                    LifecycleHandle.OnClusterArraysResized(clusterId);
-                    #endif
                 }
 
                 cluster.Chunks[cluster.ChunksCount++] = chunkIdx;
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnClusterValuesChanged(clusterId);
-                #endif
                 if (selfOwner) {
                     RemoveFromSelfFreeChunks(chunkIdx);
                 }
@@ -2272,17 +2195,11 @@ namespace FFS.Libraries.StaticEcs {
                 if (cluster.ChunksCount == cluster.Chunks.Length) {
                     Array.Resize(ref cluster.Chunks, (int) (cluster.ChunksCount << 1));
                     Array.Resize(ref cluster.LoadedChunks, (int) (cluster.ChunksCount << 1));
-                    #if FFS_ECS_BURST
-                    LifecycleHandle.OnClusterArraysResized(clusterId);
-                    #endif
                 }
                 cluster.Chunks[cluster.ChunksCount++] = chunkIdx;
                 if (HeuristicLoadedChunks[chunkIdx].Value != 0) {
                     cluster.LoadedChunks[cluster.LoadedChunksCount++] = chunkIdx;
                 }
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnClusterValuesChanged(clusterId);
-                #endif
             }
 
             [MethodImpl(AggressiveInlining)]
@@ -2315,9 +2232,6 @@ namespace FFS.Libraries.StaticEcs {
                 HeuristicLoadedChunks[chunkIdx].Value = HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
 
                 cluster.LoadedChunks[cluster.LoadedChunksCount++] = chunkIdx;
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnClusterValuesChanged(EntitiesSegments[baseSegmentIdx].ClusterId);
-                #endif
             }
 
             [MethodImpl(AggressiveInlining)]
@@ -2388,9 +2302,6 @@ namespace FFS.Libraries.StaticEcs {
                     if (cluster.Chunks[i] == chunkIdx) {
                         cluster.Chunks[i] = cluster.Chunks[--cluster.ChunksCount];
                         InvalidateFreeSegmentsForChunk(ref cluster, chunkIdx);
-                        #if FFS_ECS_BURST
-                        LifecycleHandle.OnClusterValuesChanged(clusterId);
-                        #endif
                         return;
                     }
                 }
@@ -2402,9 +2313,6 @@ namespace FFS.Libraries.StaticEcs {
                 for (var i = (int) cluster.LoadedChunksCount - 1; i >= 0; i--) {
                     if (cluster.LoadedChunks[i] == chunkIdx) {
                         cluster.LoadedChunks[i] = cluster.LoadedChunks[--cluster.LoadedChunksCount];
-                        #if FFS_ECS_BURST
-                        LifecycleHandle.OnClusterValuesChanged(clusterId);
-                        #endif
                         break;
                     }
                 }
@@ -2444,9 +2352,6 @@ namespace FFS.Libraries.StaticEcs {
 
                 if (emptySegment != uint.MaxValue) {
                     EntitiesSegments[emptySegment].EntityType = entityType;
-                    #if FFS_ECS_BURST
-                    LifecycleHandle.OnSegmentEntityTypeChanged(emptySegment, entityType);
-                    #endif
                     cluster.FreeSegmentByType[entityType] = (int) emptySegment;
                 }
             }
@@ -2603,9 +2508,6 @@ namespace FFS.Libraries.StaticEcs {
                     if (chunksClusterCapacity > cluster.Chunks.Length) {
                         Array.Resize(ref cluster.Chunks, chunksClusterCapacity);
                         Array.Resize(ref cluster.LoadedChunks, chunksClusterCapacity);
-                        #if FFS_ECS_BURST
-                        LifecycleHandle.OnClusterArraysResized(clusterId);
-                        #endif
                     }
 
                     cluster.Disabled = disabled;
@@ -2621,9 +2523,6 @@ namespace FFS.Libraries.StaticEcs {
                         }
                     }
 
-                    #if FFS_ECS_BURST
-                    LifecycleHandle.OnClusterValuesChanged(clusterId);
-                    #endif
                     RebuildFreeSegmentCacheForCluster(ref cluster);
                 }
 
@@ -2720,9 +2619,6 @@ namespace FFS.Libraries.StaticEcs {
                     reader.ReadArrayUnmanaged(ref usedSegment.Versions);
                     var entityType = reader.ReadUshort();
                     usedSegment.EntityType = entityType;
-                    #if FFS_ECS_BURST
-                    LifecycleHandle.OnSegmentEntityTypeChanged((uint)(baseSegmentIdx + segmentInChunk), entityType);
-                    #endif
                 }
 
                 for (var s = 0; s < Const.SEGMENTS_IN_CHUNK; s++) {
@@ -3443,7 +3339,6 @@ namespace FFS.Libraries.StaticEcs {
         internal static ReadOnlySpan<ComponentsHandle> _GetAllComponentsHandles() => Data.Instance.GetAllComponentsHandles();
         #endregion
 
-
         #region EVENTS
         [MethodImpl(AggressiveInlining)]
         internal static bool _TryGetEventsHandle(Type type, out EventsHandle pool) {
@@ -3583,62 +3478,4 @@ namespace FFS.Libraries.StaticEcs {
         }
     }
 
-    public unsafe struct WorldLifecycleHandle {
-        // ReSharper disable InconsistentNaming
-        public delegate*<uint, void> _OnInitialize;                            // segmentsCapacity
-        public delegate*<uint, int, void> _OnResize;                           // newSegmentsCapacity, oldSegmentsCapacity
-        public delegate*<void> _OnDestroy;
-        public delegate*<int, void> _OnClusterRegistered;                      // clusterId
-        public delegate*<uint, int, bool, void> _OnSetChunkSegmentsCluster;    // chunkIdx, clusterId, selfOwner
-        public delegate*<uint, ushort, void> _OnSegmentEntityTypeChanged;        // segmentIdx, entityType
-        public delegate*<int, void> _OnClusterValuesChanged;                   // clusterId
-        public delegate*<int, void> _OnClusterArraysResized;                   // clusterId
-        public delegate*<void> _OnActiveClustersChanged;
-        // ReSharper restore InconsistentNaming
-
-        [MethodImpl(AggressiveInlining)]
-        public readonly void OnInitialize(uint segmentsCapacity) {
-            if (_OnInitialize != null) _OnInitialize(segmentsCapacity);
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public readonly void OnResize(uint newSegmentsCapacity, int oldSegmentsCapacity) {
-            if (_OnResize != null) _OnResize(newSegmentsCapacity, oldSegmentsCapacity);
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public readonly void OnDestroy() {
-            if (_OnDestroy != null) _OnDestroy();
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public readonly void OnClusterRegistered(int clusterId) {
-            if (_OnClusterRegistered != null) _OnClusterRegistered(clusterId);
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public readonly void OnSetChunkSegmentsCluster(uint chunkIdx, int clusterId, bool selfOwner) {
-            if (_OnSetChunkSegmentsCluster != null) _OnSetChunkSegmentsCluster(chunkIdx, clusterId, selfOwner);
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public readonly void OnSegmentEntityTypeChanged(uint segmentIdx, ushort entityType) {
-            if (_OnSegmentEntityTypeChanged != null) _OnSegmentEntityTypeChanged(segmentIdx, entityType);
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public readonly void OnClusterValuesChanged(int clusterId) {
-            if (_OnClusterValuesChanged != null) _OnClusterValuesChanged(clusterId);
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public readonly void OnClusterArraysResized(int clusterId) {
-            if (_OnClusterArraysResized != null) _OnClusterArraysResized(clusterId);
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public readonly void OnActiveClustersChanged() {
-            if (_OnActiveClustersChanged != null) _OnActiveClustersChanged();
-        }
-    }
 }

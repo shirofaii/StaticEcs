@@ -31,14 +31,6 @@ namespace FFS.Libraries.StaticEcs {
         [MethodImpl(AggressiveInlining)]
         public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType { return ulong.MaxValue; }
 
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType { return ulong.MaxValue; }
-
-        [MethodImpl(AggressiveInlining)]
-        public ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType { return ulong.MaxValue; }
-        #endif
-
         #if FFS_ECS_DEBUG
         /// <inheritdoc/>
         public void Assert<TWorld>() where TWorld : struct, IWorldType { }
@@ -93,20 +85,6 @@ namespace FFS.Libraries.StaticEcs {
             return _filter0.FilterEntities<TWorld>(segmentIdx, segmentBlockIdx)
                  & _filter1.FilterEntities<TWorld>(segmentIdx, segmentBlockIdx);
         }
-
-        #if FFS_ECS_BURST
-        [MethodImpl(AggressiveInlining)]
-        public ulong BurstFilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return _filter0.BurstFilterChunk<TWorld>(chunkIdx)
-                 & _filter1.BurstFilterChunk<TWorld>(chunkIdx);
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public ulong BurstFilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return _filter0.BurstFilterEntities<TWorld>(segmentIdx, segmentBlockIdx)
-                 & _filter1.BurstFilterEntities<TWorld>(segmentIdx, segmentBlockIdx);
-        }
-        #endif
 
         #if FFS_ECS_DEBUG
         /// <inheritdoc/>
