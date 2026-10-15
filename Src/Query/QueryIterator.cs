@@ -59,10 +59,6 @@ namespace FFS.Libraries.StaticEcs {
         [MethodImpl(AggressiveInlining)]
         [SuppressMessage("ReSharper", "PossibleNullReferenceException")]
         public QueryFlexibleIterator(ReadOnlySpan<ushort> clusters, TFilter filter, EntityStatusType entities) {
-            #if FFS_ECS_DEBUG
-            World<TWorld>.AssertNotNestedParallelQuery(World<TWorld>.WorldTypeName);
-            #endif
-
             _entities = entities;
             _current = default;
             _query = World<TWorld>.Query(filter);
@@ -73,10 +69,6 @@ namespace FFS.Libraries.StaticEcs {
         [MethodImpl(AggressiveInlining)]
         [SuppressMessage("ReSharper", "PossibleNullReferenceException")]
         internal QueryFlexibleIterator(ReadOnlySpan<uint> chunks, TFilter filter, EntityStatusType entities) {
-            #if FFS_ECS_DEBUG
-            World<TWorld>.AssertNotNestedParallelQuery(World<TWorld>.WorldTypeName);
-            #endif
-
             _entities = entities;
             _current = default;
             _query = World<TWorld>.Query(filter);
@@ -193,10 +185,6 @@ namespace FFS.Libraries.StaticEcs {
         [MethodImpl(AggressiveInlining)]
         [SuppressMessage("ReSharper", "PossibleNullReferenceException")]
         public QueryStrictIterator(ReadOnlySpan<ushort> clusters, TFilter filter, EntityStatusType entities) {
-            #if FFS_ECS_DEBUG
-            World<TWorld>.AssertNotNestedParallelQuery(World<TWorld>.WorldTypeName);
-            #endif
-
             _entities = entities;
             _current = default;
             _query = World<TWorld>.Query(filter);
@@ -209,10 +197,6 @@ namespace FFS.Libraries.StaticEcs {
         [MethodImpl(AggressiveInlining)]
         [SuppressMessage("ReSharper", "PossibleNullReferenceException")]
         internal QueryStrictIterator(ReadOnlySpan<uint> chunks, TFilter filter, EntityStatusType entities) {
-            #if FFS_ECS_DEBUG
-            World<TWorld>.AssertNotNestedParallelQuery(World<TWorld>.WorldTypeName);
-            #endif
-
             _entities = entities;
             _current = default;
             _query = World<TWorld>.Query(filter);

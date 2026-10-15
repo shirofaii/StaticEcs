@@ -104,8 +104,8 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
     public struct HeuristicChunk {
-        internal AtomicMask NotEmptyBlocks;
-        internal AtomicMask FullBlocks;
+        internal ChunkMask NotEmptyBlocks;
+        internal ChunkMask FullBlocks;
         internal ushort UsedSegmentsMask;
     }
     #endregion
@@ -284,7 +284,7 @@ namespace FFS.Libraries.StaticEcs {
 
             // CHUNKS
             internal HeuristicChunk[] HeuristicChunks;
-            internal AtomicMask[] HeuristicLoadedChunks;
+            internal ChunkMask[] HeuristicLoadedChunks;
             internal EntitiesSegment[] EntitiesSegments;
             private uint[] _selfFreeChunks;
             private int _selfFreeChunksCount;
@@ -340,9 +340,8 @@ namespace FFS.Libraries.StaticEcs {
             private int _blockerDisable;
             private int _blockerEnable;
             internal byte QueryMode; // 0 - None, 1 - Strict, 2 - Flexible
-            private (uint, uint)[] _currentEntitiesRangeMainThread;
-            [ThreadStatic] private static (uint, uint)[] _currentEntitiesRangeOtherThread;
-            private QueryData[] _activeQueryDataMainThread;
+            private (uint, uint)[] _currentEntitiesRange;
+            private QueryData[] _activeQueryData;
             #endif
 
             // CONFIG
@@ -353,7 +352,6 @@ namespace FFS.Libraries.StaticEcs {
 
             // STATE
             internal WorldStatus WorldStatus;
-            internal volatile bool MultiThreadActive;
             #endregion
 
             #region BASE
@@ -396,10 +394,9 @@ namespace FFS.Libraries.StaticEcs {
                 _blockerDestroy = 0;
                 _blockerDisable = 0;
                 _blockerEnable = 0;
-                _activeQueryDataMainThread = null;
+                _activeQueryData = null;
                 #endif
                 
-                MultiThreadActive = false;
                 WorldStatus = WorldStatus.Created;
                 
                 if (!BinaryPack.IsRegistered<EntityGID>()) {
@@ -444,7 +441,7 @@ namespace FFS.Libraries.StaticEcs {
                 _selfFreeChunksCount = default;
                 
                 #if FFS_ECS_DEBUG
-                _currentEntitiesRangeMainThread = null;
+                _currentEntitiesRange = null;
                 EventListener = null;
                 #endif
                 
@@ -474,7 +471,7 @@ namespace FFS.Libraries.StaticEcs {
                 // SEGMENTS
                 EntitiesSegments = new EntitiesSegment[segmentsCapacity];
                 HeuristicChunks = new HeuristicChunk[chunksCapacity];
-                HeuristicLoadedChunks = new AtomicMask[chunksCapacity];
+                HeuristicLoadedChunks = new ChunkMask[chunksCapacity];
                 for (var i = (int) segmentsCapacity - 1; i >= 0; i--) {
                     ref var segment = ref EntitiesSegments[i];
                     FillEntitiesVersions(ref segment.Versions);
@@ -502,7 +499,7 @@ namespace FFS.Libraries.StaticEcs {
                 // ENTITY TYPES
                 for (var i = 0; i < 256; i++) {
                     if (EntityTypes[i].Registered) {
-                        EntityTypes[i].HeuristicChunks = new AtomicMask[chunksCapacity];
+                        EntityTypes[i].HeuristicChunks = new ChunkMask[chunksCapacity];
                     }
                 }
 
@@ -1025,7 +1022,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void CreateEntityWithOnCreate(byte entityType, ushort clusterId, out Entity entity) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertMultiThreadNotActive(EntityTypeName);
                 AssertClusterIsRegistered(EntityTypeName, clusterId);
                 AssertEntityTypeIsRegistered(EntityTypeName, entityType);
                 #endif
@@ -1042,7 +1038,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void CreateEntity<TEntityType>(TEntityType entityType, ushort clusterId, out Entity entity) where TEntityType : struct, IEntityType {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertMultiThreadNotActive(EntityTypeName);
                 AssertClusterIsRegistered(EntityTypeName, clusterId);
                 AssertEntityTypeIsRegistered(EntityTypeName, EntityTypeInfo<TEntityType>.Instance.Id);
                 #endif
@@ -1059,7 +1054,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void CreateEntity(byte entityType, ushort clusterId, out Entity entity) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertMultiThreadNotActive(EntityTypeName);
                 AssertClusterIsRegistered(EntityTypeName, clusterId);
                 AssertEntityTypeIsRegistered(EntityTypeName, entityType);
                 #endif
@@ -1124,7 +1118,6 @@ namespace FFS.Libraries.StaticEcs {
             internal bool TryCreateEntity(byte entityType, ushort clusterId, out Entity entity) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertMultiThreadNotActive(EntityTypeName);
                 AssertClusterIsRegistered(EntityTypeName, clusterId);
                 AssertEntityTypeIsRegistered(EntityTypeName, entityType);
                 #endif
@@ -1185,7 +1178,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void CreateEntity(byte entityType, uint chunkIdx, out Entity entity) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertMultiThreadNotActive(EntityTypeName);
                 AssertChunkIsRegistered(EntityTypeName, chunkIdx);
                 AssertEntityTypeIsRegistered(EntityTypeName, entityType);
                 #endif
@@ -1198,7 +1190,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void CreateEntity<TEntityType>(TEntityType entityType, uint chunkIdx, out Entity entity) where TEntityType : struct, IEntityType {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertMultiThreadNotActive(EntityTypeName);
                 AssertChunkIsRegistered(EntityTypeName, chunkIdx);
                 AssertEntityTypeIsRegistered(EntityTypeName, EntityTypeInfo<TEntityType>.Instance.Id);
                 #endif
@@ -1215,7 +1206,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void CreateEntityWithOnCreate(byte entityType, uint chunkIdx, out Entity entity) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertMultiThreadNotActive(EntityTypeName);
                 AssertChunkIsRegistered(EntityTypeName, chunkIdx);
                 AssertEntityTypeIsRegistered(EntityTypeName, entityType);
                 #endif
@@ -1245,7 +1235,6 @@ namespace FFS.Libraries.StaticEcs {
             internal bool TryCreateEntity(byte entityType, uint chunkIdx, out Entity entity) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertMultiThreadNotActive(EntityTypeName);
                 AssertChunkIsRegistered(EntityTypeName, chunkIdx);
                 AssertEntityTypeIsRegistered(EntityTypeName, entityType);
                 Assert(EntityTypeName, EntitiesSegments[chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT].SelfOwner, $"Chunk {chunkIdx} has the ownership type Other");
@@ -1334,7 +1323,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void CreateEntity(byte entityType, EntityGID gid, out Entity entity) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertMultiThreadNotActive(EntityTypeName);
                 AssertEntityTypeIsRegistered(EntityTypeName, entityType);
                 #endif
 
@@ -1415,7 +1403,6 @@ namespace FFS.Libraries.StaticEcs {
             internal uint CreateEntitiesBatch(byte entityType, ushort clusterId, uint count, out ulong newEntitiesMask, out uint segmentIdx, out byte segmentBlockIdx) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertMultiThreadNotActive(EntityTypeName);
                 AssertClusterIsRegistered(EntityTypeName, clusterId);
                 AssertEntityTypeIsRegistered(EntityTypeName, entityType);
                 #endif
@@ -1560,7 +1547,6 @@ namespace FFS.Libraries.StaticEcs {
                 AssertWorldIsInitialized(EntityTypeName);
                 AssertEntityIsNotDestroyedAndLoaded(EntityTypeName, entity);
                 AssertNotBlockedByQuery(EntityTypeName, entity, _blockerDisable);
-                AssertNotBlockedByParallelQuery(EntityTypeName, entity);
                 #endif
                 
                 var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
@@ -1579,7 +1565,6 @@ namespace FFS.Libraries.StaticEcs {
                 AssertWorldIsInitialized(EntityTypeName);
                 AssertEntityIsNotDestroyedAndLoaded(EntityTypeName, entity);
                 AssertNotBlockedByQuery(EntityTypeName, entity, _blockerEnable);
-                AssertNotBlockedByParallelQuery(EntityTypeName, entity);
                 #endif
                 
                 var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
@@ -1596,7 +1581,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void LoadEntity(EntityGID gid, out Entity entity) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertMultiThreadNotActive(EntityTypeName);
                 AssertGidIsNotLoaded(EntityTypeName, gid);
                 #endif
 
@@ -1637,9 +1621,7 @@ namespace FFS.Libraries.StaticEcs {
             internal void UnloadEntity(Entity entity) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertMultiThreadNotActive(EntityTypeName);
                 AssertEntityIsNotDestroyedAndLoaded(EntityTypeName, entity);
-                AssertNotBlockedByParallelQuery(EntityTypeName, entity);
                 #endif
                 
                 var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
@@ -1685,7 +1667,6 @@ namespace FFS.Libraries.StaticEcs {
             internal bool DestroyEntity(Entity entity, HookReason reason = HookReason.Default) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertNotBlockedByParallelQuery(EntityTypeName, entity);
                 AssertNotBlockedByQuery(EntityTypeName, entity, _blockerDestroy);
                 #endif
 
@@ -1755,7 +1736,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void DestroyEntitiesBatch(QueryData queryData, int nextGlobalBlockIdx, HookReason reason = HookReason.Default) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertMultiThreadNotActive(EntityTypeName);
                 #endif
 
                 while (nextGlobalBlockIdx >= 0) {
@@ -1775,7 +1755,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void DestroyEntitiesBatch(ulong entitiesMaskFilter, uint segmentIdx, byte segmentBlockIdx, HookReason reason = HookReason.Default) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertMultiThreadNotActive(EntityTypeName);
                 #endif
 
                 if (entitiesMaskFilter == 0) {
@@ -1883,7 +1862,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void UnloadEntitiesBatch(QueryData queryData, int nextGlobalBlockIdx) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertMultiThreadNotActive(EntityTypeName);
                 #endif
 
                 while (nextGlobalBlockIdx >= 0) {
@@ -1903,7 +1881,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void UnloadEntitiesBatch(ulong entitiesMaskFilter, uint segmentIdx, byte segmentBlockIdx) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(EntityTypeName);
-                AssertMultiThreadNotActive(EntityTypeName);
                 #endif
 
                 if (entitiesMaskFilter == 0) {
@@ -2029,7 +2006,6 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsCreatedOrInitialized(WorldTypeName);
                 AssertClusterIsNotRegistered(WorldTypeName, clusterId);
-                AssertMultiThreadNotActive(WorldTypeName);
                 #endif
                 
                 if (clusterId >= Clusters.Length) {
@@ -2079,7 +2055,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void SetActiveClusterInternal(ushort clusterId, bool active) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(WorldTypeName);
-                AssertMultiThreadNotActive(WorldTypeName);
                 AssertQueryNotActive(WorldTypeName);
                 AssertClusterIsRegistered(WorldTypeName, clusterId);
                 #endif
@@ -2094,7 +2069,6 @@ namespace FFS.Libraries.StaticEcs {
             internal readonly bool ClusterIsActiveInternal(ushort clusterId) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(WorldTypeName);
-                AssertMultiThreadNotActive(WorldTypeName);
                 AssertQueryNotActive(WorldTypeName);
                 AssertClusterIsRegistered(WorldTypeName, clusterId);
                 #endif
@@ -2106,7 +2080,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void FreeClusterInternal(ushort clusterId) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(WorldTypeName);
-                AssertMultiThreadNotActive(WorldTypeName);
                 AssertQueryNotActive(WorldTypeName);
                 #endif
 
@@ -2119,7 +2092,6 @@ namespace FFS.Libraries.StaticEcs {
             internal bool TryFreeClusterInternal(ushort clusterId) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(WorldTypeName);
-                AssertMultiThreadNotActive(WorldTypeName);
                 AssertQueryNotActive(WorldTypeName);
                 #endif
 
@@ -2243,7 +2215,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void FreeChunkInternal(uint chunkIdx) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(WorldTypeName);
-                AssertMultiThreadNotActive(WorldTypeName);
                 AssertQueryNotActive(WorldTypeName);
                 #endif
                 
@@ -2272,7 +2243,6 @@ namespace FFS.Libraries.StaticEcs {
             public readonly ushort GetChunkClusterIdInternal(uint chunkIdx) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsCreatedOrInitialized(WorldTypeName);
-                AssertMultiThreadNotActive(WorldTypeName);
                 AssertChunkIsRegistered(WorldTypeName, chunkIdx);
                 #endif
 
@@ -2283,7 +2253,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void ChangeChunkClusterInternal(uint chunkIdx, ushort clusterId) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsCreatedOrInitialized(WorldTypeName);
-                AssertMultiThreadNotActive(WorldTypeName);
                 AssertChunkIsRegistered(WorldTypeName, chunkIdx);
                 AssertClusterIsRegistered(WorldTypeName, clusterId);
                 #endif
@@ -2355,7 +2324,6 @@ namespace FFS.Libraries.StaticEcs {
             internal void ChangeChunkOwnerInternal(uint chunkIdx, ChunkOwnerType owner) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsCreatedOrInitialized(WorldTypeName);
-                AssertMultiThreadNotActive(WorldTypeName);
                 AssertChunkIsRegistered(WorldTypeName, chunkIdx);
                 #endif
                 var baseSegmentIdx = chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT;
@@ -2376,7 +2344,6 @@ namespace FFS.Libraries.StaticEcs {
             internal readonly ChunkOwnerType GetChunkOwnerType(uint chunkIdx) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsCreatedOrInitialized(WorldTypeName);
-                AssertMultiThreadNotActive(WorldTypeName);
                 AssertChunkIsRegistered(WorldTypeName, chunkIdx);
                 #endif
                 return EntitiesSegments[chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT].SelfOwner ? ChunkOwnerType.Self : ChunkOwnerType.Other;
@@ -2386,7 +2353,6 @@ namespace FFS.Libraries.StaticEcs {
             internal EntitiesChunkInfo FindNextSelfFreeChunkInternal() {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsCreatedOrInitialized(WorldTypeName);
-                AssertMultiThreadNotActive(WorldTypeName);
                 #endif
                 
                 if (!TryFindNextSelfFreeChunkInternal(out var chunkInfo)) {
@@ -2400,7 +2366,6 @@ namespace FFS.Libraries.StaticEcs {
             internal bool TryFindNextSelfFreeChunkInternal(out EntitiesChunkInfo chunkInfo) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsCreatedOrInitialized(WorldTypeName);
-                AssertMultiThreadNotActive(WorldTypeName);
                 #endif
                 
                 if (_selfFreeChunksCount == 0) {
@@ -2896,27 +2861,16 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             internal void SetCurrentQueryEntity(uint entity) {
                 if (QueryDataCount > 0) {
-                    if (MultiThreadActive) {
-                        _currentEntitiesRangeOtherThread ??= new (uint, uint)[Environment.ProcessorCount * Const.MAX_NESTED_QUERY + 1];
-                        _currentEntitiesRangeOtherThread[QueryDataCount - 1] = (entity, entity);
-                    } else {
-                        _currentEntitiesRangeMainThread ??= new (uint, uint)[Const.MAX_NESTED_QUERY + 1];
-                        _currentEntitiesRangeMainThread[QueryDataCount - 1] = (entity, entity);
-                    }
+                    _currentEntitiesRange ??= new (uint, uint)[Const.MAX_NESTED_QUERY + 1];
+                    _currentEntitiesRange[QueryDataCount - 1] = (entity, entity);
                 }
             }
             
             [MethodImpl(AggressiveInlining)]
             internal void SetCurrentQueryEntity(uint entityStart, uint entityEndIncluded) {
                 if (QueryDataCount > 0) {
-                    if (MultiThreadActive) {
-                        _currentEntitiesRangeOtherThread ??= new (uint, uint)[Environment.ProcessorCount * Const.MAX_NESTED_QUERY + 1];
-                        _currentEntitiesRangeOtherThread[QueryDataCount - 1] = (entityStart, entityEndIncluded);
-                    }
-                    else {
-                        _currentEntitiesRangeMainThread ??= new (uint, uint)[Const.MAX_NESTED_QUERY + 1];
-                        _currentEntitiesRangeMainThread[QueryDataCount - 1] = (entityStart, entityEndIncluded);
-                    }
+                    _currentEntitiesRange ??= new (uint, uint)[Const.MAX_NESTED_QUERY + 1];
+                    _currentEntitiesRange[QueryDataCount - 1] = (entityStart, entityEndIncluded);
                 }
             }
 
@@ -2924,24 +2878,19 @@ namespace FFS.Libraries.StaticEcs {
             internal readonly bool IsNotCurrentQueryEntity(Entity entity) {
                 var id = entity.IdWithOffset;
                 for (var i = 0; i < QueryDataCount; i++) {
-                    if (MultiThreadActive) {
-                        if (id < _currentEntitiesRangeOtherThread[i].Item1) return true;
-                        if (id > _currentEntitiesRangeOtherThread[i].Item2) return true;
-                    } else {
-                        ref readonly var range = ref _currentEntitiesRangeMainThread[i];
-                        if (id >= range.Item1 && id <= range.Item2) continue;
+                    ref readonly var range = ref _currentEntitiesRange[i];
+                    if (id >= range.Item1 && id <= range.Item2) continue;
 
-                        if (_activeQueryDataMainThread == null) continue;
-                        var blocks = _activeQueryDataMainThread[i].Blocks;
-                        if (blocks == null) continue;
+                    if (_activeQueryData == null) continue;
+                    var blocks = _activeQueryData[i].Blocks;
+                    if (blocks == null) continue;
 
-                        var localId = id - Const.ENTITY_ID_OFFSET;
-                        var globalBlockIdx = localId >> Const.ENTITIES_IN_BLOCK_SHIFT;
-                        if (globalBlockIdx >= (uint) blocks.Length) continue;
+                    var localId = id - Const.ENTITY_ID_OFFSET;
+                    var globalBlockIdx = localId >> Const.ENTITIES_IN_BLOCK_SHIFT;
+                    if (globalBlockIdx >= (uint) blocks.Length) continue;
 
-                        var bit = 1UL << (int) (localId & Const.ENTITIES_IN_BLOCK_MASK);
-                        if ((blocks[globalBlockIdx].EntitiesMask & bit) != 0) return true;
-                    }
+                    var bit = 1UL << (int) (localId & Const.ENTITIES_IN_BLOCK_MASK);
+                    if ((blocks[globalBlockIdx].EntitiesMask & bit) != 0) return true;
                 }
 
                 return false;
@@ -2960,10 +2909,8 @@ namespace FFS.Libraries.StaticEcs {
                 };
                 #if FFS_ECS_DEBUG
                 Array.Clear(data.Blocks, 0, data.Blocks.Length);
-                if (!MultiThreadActive) {
-                    _activeQueryDataMainThread ??= new QueryData[Const.MAX_NESTED_QUERY + 1];
-                    _activeQueryDataMainThread[QueryDataCount - 1] = data;
-                }
+                _activeQueryData ??= new QueryData[Const.MAX_NESTED_QUERY + 1];
+                _activeQueryData[QueryDataCount - 1] = data;
                 #endif
                 return data;
             }
@@ -2973,8 +2920,8 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 if (QueryDataCount == 0) throw new StaticEcsException("Unexpected error");
                 SetCurrentQueryEntity(default, default);
-                if (!MultiThreadActive && _activeQueryDataMainThread != null) {
-                    _activeQueryDataMainThread[QueryDataCount - 1] = default;
+                if (_activeQueryData != null) {
+                    _activeQueryData[QueryDataCount - 1] = default;
                 }
                 #endif
                 ArrayPool<BlockMaskCache>.Shared.Return(data.Blocks);
@@ -3579,7 +3526,7 @@ namespace FFS.Libraries.StaticEcs {
         [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
         #endif
         internal struct EntityTypeData {
-            internal AtomicMask[] HeuristicChunks;
+            internal ChunkMask[] HeuristicChunks;
             internal unsafe delegate*<Entity, HookReason, void> OnDestroyFn;
             internal unsafe delegate*<Entity, void> OnCreateFn;
             internal bool Registered;

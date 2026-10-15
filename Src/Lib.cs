@@ -134,52 +134,17 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
-    [StructLayout(LayoutKind.Explicit)]
-    public struct AtomicMask {
-        [FieldOffset(0)] internal ulong Value;
-        [FieldOffset(0)] private long _value;
+    public struct ChunkMask {
+        internal ulong Value;
 
         [MethodImpl(AggressiveInlining)]
-        internal void SetBit(byte index) {
-            var mask = (long) (1UL << index);
-            #if NET6_0_OR_GREATER
-            Interlocked.Or(ref _value, mask);
-            #else
-            long orig, newVal;
-            do {
-                orig = _value;
-                newVal = orig | mask;
-            } while (Interlocked.CompareExchange(ref _value, newVal, orig) != orig);
-            #endif
-        }
+        internal void SetBit(byte index) => Value |= 1UL << index;
 
         [MethodImpl(AggressiveInlining)]
-        internal ulong ClearBit(byte index) {
-            var mask = (long) ~(1UL << index);
-            #if NET6_0_OR_GREATER
-            return (ulong) (Interlocked.And(ref _value, mask) & mask);
-            #else
-            long orig, newVal;
-            do {
-                orig = _value;
-                newVal = orig & mask;
-            } while (Interlocked.CompareExchange(ref _value, newVal, orig) != orig);
-            return (ulong) newVal;
-            #endif
-        }
+        internal ulong ClearBit(byte index) => Value &= ~(1UL << index);
 
         [MethodImpl(AggressiveInlining)]
-        internal void ClearBits(ulong invertedMask) {
-            #if NET6_0_OR_GREATER
-            Interlocked.And(ref _value, (long) invertedMask);
-            #else
-            long orig, newVal;
-            do {
-                orig = _value;
-                newVal = orig & (long) invertedMask;
-            } while (Interlocked.CompareExchange(ref _value, newVal, orig) != orig);
-            #endif
-        }
+        internal void ClearBits(ulong invertedMask) => Value &= invertedMask;
     }
 
     /// <summary>
@@ -470,24 +435,6 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
         
-        internal static void AssertNotBlockedByParallelQuery(string type, Entity entity, [CallerMemberName] string method = "") {
-            if (Data.Instance.MultiThreadActive && Data.Instance.IsNotCurrentQueryEntity(entity)) {
-                throw new StaticEcsException(type, method, $"Operation is blocked, it is forbidden to modify a non-current {entity} in a parallel query.");
-            }
-        }
-        
-        internal static void AssertNotNestedParallelQuery(string type, [CallerMemberName] string method = "") {
-            if (Data.Instance.MultiThreadActive) {
-                throw new StaticEcsException(type, method, "Nested query are not available with parallel query");
-            }
-        }
-        
-        internal static void AssertMultiThreadNotActive(string type, [CallerMemberName] string method = "") {
-            if (Data.Instance.MultiThreadActive) {
-                throw new StaticEcsException(type, method, "Forbidden in a parallel query.");
-            }
-        }
-
         internal static void AssertSameQueryMode(string type, byte mode, [CallerMemberName] string method = "") {
             if (Data.Instance.QueryMode != 0 && mode != Data.Instance.QueryMode) {
                 throw new StaticEcsException(type, method, "Nested iterators must have the same QueryMode as the outer iterator");
@@ -639,28 +586,6 @@ namespace FFS.Libraries.StaticEcs {
             #endif
         }
         
-        [MethodImpl(AggressiveInlining)]
-        internal static void SetBitAtomic(this ref long mask, int bitIndex) {
-            var bit = 1UL << bitIndex;
-            long oldValue, newValue;
-            do {
-                oldValue = Volatile.Read(ref mask);
-                newValue = (long)((ulong)oldValue | bit);
-            }
-            while (Interlocked.CompareExchange(ref mask, newValue, oldValue) != oldValue);
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        internal static void ClearBitAtomic(this ref long mask, int bitIndex) {
-            var bitMask = ~(1UL << bitIndex);
-            long oldValue, newValue;
-            do {
-                oldValue = Volatile.Read(ref mask);
-                newValue = (long)((ulong)oldValue & bitMask);
-            }
-            while (Interlocked.CompareExchange(ref mask, newValue, oldValue) != oldValue);
-        }
-
         [MethodImpl(AggressiveInlining)]
         internal static uint RoundUpToPowerOf2(ushort value) {
             if (value == 0) {

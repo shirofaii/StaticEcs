@@ -576,7 +576,6 @@ namespace FFS.Libraries.StaticEcs {
                 AssertComponentDisableable<T>(ComponentsTypeName);
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
                 AssertNotBlockedByQuery(ComponentsTypeName, entity, _blockerDisable);
-                AssertNotBlockedByParallelQuery(ComponentsTypeName, entity);
                 #endif
 
                 var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
@@ -616,7 +615,6 @@ namespace FFS.Libraries.StaticEcs {
                 AssertComponentDisableable<T>(ComponentsTypeName);
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
                 AssertNotBlockedByQuery(ComponentsTypeName, entity, _blockerEnable);
-                AssertNotBlockedByParallelQuery(ComponentsTypeName, entity);
                 #endif
 
                 var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
@@ -701,7 +699,6 @@ namespace FFS.Libraries.StaticEcs {
                 AssertIsNotTag<T>(ComponentsTypeName);
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
                 AssertNotBlockedByQuery(ComponentsTypeName, entity, _blockerAdd);
-                AssertNotBlockedByParallelQuery(ComponentsTypeName, entity);
                 #endif
 
                 var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
@@ -754,7 +751,6 @@ namespace FFS.Libraries.StaticEcs {
                 AssertIsNotTag<T>(ComponentsTypeName);
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
                 AssertNotBlockedByQuery(ComponentsTypeName, entity, _blockerAdd);
-                AssertNotBlockedByParallelQuery(ComponentsTypeName, entity);
                 #endif
 
                 var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
@@ -816,7 +812,6 @@ namespace FFS.Libraries.StaticEcs {
                 AssertInternalSetValueIsDefault(value, ComponentsTypeName);
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
                 AssertNotBlockedByQuery(ComponentsTypeName, entity, _blockerAdd);
-                AssertNotBlockedByParallelQuery(ComponentsTypeName, entity);
                 #endif
 
                 var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
@@ -882,7 +877,6 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
                 AssertNotBlockedByQuery(ComponentsTypeName, entity, _blockerDelete);
-                AssertNotBlockedByParallelQuery(ComponentsTypeName, entity);
                 #endif
                 
                 var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
@@ -1019,7 +1013,6 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
                 AssertNotBlockedByQuery(ComponentsTypeName, entity, _blockerAdd);
-                AssertNotBlockedByParallelQuery(ComponentsTypeName, entity);
                 AssertIsTag<T>(ComponentsTypeName);
                 #endif
 
@@ -1143,10 +1136,6 @@ namespace FFS.Libraries.StaticEcs {
             #region BATCH
             [MethodImpl(AggressiveInlining)]
             internal void BatchDelete(QueryData queryData, int nextGlobalBlockIdx, HookReason reason = HookReason.Default) {
-                #if FFS_ECS_DEBUG
-                AssertMultiThreadNotActive(ComponentsTypeName);
-                #endif
-
                 if (IsTag) {
                     while (nextGlobalBlockIdx >= 0) {
                         ref var blocks = ref queryData.Blocks[nextGlobalBlockIdx];
@@ -1536,8 +1525,7 @@ namespace FFS.Libraries.StaticEcs {
 
                         EntitiesMaskSegments[segmentIdx] = null;
 
-                        var poolIdx = Interlocked.Increment(ref _segmentsPoolCount) - 1;
-                        Volatile.Write(ref _segmentsPool[poolIdx], maskSegment);
+                        _segmentsPool[_segmentsPoolCount++] = maskSegment;
 
                         #if FFS_ECS_BURST
                         LifecycleHandle.OnSegmentPooled(segmentIdx);
@@ -1789,11 +1777,9 @@ namespace FFS.Libraries.StaticEcs {
 
                 T[] comps = null;
                 ulong[] masks;
-                var poolIdx = Interlocked.Decrement(ref _segmentsPoolCount);
-                if (poolIdx >= 0) {
-                    while ((masks = Volatile.Read(ref _segmentsPool[poolIdx])) == null) {
-                        Thread.SpinWait(1);
-                    }
+                if (_segmentsPoolCount > 0) {
+                    var poolIdx = --_segmentsPoolCount;
+                    masks = _segmentsPool[poolIdx];
                     if (!IsTag) {
                         comps = _componentsPool[poolIdx];
                         _componentsPool[poolIdx] = null;
@@ -1807,7 +1793,6 @@ namespace FFS.Libraries.StaticEcs {
                     return (masks, comps);
                 }
 
-                Interlocked.Increment(ref _segmentsPoolCount);
                 if (!IsTag) {
                     comps = new T[Const.ENTITIES_IN_SEGMENT];
                     if (HasDefaultValue && DataLifecycle) {
@@ -1828,12 +1813,12 @@ namespace FFS.Libraries.StaticEcs {
                 _chunkHeuristicWorldMask[chunkIdx][(segmentIdx & Const.SEGMENTS_IN_CHUNK_MASK) * _chunkHeuristicWorldMaskLen + _idDiv] &= _idMaskInv;
 
                 EntitiesMaskSegments[segmentIdx] = null;
-                var poolIdx = Interlocked.Increment(ref _segmentsPoolCount) - 1;
+                var poolIdx = _segmentsPoolCount++;
                 if (!IsTag) {
                     ComponentSegments[segmentIdx] = null;
                     _componentsPool[poolIdx] = componentSegment;
                 }
-                Volatile.Write(ref _segmentsPool[poolIdx], maskSegment);
+                _segmentsPool[poolIdx] = maskSegment;
 
                 #if FFS_ECS_BURST
                 LifecycleHandle.OnSegmentPooled(segmentIdx);

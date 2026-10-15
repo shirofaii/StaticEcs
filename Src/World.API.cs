@@ -450,7 +450,6 @@ namespace FFS.Libraries.StaticEcs {
         public static bool HasEntitiesInChunk(uint chunkIdx) {
             #if FFS_ECS_DEBUG
             AssertWorldIsInitialized(WorldTypeName);
-            AssertMultiThreadNotActive(WorldTypeName);
             AssertChunkIsRegistered(WorldTypeName, chunkIdx);
             #endif
 
@@ -466,7 +465,6 @@ namespace FFS.Libraries.StaticEcs {
         public static bool HasLoadedEntitiesInChunk(uint chunkIdx) {
             #if FFS_ECS_DEBUG
             AssertWorldIsInitialized(WorldTypeName);
-            AssertMultiThreadNotActive(WorldTypeName);
             AssertChunkIsRegistered(WorldTypeName, chunkIdx);
             #endif
 

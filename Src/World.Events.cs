@@ -1321,7 +1321,6 @@ namespace FFS.Libraries.StaticEcs {
         public int ReadAll(World<TWorld>.EventAction<TEvent> action) {
             #if FFS_ECS_DEBUG
             if (Id < 0) throw new StaticEcsException($"[ World<{typeof(TWorld)}>.EventReceiver<{typeof(TEvent)}>.ReadAll ] receiver is deleted");
-            if (World<TWorld>.Data.Instance.MultiThreadActive) throw new StaticEcsException($"[ World<{typeof(TWorld)}>.EventReceiver<{typeof(TEvent)}>.ReadAll ] this operation is not supported in multithreaded mode");
             #endif
             return World<TWorld>.Events<TEvent>.Instance.ReadAll(Id, action);
         }
@@ -1344,7 +1343,6 @@ namespace FFS.Libraries.StaticEcs {
         public int MarkAsReadAll() {
             #if FFS_ECS_DEBUG
             if (Id < 0) throw new StaticEcsException($"[ World<{typeof(TWorld)}>.EventReceiver<{typeof(TEvent)}>.MarkAsReadAll ] receiver is deleted");
-            if (World<TWorld>.Data.Instance.MultiThreadActive) throw new StaticEcsException($"[ World<{typeof(TWorld)}>.EventReceiver<{typeof(TEvent)}>.MarkAsReadAl ] this operation is not supported in multithreaded mode");
             #endif
             return World<TWorld>.Events<TEvent>.Instance.ReadAll(Id);
         }
@@ -1371,7 +1369,6 @@ namespace FFS.Libraries.StaticEcs {
         public int SuppressAll() {
             #if FFS_ECS_DEBUG
             if (Id < 0) throw new StaticEcsException($"[ World<{typeof(TWorld)}>.EventReceiver<{typeof(TEvent)}>.SuppressAll ] receiver is deleted");
-            if (World<TWorld>.Data.Instance.MultiThreadActive) throw new StaticEcsException($"[ World<{typeof(TWorld)}>.EventReceiver<{typeof(TEvent)}>.SuppressAll ] this operation is not supported in multithreaded mode");
             #endif
             return World<TWorld>.Events<TEvent>.Instance.SuppressAll(Id);
         }
@@ -1391,7 +1388,6 @@ namespace FFS.Libraries.StaticEcs {
         public World<TWorld>.EventIterator<TEvent> GetEnumerator() {
             #if FFS_ECS_DEBUG
             if (Id < 0) throw new StaticEcsException($"[ World<{typeof(TWorld)}>.EventReceiver<{typeof(TEvent)}>.GetEnumerator ] receiver is deleted");
-            if (World<TWorld>.Data.Instance.MultiThreadActive) throw new StaticEcsException($"[ World<{typeof(TWorld)}>.EventReceiver<{typeof(TEvent)}>.GetEnumerator ] this operation is not supported in multithreaded mode");
             if (World<TWorld>.Events<TEvent>.Instance.IsBlocked()) throw new StaticEcsException($"[ World<{typeof(TWorld)}>.EventReceiver<{typeof(TEvent)}>.GetEnumerator ] event pool is blocked");
             #endif
             return new World<TWorld>.EventIterator<TEvent>(Id);
@@ -1412,7 +1408,6 @@ namespace FFS.Libraries.StaticEcs {
         public World<TWorld>.PeekIterator<TEvent> Peek() {
             #if FFS_ECS_DEBUG
             if (Id < 0) throw new StaticEcsException($"[ World<{typeof(TWorld)}>.EventReceiver<{typeof(TEvent)}>.Peek ] receiver is deleted");
-            if (World<TWorld>.Data.Instance.MultiThreadActive) throw new StaticEcsException($"[ World<{typeof(TWorld)}>.EventReceiver<{typeof(TEvent)}>.Peek ] this operation is not supported in multithreaded mode");
             if (World<TWorld>.Events<TEvent>.Instance.IsBlocked()) throw new StaticEcsException($"[ World<{typeof(TWorld)}>.EventReceiver<{typeof(TEvent)}>.Peek ] event pool is blocked");
             #endif
             return new World<TWorld>.PeekIterator<TEvent>(Id);
@@ -1442,7 +1437,6 @@ namespace FFS.Libraries.StaticEcs {
         public World<TWorld>.LastOnlyIterator<TEvent> LastOnly() {
             #if FFS_ECS_DEBUG
             if (Id < 0) throw new StaticEcsException($"[ World<{typeof(TWorld)}>.EventReceiver<{typeof(TEvent)}>.LastOnly ] receiver is deleted");
-            if (World<TWorld>.Data.Instance.MultiThreadActive) throw new StaticEcsException($"[ World<{typeof(TWorld)}>.EventReceiver<{typeof(TEvent)}>.LastOnly ] this operation is not supported in multithreaded mode");
             if (World<TWorld>.Events<TEvent>.Instance.IsBlocked()) throw new StaticEcsException($"[ World<{typeof(TWorld)}>.EventReceiver<{typeof(TEvent)}>.LastOnly ] event pool is blocked");
             #endif
             return new World<TWorld>.LastOnlyIterator<TEvent>(Id);

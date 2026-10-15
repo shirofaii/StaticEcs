@@ -29,10 +29,6 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             internal bool Prepare(TFilter filter, ReadOnlySpan<ushort> clusters, EntityStatusType entities,
                                   bool strict, out QueryData queryData, out int firstGlobalBlockIdx, bool withDisabledClusters = false) {
-                #if FFS_ECS_DEBUG
-                AssertNotNestedParallelQuery(WorldTypeName);
-                #endif
-
 
                 ref var world = ref Data.Instance;
 
@@ -143,10 +139,6 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             internal bool Prepare(TFilter filter, ReadOnlySpan<uint> chunks, EntityStatusType entities,
                                   bool strict, out QueryData queryData, out int firstGlobalBlockIdx) {
-                #if FFS_ECS_DEBUG
-                AssertNotNestedParallelQuery(WorldTypeName);
-                #endif
-
 
                 ref var world = ref Data.Instance;
 

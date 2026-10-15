@@ -1356,17 +1356,13 @@ namespace FFS.Libraries.StaticEcs {
         [MethodImpl(NoInlining)]
         private void CreateSegment(uint segmentIdx) {
             Allocators[segmentIdx].Init();
-            var poolIdx = Interlocked.Decrement(ref _segmentsPoolCount);
-            if (poolIdx >= 0) {
-                TValue[] pooled;
-                while ((pooled = Volatile.Read(ref _segmentsPool[poolIdx])) == null) {
-                    Thread.SpinWait(1);
-                }
+            if (_segmentsPoolCount > 0) {
+                var poolIdx = --_segmentsPoolCount;
+                var pooled = _segmentsPool[poolIdx];
                 _segmentsPool[poolIdx] = null;
                 Allocators[segmentIdx].SegmentCapacity = (uint)pooled.Length;
                 Segments[segmentIdx] = pooled;
             } else {
-                Interlocked.Increment(ref _segmentsPoolCount);
                 Segments[segmentIdx] = Array.Empty<TValue>();
             }
         }
@@ -1376,8 +1372,7 @@ namespace FFS.Libraries.StaticEcs {
             var segment = Segments[segmentIdx];
             Segments[segmentIdx] = null;
             Allocators[segmentIdx] = default;
-            var poolIdx = Interlocked.Increment(ref _segmentsPoolCount) - 1;
-            Volatile.Write(ref _segmentsPool[poolIdx], segment);
+            _segmentsPool[_segmentsPoolCount++] = segment;
         }
 
     }
