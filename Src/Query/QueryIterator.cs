@@ -17,7 +17,7 @@ namespace FFS.Libraries.StaticEcs {
     /// Flexible (re-checking) entity iterator returned by
     /// <see cref="World{TWorld}.WorldQuery{TFilter}.EntitiesFlexible"/>.
     /// <para>
-    /// Unlike <see cref="QueryStrictIterator{TWorld,TFilter}"/>, this iterator re-reads the cached
+    /// Unlike <see cref="QueryStrictIterator{TWorld}"/>, this iterator re-reads the cached
     /// block bitmask on every step, allowing <see cref="World{TWorld}.Entity.Destroy"/> and entity
     /// status changes (Disable/Enable) to be performed on <b>other snapshot</b> entities during the
     /// loop — such entities are excluded from the remaining iteration. This is slightly slower than
@@ -36,20 +36,18 @@ namespace FFS.Libraries.StaticEcs {
     /// </para>
     /// </summary>
     /// <typeparam name="TWorld">World type identifying the static ECS world to iterate.</typeparam>
-    /// <typeparam name="TFilter">Query filter constraining which entities are visited.</typeparam>
     #if ENABLE_IL2CPP
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
-    public ref struct QueryFlexibleIterator<TWorld, TFilter>
-        where TFilter : struct, IQueryFilter
+    public ref struct QueryFlexibleIterator<TWorld>
         where TWorld : struct, IWorldType {
 
         private readonly QueryData _queryData;
         private ulong _availableMask;
         private World<TWorld>.Entity _current;
         private int _firstGlobalBlockIdx;
-        private World<TWorld>.WorldQuery<TFilter> _query;
+        private readonly QueryDef _def;
         private readonly EntityStatusType _entities;
 
         /// <summary>Creates a flexible iterator over entities in the specified clusters.</summary>
@@ -58,21 +56,21 @@ namespace FFS.Libraries.StaticEcs {
         /// <param name="entities">Which entity status to include (enabled, disabled, or both).</param>
         [MethodImpl(AggressiveInlining)]
         [SuppressMessage("ReSharper", "PossibleNullReferenceException")]
-        public QueryFlexibleIterator(ReadOnlySpan<ushort> clusters, TFilter filter, EntityStatusType entities) {
+        public QueryFlexibleIterator(ReadOnlySpan<ushort> clusters, QueryDef def, EntityStatusType entities) {
             _entities = entities;
             _current = default;
-            _query = World<TWorld>.Query(filter);
-            _query.Prepare(_query.Filter, clusters, entities, false, out _queryData, out _firstGlobalBlockIdx);
+            _def = def;
+            World<TWorld>.Prepare(def, clusters, entities, false, out _queryData, out _firstGlobalBlockIdx);
             _availableMask = _firstGlobalBlockIdx >= 0 ? ulong.MaxValue : 0;
         }
 
         [MethodImpl(AggressiveInlining)]
         [SuppressMessage("ReSharper", "PossibleNullReferenceException")]
-        internal QueryFlexibleIterator(ReadOnlySpan<uint> chunks, TFilter filter, EntityStatusType entities) {
+        internal QueryFlexibleIterator(ReadOnlySpan<uint> chunks, QueryDef def, EntityStatusType entities) {
             _entities = entities;
             _current = default;
-            _query = World<TWorld>.Query(filter);
-            _query.Prepare(_query.Filter, chunks, entities, false, out _queryData, out _firstGlobalBlockIdx);
+            _def = def;
+            World<TWorld>.Prepare(def, chunks, entities, false, out _queryData, out _firstGlobalBlockIdx);
             _availableMask = _firstGlobalBlockIdx >= 0 ? ulong.MaxValue : 0;
         }
 
@@ -129,12 +127,12 @@ namespace FFS.Libraries.StaticEcs {
         }
 
         [MethodImpl(AggressiveInlining)]
-        public readonly QueryFlexibleIterator<TWorld, TFilter> GetEnumerator() => this;
+        public readonly QueryFlexibleIterator<TWorld> GetEnumerator() => this;
 
         [MethodImpl(AggressiveInlining)]
         public void Dispose() {
             if (_queryData.Blocks != null) {
-                _query.Dispose(_query.Filter, _entities, false, _queryData);
+                World<TWorld>.Dispose(_def, _entities, false, _queryData);
             }
         }
     }
@@ -146,7 +144,7 @@ namespace FFS.Libraries.StaticEcs {
     /// The strict iterator assumes that the filtered component and tag types are <b>not</b>
     /// modified on other entities that belong to the iteration snapshot. This allows it to skip
     /// per-block bitmask re-evaluation, making it faster than
-    /// <see cref="QueryFlexibleIterator{TWorld,TFilter}"/>. Additionally, it uses a sequential
+    /// <see cref="QueryFlexibleIterator{TWorld}"/>. Additionally, it uses a sequential
     /// bit-scan optimization: when the next entity is adjacent in the bitmask, it advances with a
     /// single shift + increment instead of a full trailing-zero-count scan.
     /// </para>
@@ -161,13 +159,11 @@ namespace FFS.Libraries.StaticEcs {
     /// </para>
     /// </summary>
     /// <typeparam name="TWorld">World type identifying the static ECS world to iterate.</typeparam>
-    /// <typeparam name="TFilter">Query filter constraining which entities are visited.</typeparam>
     #if ENABLE_IL2CPP
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
-    public ref struct QueryStrictIterator<TWorld, TFilter>
-        where TFilter : struct, IQueryFilter
+    public ref struct QueryStrictIterator<TWorld>
         where TWorld : struct, IWorldType {
 
         private readonly QueryData _queryData;
@@ -175,7 +171,7 @@ namespace FFS.Libraries.StaticEcs {
         private ulong _isolatedBit;
         private World<TWorld>.Entity _current;
         private int _firstGlobalBlockIdx;
-        private World<TWorld>.WorldQuery<TFilter> _query;
+        private readonly QueryDef _def;
         private readonly EntityStatusType _entities;
 
         /// <summary>Creates a strict iterator over entities in the specified clusters.</summary>
@@ -184,11 +180,11 @@ namespace FFS.Libraries.StaticEcs {
         /// <param name="entities">Which entity status to include (enabled, disabled, or both).</param>
         [MethodImpl(AggressiveInlining)]
         [SuppressMessage("ReSharper", "PossibleNullReferenceException")]
-        public QueryStrictIterator(ReadOnlySpan<ushort> clusters, TFilter filter, EntityStatusType entities) {
+        public QueryStrictIterator(ReadOnlySpan<ushort> clusters, QueryDef def, EntityStatusType entities) {
             _entities = entities;
             _current = default;
-            _query = World<TWorld>.Query(filter);
-            _query.Prepare(_query.Filter, clusters, entities, true, out _queryData, out _firstGlobalBlockIdx);
+            _def = def;
+            World<TWorld>.Prepare(def, clusters, entities, true, out _queryData, out _firstGlobalBlockIdx);
 
             _isolatedBit = 0;
             _entitiesMask = _firstGlobalBlockIdx >= 0 ? _queryData.Blocks[_firstGlobalBlockIdx].EntitiesMask : 0;
@@ -196,11 +192,11 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         [SuppressMessage("ReSharper", "PossibleNullReferenceException")]
-        internal QueryStrictIterator(ReadOnlySpan<uint> chunks, TFilter filter, EntityStatusType entities) {
+        internal QueryStrictIterator(ReadOnlySpan<uint> chunks, QueryDef def, EntityStatusType entities) {
             _entities = entities;
             _current = default;
-            _query = World<TWorld>.Query(filter);
-            _query.Prepare(_query.Filter, chunks, entities, true, out _queryData, out _firstGlobalBlockIdx);
+            _def = def;
+            World<TWorld>.Prepare(def, chunks, entities, true, out _queryData, out _firstGlobalBlockIdx);
 
             _isolatedBit = 0;
             _entitiesMask = _firstGlobalBlockIdx >= 0 ? _queryData.Blocks[_firstGlobalBlockIdx].EntitiesMask : 0;
@@ -255,12 +251,12 @@ namespace FFS.Libraries.StaticEcs {
         }
 
         [MethodImpl(AggressiveInlining)]
-        public readonly QueryStrictIterator<TWorld, TFilter> GetEnumerator() => this;
+        public readonly QueryStrictIterator<TWorld> GetEnumerator() => this;
 
         [MethodImpl(AggressiveInlining)]
         public void Dispose() {
             if (_queryData.Blocks != null) {
-                _query.Dispose(_query.Filter, _entities, true, _queryData);
+                World<TWorld>.Dispose(_def, _entities, true, _queryData);
             }
         }
     }

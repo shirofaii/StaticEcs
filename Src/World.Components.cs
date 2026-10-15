@@ -380,12 +380,21 @@ namespace FFS.Libraries.StaticEcs {
                     Data.Instance.RegisterComponentOrTagTypeInternal(componentConfig.Config(), false, nonSerializable, typeof(T).Name);
                     return;
                 }
-                Data.Instance.RegisterDefaultComponentOrTagTypeInternal<T>(isTag, nonSerializable, typeof(T).Name);
+                var typeName = typeof(T).Name;
+                var guid = typeof(T).GuidFromAQN();
+                #if FFS_ECS_DEBUG
+                AssertGuidNotEmpty(WorldTypeName, guid, typeName);
+                instance = new Components<T>(Data.Instance.ComponentPoolsCount, guid, 0, false, null, false, default, isTag, nonSerializable, typeName);
+                #else
+                Instance = new Components<T>(Data.Instance.ComponentPoolsCount, guid, 0, false, null, false, default, isTag, nonSerializable, typeName);
+                #endif
+                Handle = ComponentsHandle.Create<TWorld, T>();
+                Data.Instance.RegisterComponentPool(Handle, guid, nonSerializable, typeName);
             }
 
-            internal HeuristicChunk[] HeuristicChunks;
+            internal ComponentMasks Masks;
+            internal ulong[][] MaskSegments;
             internal T[][] ComponentSegments;
-            internal ulong[][] EntitiesMaskSegments; // 4 ulong active entities + 4 ulong disabled entities
 
             /// <summary>
             /// Whether this storage represents a tag type (no data, no enable/disable, no change tracking).
@@ -413,19 +422,10 @@ namespace FFS.Libraries.StaticEcs {
             internal readonly bool DataLifecycle;
             internal readonly bool HasOnAdd;
             internal readonly bool HasOnDelete;
-            internal readonly bool HasDisable;
-            internal readonly byte SegmentMaskLen;
             internal readonly T DefaultValue;
 
-            internal ulong[][] _chunkHeuristicWorldMask;
-            internal readonly ulong[] _segmentsMaskCache;
             internal T[][] _componentsPool;
-            internal ulong[][] _segmentsPool;
-            internal int _segmentsPoolCount;
-            internal readonly ulong _idMask;
-            internal readonly ulong _idMaskInv;
-            internal readonly ushort _idDiv;
-            internal ushort _chunkHeuristicWorldMaskLen;
+            internal int _componentsPoolCount;
             internal readonly bool HasDefaultValue;
             
             /// <summary>
@@ -439,7 +439,6 @@ namespace FFS.Libraries.StaticEcs {
             internal readonly bool HasWrite;
             internal readonly bool HasRead;
             internal readonly bool Unmanaged;
-            internal readonly int UnmanagedSize;
 
             private IPackArrayStrategy<T> _readWriteArrayStrategy;
             private IPackArrayStrategyResettable _resettableStrategy;
@@ -469,10 +468,6 @@ namespace FFS.Libraries.StaticEcs {
             #if FFS_ECS_DEBUG
             internal static readonly string ComponentsTypeName = $"{WorldTypeName}.Components<{typeof(T).GenericName()}>"; 
             
-            private int _blockerDelete;
-            private int _blockerAdd;
-            private int _blockerDisable;
-            private int _blockerEnable;
             #endif
 
             #region PUBLIC API
@@ -508,12 +503,8 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             internal readonly bool HasUnchecked(Entity entity) {
                 var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
-                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-
-                var maskSegment = EntitiesMaskSegments[segmentIdx];
-                return maskSegment != null && (maskSegment[segmentBlockIdx] & blockEntityMask) != 0;
+                var segment = MaskSegments[entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT];
+                return segment != null && (segment[(entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK] & (1UL << (int) (entityId & Const.ENTITIES_IN_BLOCK_MASK))) != 0;
             }
 
             /// <summary>
@@ -531,13 +522,7 @@ namespace FFS.Libraries.StaticEcs {
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
                 #endif
 
-                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
-                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-
-                var maskSegment = EntitiesMaskSegments[segmentIdx];
-                return maskSegment != null && (maskSegment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT] & blockEntityMask) != 0;
+                return Masks.HasDisabled(entity.IdWithOffset - Const.ENTITY_ID_OFFSET);
             }
 
             /// <summary>
@@ -555,13 +540,7 @@ namespace FFS.Libraries.StaticEcs {
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
                 #endif
 
-                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
-                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-
-                var maskSegment = EntitiesMaskSegments[segmentIdx];
-                return maskSegment != null && (maskSegment[segmentBlockIdx] & ~maskSegment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT] & blockEntityMask) != 0;
+                return Masks.HasEnabled(entity.IdWithOffset - Const.ENTITY_ID_OFFSET);
             }
 
             /// <summary>
@@ -583,26 +562,10 @@ namespace FFS.Libraries.StaticEcs {
                 AssertIsNotTag<T>(ComponentsTypeName);
                 AssertComponentDisableable<T>(ComponentsTypeName);
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                AssertNotBlockedByQuery(ComponentsTypeName, entity, _blockerDisable);
+                AssertNotBlockedByQuery(ComponentsTypeName, entity, Masks.BlockerDisable);
                 #endif
 
-                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
-                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-
-                var maskSegment = EntitiesMaskSegments[segmentIdx];
-                if (maskSegment == null || (maskSegment[segmentBlockIdx] & blockEntityMask) == 0) {
-                    return ToggleResult.MissingComponent;
-                }
-
-                ref var disabledMask = ref maskSegment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT];
-                if ((disabledMask & blockEntityMask) != 0) {
-                    return ToggleResult.Unchanged;
-                }
-
-                disabledMask |= blockEntityMask;
-                return ToggleResult.Changed;
+                return Masks.Disable(entity.IdWithOffset - Const.ENTITY_ID_OFFSET);
             }
 
             /// <summary>
@@ -622,26 +585,10 @@ namespace FFS.Libraries.StaticEcs {
                 AssertIsNotTag<T>(ComponentsTypeName);
                 AssertComponentDisableable<T>(ComponentsTypeName);
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                AssertNotBlockedByQuery(ComponentsTypeName, entity, _blockerEnable);
+                AssertNotBlockedByQuery(ComponentsTypeName, entity, Masks.BlockerEnable);
                 #endif
 
-                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
-                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-
-                var maskSegment = EntitiesMaskSegments[segmentIdx];
-                if (maskSegment == null || (maskSegment[segmentBlockIdx] & blockEntityMask) == 0) {
-                    return ToggleResult.MissingComponent;
-                }
-
-                ref var disabledMask = ref maskSegment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT];
-                if ((disabledMask & blockEntityMask) == 0) {
-                    return ToggleResult.Unchanged;
-                }
-
-                disabledMask &= ~blockEntityMask;
-                return ToggleResult.Changed;
+                return Masks.Enable(entity.IdWithOffset - Const.ENTITY_ID_OFFSET);
             }
 
             /// <summary>
@@ -701,38 +648,21 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 AssertIsNotTag<T>(ComponentsTypeName);
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                AssertNotBlockedByQuery(ComponentsTypeName, entity, _blockerAdd);
+                AssertNotBlockedByQuery(ComponentsTypeName, entity, Masks.BlockerAdd);
                 #endif
 
                 var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
                 var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentEntityIdx = (byte) (entityId & Const.ENTITIES_IN_SEGMENT_MASK);
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-
-                ref var maskSegment = ref EntitiesMaskSegments[segmentIdx];
-                ref var componentSegment = ref ComponentSegments[segmentIdx];
-                if (maskSegment == null) {
-                    (maskSegment, componentSegment) = CreateNewSegment(segmentIdx);
+                var added = Masks.Add(entityId);
+                if (added == ComponentMasks.AddedToNewSegment) {
+                    ComponentSegments[segmentIdx] = NewDataSegment();
                 }
 
-                ref var entitiesMask = ref maskSegment[segmentBlockIdx];
-
-                if ((entitiesMask & blockEntityMask) != 0) {
-                    return ref componentSegment[segmentEntityIdx];
+                ref var component = ref ComponentSegments[segmentIdx][entityId & Const.ENTITIES_IN_SEGMENT_MASK];
+                if (added == ComponentMasks.Existed) {
+                    return ref component;
                 }
 
-                if (entitiesMask == 0) {
-                    var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
-                    HeuristicChunks[entityId >> Const.ENTITIES_IN_CHUNK_SHIFT].NotEmptyBlocks.SetBit(chunkBlockIdx);
-                }
-                entitiesMask |= blockEntityMask;
-                if (entitiesMask == ulong.MaxValue) {
-                    var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
-                    HeuristicChunks[segmentIdx >> Const.SEGMENTS_IN_CHUNK_SHIFT].FullBlocks.SetBit(chunkBlockIdx);
-                }
-
-                ref var component = ref componentSegment[segmentEntityIdx];
                 if (HasOnAdd) {
                     CallOnAdd(ref component, entity);
                 }
@@ -753,39 +683,22 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 AssertIsNotTag<T>(ComponentsTypeName);
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                AssertNotBlockedByQuery(ComponentsTypeName, entity, _blockerAdd);
+                AssertNotBlockedByQuery(ComponentsTypeName, entity, Masks.BlockerAdd);
                 #endif
 
                 var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
                 var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentEntityIdx = (byte) (entityId & Const.ENTITIES_IN_SEGMENT_MASK);
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-
-                ref var maskSegment = ref EntitiesMaskSegments[segmentIdx];
-                ref var componentSegment = ref ComponentSegments[segmentIdx];
-                if (maskSegment == null) {
-                    (maskSegment, componentSegment) = CreateNewSegment(segmentIdx);
+                var added = Masks.Add(entityId);
+                if (added == ComponentMasks.AddedToNewSegment) {
+                    ComponentSegments[segmentIdx] = NewDataSegment();
                 }
 
-                ref var entitiesMask = ref maskSegment[segmentBlockIdx];
-                
-                isNew = (entitiesMask & blockEntityMask) == 0;
+                ref var component = ref ComponentSegments[segmentIdx][entityId & Const.ENTITIES_IN_SEGMENT_MASK];
+                isNew = added != ComponentMasks.Existed;
                 if (!isNew) {
-                    return ref componentSegment[segmentEntityIdx];
+                    return ref component;
                 }
 
-                if (entitiesMask == 0) {
-                    var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
-                    HeuristicChunks[entityId >> Const.ENTITIES_IN_CHUNK_SHIFT].NotEmptyBlocks.SetBit(chunkBlockIdx);
-                }
-                entitiesMask |= blockEntityMask;
-                if (entitiesMask == ulong.MaxValue) {
-                    var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
-                    HeuristicChunks[segmentIdx >> Const.SEGMENTS_IN_CHUNK_SHIFT].FullBlocks.SetBit(chunkBlockIdx);
-                }
-
-                ref var component = ref componentSegment[segmentEntityIdx];
                 if (HasOnAdd) {
                     CallOnAdd(ref component, entity);
                 }
@@ -814,37 +727,18 @@ namespace FFS.Libraries.StaticEcs {
                 AssertIsNotTag<T>(ComponentsTypeName);
                 AssertInternalSetValueIsDefault(value, ComponentsTypeName);
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                AssertNotBlockedByQuery(ComponentsTypeName, entity, _blockerAdd);
+                AssertNotBlockedByQuery(ComponentsTypeName, entity, Masks.BlockerAdd);
                 #endif
 
                 var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
                 var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentEntityIdx = (byte) (entityId & Const.ENTITIES_IN_SEGMENT_MASK);
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-
-                ref var maskSegment = ref EntitiesMaskSegments[segmentIdx];
-                ref var componentSegment = ref ComponentSegments[segmentIdx];
-                if (maskSegment == null) {
-                    (maskSegment, componentSegment) = CreateNewSegment(segmentIdx);
+                var added = Masks.Add(entityId);
+                if (added == ComponentMasks.AddedToNewSegment) {
+                    ComponentSegments[segmentIdx] = NewDataSegment();
                 }
 
-                ref var entitiesMask = ref maskSegment[segmentBlockIdx];
-                
-                ref var component = ref componentSegment[segmentEntityIdx];
-                if ((entitiesMask & blockEntityMask) == 0) {
-                    if (entitiesMask == 0) {
-                        var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
-                        HeuristicChunks[entityId >> Const.ENTITIES_IN_CHUNK_SHIFT].NotEmptyBlocks.SetBit(chunkBlockIdx);
-                    }
-                    entitiesMask |= blockEntityMask;
-                    if (entitiesMask == ulong.MaxValue) {
-                        var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
-                        HeuristicChunks[segmentIdx >> Const.SEGMENTS_IN_CHUNK_SHIFT].FullBlocks.SetBit(chunkBlockIdx);
-                    }
-
-                }
-                else if (HasOnDelete) {
+                ref var component = ref ComponentSegments[segmentIdx][entityId & Const.ENTITIES_IN_SEGMENT_MASK];
+                if (added == ComponentMasks.Existed && HasOnDelete) {
                     CallOnDelete(ref component, entity, HookReason.Default);
                 }
 
@@ -878,52 +772,25 @@ namespace FFS.Libraries.StaticEcs {
             public bool Delete(Entity entity, HookReason reason = HookReason.Default, bool withOnDelete = true) {
                 #if FFS_ECS_DEBUG
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                AssertNotBlockedByQuery(ComponentsTypeName, entity, _blockerDelete);
+                AssertNotBlockedByQuery(ComponentsTypeName, entity, Masks.BlockerDelete);
                 #endif
-                
-                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
-                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte)(entityId & Const.ENTITIES_IN_BLOCK_MASK);
-                var invertedBlockEntityMask = ~blockEntityMask;
-                
-                var maskSegment = EntitiesMaskSegments[segmentIdx];
 
+                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
+                var maskSegment = Masks.Remove(entityId);
                 if (maskSegment == null) {
                     return false;
                 }
-                
-                ref var entitiesMask = ref maskSegment[segmentBlockIdx];
-                if ((entitiesMask & blockEntityMask) == 0) {
-                    return false;
-                }
 
-                if (entitiesMask == ulong.MaxValue) {
-                    var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
-                    HeuristicChunks[entityId >> Const.ENTITIES_IN_CHUNK_SHIFT].FullBlocks.ClearBit(chunkBlockIdx);
-                }
-
-                entitiesMask &= invertedBlockEntityMask;
-                if (HasDisable) {
-                    maskSegment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT] &= invertedBlockEntityMask;
-                }
-
+                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
                 if (withOnDelete && HasOnDelete) {
-                    var segmentEntityIdx = (byte) (entityId & Const.ENTITIES_IN_SEGMENT_MASK);
-                    CallOnDelete(ref ComponentSegments[segmentIdx][segmentEntityIdx], entity, HookReason.Default);
+                    CallOnDelete(ref ComponentSegments[segmentIdx][entityId & Const.ENTITIES_IN_SEGMENT_MASK], entity, HookReason.Default);
                 }
                 else if (DataLifecycle) {
-                    var segmentEntityIdx = (byte) (entityId & Const.ENTITIES_IN_SEGMENT_MASK);
-                    ComponentSegments[segmentIdx][segmentEntityIdx] = DefaultValue;
+                    ComponentSegments[segmentIdx][entityId & Const.ENTITIES_IN_SEGMENT_MASK] = DefaultValue;
                 }
 
-                                      // V safety during recursive deletion via the OnDelete hook
-                if (entitiesMask == 0 && EntitiesMaskSegments[segmentIdx] == maskSegment) {
-                    var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
-                    var notEmptyBlocks = HeuristicChunks[entityId >> Const.ENTITIES_IN_CHUNK_SHIFT].NotEmptyBlocks.ClearBit(chunkBlockIdx);
-                    if ((notEmptyBlocks & _segmentsMaskCache[segmentIdx & Const.SEGMENTS_IN_CHUNK_MASK]) == 0UL) {
-                        FreeSegment(entityId >> Const.ENTITIES_IN_CHUNK_SHIFT, segmentIdx, maskSegment, IsTag ? null : ComponentSegments[segmentIdx]);
-                    }
+                if (Masks.ReleaseIfEmpty(entityId, maskSegment) && !IsTag) {
+                    FreeDataSegment(segmentIdx);
                 }
 
                 return true;
@@ -961,12 +828,12 @@ namespace FFS.Libraries.StaticEcs {
                 var segmentBlockIdx = (byte) ((sourceEntityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
                 var sourceBlockEntityMask = 1UL << (byte) (sourceEntityId & Const.ENTITIES_IN_BLOCK_MASK);
 
-                var maskSegment = EntitiesMaskSegments[segmentIdx];
+                var maskSegment = Masks.Segments[segmentIdx];
                 if (maskSegment != null && (maskSegment[segmentBlockIdx] & sourceBlockEntityMask) != 0) {
                     if (IsTag) {
                         Set(destination);
                     } else {
-                        var disabled = HasDisable && (maskSegment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT] & sourceBlockEntityMask) != 0;
+                        var disabled = Masks.HasDisable && (maskSegment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT] & sourceBlockEntityMask) != 0;
                         var sourceSegmentEntityIdx = (byte) (sourceEntityId & Const.ENTITIES_IN_SEGMENT_MASK);
                         if (HasCopyTo) {
                             ComponentSegments[segmentIdx][sourceSegmentEntityIdx].CopyTo(source, destination, disabled);
@@ -1014,35 +881,11 @@ namespace FFS.Libraries.StaticEcs {
             public bool Set(Entity entity) {
                 #if FFS_ECS_DEBUG
                 AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                AssertNotBlockedByQuery(ComponentsTypeName, entity, _blockerAdd);
+                AssertNotBlockedByQuery(ComponentsTypeName, entity, Masks.BlockerAdd);
                 AssertIsTag<T>(ComponentsTypeName);
                 #endif
 
-                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
-                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-
-                ref var maskSegment = ref EntitiesMaskSegments[segmentIdx];
-                maskSegment ??= CreateNewSegment(segmentIdx).Item1;
-
-                ref var entitiesMask = ref maskSegment[segmentBlockIdx];
-
-                if ((entitiesMask & blockEntityMask) != 0) {
-                    return false;
-                }
-
-                var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
-                if (entitiesMask == 0) {
-                    HeuristicChunks[entityId >> Const.ENTITIES_IN_CHUNK_SHIFT].NotEmptyBlocks.SetBit(chunkBlockIdx);
-                }
-
-                entitiesMask |= blockEntityMask;
-                if (entitiesMask == ulong.MaxValue) {
-                    HeuristicChunks[entityId >> Const.ENTITIES_IN_CHUNK_SHIFT].FullBlocks.SetBit(chunkBlockIdx);
-                }
-
-                return true;
+                return Masks.Add(entity.IdWithOffset - Const.ENTITY_ID_OFFSET) != ComponentMasks.Existed;
             }
 
             /// <summary>
@@ -1090,26 +933,7 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             /// <returns>Total number of entities with this component across the entire world.</returns>
             [MethodImpl(AggressiveInlining)]
-            public readonly uint CalculateCount() {
-                uint count = 0;
-
-                for (var chunkIdx = 0; chunkIdx < HeuristicChunks.Length; chunkIdx++) {
-                    ref var heuristic = ref HeuristicChunks[chunkIdx];
-                    var fullBlocks = heuristic.FullBlocks.Value;
-                    count += (uint)(fullBlocks.PopCnt() * Const.ENTITIES_IN_BLOCK);
-
-                    var partialMask = heuristic.NotEmptyBlocks.Value & ~fullBlocks;
-                    while (partialMask != 0) {
-                        var chunkBlockIdx = Utils.PopLsb(ref partialMask);
-                        var segmentIdx = (uint) ((chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT) + (chunkBlockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT));
-                        var segmentBlockIdx = (byte) (chunkBlockIdx & Const.BLOCKS_IN_SEGMENT_MASK);
-
-                        count += (uint)EntitiesMaskSegments[segmentIdx][segmentBlockIdx].PopCnt();
-                    }
-                }
-
-                return count;
-            }
+            public readonly uint CalculateCount() => Masks.CalculateCount();
 
             /// <summary>
             /// Calculates the current memory capacity for this component type, in entity slots.
@@ -1119,19 +943,7 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             /// <returns>Total capacity in entity slots (allocated segments * 256 + pooled segments * 256).</returns>
             [MethodImpl(AggressiveInlining)]
-            public readonly int CalculateCapacity() {
-                var count = 0;
-
-                for (var segmentIdx = 0; segmentIdx < EntitiesMaskSegments.Length; segmentIdx++) {
-                    if (EntitiesMaskSegments[segmentIdx] != null) {
-                        count++;
-                    }
-                }
-
-                count += _segmentsPoolCount;
-
-                return count * Const.ENTITIES_IN_SEGMENT;
-            }
+            public readonly int CalculateCapacity() => Masks.CalculateCapacity();
             #endregion
 
             #region INTERNAL API
@@ -1177,7 +989,7 @@ namespace FFS.Libraries.StaticEcs {
                 var chunkIdx = baseGlobalBlockEntityIdx >> Const.ENTITIES_IN_CHUNK_SHIFT;
                 var baseSegmentEntityIdx = (byte) (baseGlobalBlockEntityIdx & Const.ENTITIES_IN_SEGMENT_MASK);
 
-                ref var maskSegment = ref EntitiesMaskSegments[segmentIdx];
+                ref var maskSegment = ref Masks.Segments[segmentIdx];
                 ref var componentSegment = ref ComponentSegments[segmentIdx];
                 if (maskSegment == null) {
                     (maskSegment, componentSegment) = CreateNewSegment(segmentIdx);
@@ -1190,7 +1002,7 @@ namespace FFS.Libraries.StaticEcs {
                 }
 
                 if (entitiesMask == 0) {
-                    HeuristicChunks[chunkIdx].NotEmptyBlocks.SetBit(chunkBlockIdx);
+                    Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.SetBit(chunkBlockIdx);
                 }
                 
                 if (!HasOnAdd) {
@@ -1231,7 +1043,7 @@ namespace FFS.Libraries.StaticEcs {
                 }
 
                 if (entitiesMask == ulong.MaxValue) {
-                    HeuristicChunks[chunkIdx].FullBlocks.SetBit(chunkBlockIdx);
+                    Masks.HeuristicChunks[chunkIdx].FullBlocks.SetBit(chunkBlockIdx);
                 }
             }
 
@@ -1246,7 +1058,7 @@ namespace FFS.Libraries.StaticEcs {
                 var chunkIdx = baseGlobalBlockEntityIdx >> Const.ENTITIES_IN_CHUNK_SHIFT;
                 var baseSegmentEntityIdx = (byte) (baseGlobalBlockEntityIdx & Const.ENTITIES_IN_SEGMENT_MASK);
 
-                ref var maskSegment = ref EntitiesMaskSegments[segmentIdx];
+                ref var maskSegment = ref Masks.Segments[segmentIdx];
                 ref var componentSegment = ref ComponentSegments[segmentIdx];
                 if (maskSegment == null) {
                     (maskSegment, componentSegment) = CreateNewSegment(segmentIdx);
@@ -1284,7 +1096,7 @@ namespace FFS.Libraries.StaticEcs {
                         }
                     } while (starts != 0);
 
-                    if (EntitiesMaskSegments[segmentIdx] != maskSegment) {
+                    if (Masks.Segments[segmentIdx] != maskSegment) {
                         #pragma warning disable EPC30
                         // ReSharper disable once TailRecursiveCall
                         BatchSet(value, entitiesMaskFilter, segmentIdx, segmentBlockIdx);
@@ -1314,11 +1126,11 @@ namespace FFS.Libraries.StaticEcs {
 
                 if (newEntitiesMaskFilter != 0) {
                     if (entitiesMask == 0) {
-                        HeuristicChunks[chunkIdx].NotEmptyBlocks.SetBit(chunkBlockIdx);
+                        Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.SetBit(chunkBlockIdx);
                     }
                     entitiesMask |= newEntitiesMaskFilter;
                     if (entitiesMask == ulong.MaxValue) {
-                        HeuristicChunks[chunkIdx].FullBlocks.SetBit(chunkBlockIdx);
+                        Masks.HeuristicChunks[chunkIdx].FullBlocks.SetBit(chunkBlockIdx);
                     }
                 }
 
@@ -1363,7 +1175,7 @@ namespace FFS.Libraries.StaticEcs {
                 var chunkIdx = baseGlobalBlockEntityIdx >> Const.ENTITIES_IN_CHUNK_SHIFT;
                 var baseSegmentEntityIdx = (byte) (baseGlobalBlockEntityIdx & Const.ENTITIES_IN_SEGMENT_MASK);
 
-                var maskSegment = EntitiesMaskSegments[segmentIdx];
+                var maskSegment = Masks.Segments[segmentIdx];
                 var componentSegment = ComponentSegments[segmentIdx];
                 if (maskSegment == null) {
                     return;
@@ -1376,11 +1188,11 @@ namespace FFS.Libraries.StaticEcs {
                 }
 
                 ulong scratch = 0;
-                ref var disabledEntitiesMask = ref HasDisable 
+                ref var disabledEntitiesMask = ref Masks.HasDisable 
                     ? ref maskSegment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT] 
                     : ref scratch;
                 if (entitiesMask == ulong.MaxValue) {
-                    HeuristicChunks[chunkIdx].FullBlocks.ClearBit(chunkBlockIdx);
+                    Masks.HeuristicChunks[chunkIdx].FullBlocks.ClearBit(chunkBlockIdx);
                 }
                 
                 if (!HasOnDelete && !DataLifecycle) {
@@ -1463,9 +1275,9 @@ namespace FFS.Libraries.StaticEcs {
                     } while (starts != 0);
                 }
 
-                if (entitiesMask == 0 && EntitiesMaskSegments[segmentIdx] == maskSegment) {
-                    var notEmptyBlocks = HeuristicChunks[chunkIdx].NotEmptyBlocks.ClearBit(chunkBlockIdx);
-                    if ((notEmptyBlocks & _segmentsMaskCache[segmentIdx & Const.SEGMENTS_IN_CHUNK_MASK]) == 0UL) {
+                if (entitiesMask == 0 && Masks.Segments[segmentIdx] == maskSegment) {
+                    var notEmptyBlocks = Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.ClearBit(chunkBlockIdx);
+                    if ((notEmptyBlocks & Const.DataMasks[segmentIdx & Const.SEGMENTS_IN_CHUNK_MASK]) == 0UL) {
                         FreeSegment(chunkIdx, segmentIdx, maskSegment, componentSegment);
                     }
                 }
@@ -1477,7 +1289,7 @@ namespace FFS.Libraries.StaticEcs {
                 var chunkBlockIdx = (byte)((baseGlobalBlockEntityIdx >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
                 var chunkIdx = baseGlobalBlockEntityIdx >> Const.ENTITIES_IN_CHUNK_SHIFT;
 
-                ref var maskSegment = ref EntitiesMaskSegments[segmentIdx];
+                ref var maskSegment = ref Masks.Segments[segmentIdx];
                 maskSegment ??= CreateNewSegment(segmentIdx).Item1;
 
                 ref var entitiesMask = ref maskSegment[segmentBlockIdx];
@@ -1487,13 +1299,13 @@ namespace FFS.Libraries.StaticEcs {
                 }
 
                 if (entitiesMask == 0) {
-                    HeuristicChunks[chunkIdx].NotEmptyBlocks.SetBit(chunkBlockIdx);
+                    Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.SetBit(chunkBlockIdx);
                 }
 
                 entitiesMask |= entitiesMaskFilter;
 
                 if (entitiesMask == ulong.MaxValue) {
-                    HeuristicChunks[chunkIdx].FullBlocks.SetBit(chunkBlockIdx);
+                    Masks.HeuristicChunks[chunkIdx].FullBlocks.SetBit(chunkBlockIdx);
                 }
             }
 
@@ -1503,7 +1315,7 @@ namespace FFS.Libraries.StaticEcs {
                 var chunkBlockIdx = (byte)((baseGlobalBlockEntityIdx >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
                 var chunkIdx = baseGlobalBlockEntityIdx >> Const.ENTITIES_IN_CHUNK_SHIFT;
 
-                var maskSegment = EntitiesMaskSegments[segmentIdx];
+                var maskSegment = Masks.Segments[segmentIdx];
                 if (maskSegment == null) {
                     return;
                 }
@@ -1515,20 +1327,15 @@ namespace FFS.Libraries.StaticEcs {
                 }
 
                 if (entitiesMask == ulong.MaxValue) {
-                    HeuristicChunks[chunkIdx].FullBlocks.ClearBit(chunkBlockIdx);
+                    Masks.HeuristicChunks[chunkIdx].FullBlocks.ClearBit(chunkBlockIdx);
                 }
                 
                 entitiesMask &= ~entitiesMaskFilter;
 
                 if (entitiesMask == 0) {
-                    var notEmptyBlocks = HeuristicChunks[chunkIdx].NotEmptyBlocks.ClearBit(chunkBlockIdx);
-                    if ((notEmptyBlocks & _segmentsMaskCache[segmentIdx & Const.SEGMENTS_IN_CHUNK_MASK]) == 0UL) {
-                        _chunkHeuristicWorldMask[chunkIdx][(segmentIdx & Const.SEGMENTS_IN_CHUNK_MASK) * _chunkHeuristicWorldMaskLen + _idDiv] &= _idMaskInv;
-
-                        EntitiesMaskSegments[segmentIdx] = null;
-
-                        _segmentsPool[_segmentsPoolCount++] = maskSegment;
-
+                    var notEmptyBlocks = Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.ClearBit(chunkBlockIdx);
+                    if ((notEmptyBlocks & Const.DataMasks[segmentIdx & Const.SEGMENTS_IN_CHUNK_MASK]) == 0UL) {
+                        Masks.FreeSegment(chunkIdx, segmentIdx, maskSegment);
                     }
                 }
             }
@@ -1543,64 +1350,33 @@ namespace FFS.Libraries.StaticEcs {
                 IsTag = isTag;
                 NonSerializable = nonSerializable;
                 DynamicId = componentId;
-                _idDiv = (ushort) (DynamicId >> Const.U64_SHIFT);
-                _idMask = 1UL << (DynamicId & Const.U64_MASK);
-                _idMaskInv = ~_idMask;
 
                 Guid = guid;
                 Version = version;
                 _readWriteArrayStrategy = default(T) is IComponentStrategyOverride ? null : readWriteStrategy;
                 _resettableStrategy = _readWriteArrayStrategy as IPackArrayStrategyResettable;
 
-                _segmentsMaskCache = Const.DataMasks;
-                _segmentsPoolCount = 0;
-                if (isTag) {
-                    HasOnAdd = false;
-                    HasOnDelete = false;
-                    HasCopyTo = false;
-                    HasWrite = false;
-                    HasRead = false;
-                } else {
-                    if (default(T) is IComponentHookOverride hookOverride) {
-                        HasOnAdd = hookOverride.HasOnAdd();
-                        HasOnDelete = hookOverride.HasOnDelete();
-                        HasCopyTo = hookOverride.HasCopyTo();
-                    } else {
-                        HasOnAdd = TypeHooks.ComponentHasOnAdd(typeof(T));
-                        HasOnDelete = TypeHooks.ComponentHasOnDelete(typeof(T));
-                        HasCopyTo = TypeHooks.ComponentHasCopyTo(typeof(T));
-                    }
-                    HasWrite = TypeHooks.ComponentHasWrite(typeof(T));
-                    HasRead = TypeHooks.ComponentHasRead(typeof(T));
-                }
+                _componentsPoolCount = 0;
+                var hooks = TypeHooks.DescribeComponent(typeof(T), default(T), isTag);
+                HasOnAdd = hooks.HasOnAdd;
+                HasOnDelete = hooks.HasOnDelete;
+                HasCopyTo = hooks.HasCopyTo;
+                HasWrite = hooks.HasWrite;
+                HasRead = hooks.HasRead;
                 Unmanaged = isTag || !RuntimeHelpers.IsReferenceOrContainsReferences<T>();
-                UnmanagedSize = !isTag && Unmanaged ? BinaryPack.SizeOf<T>() : 0;
                 DataLifecycle = !isTag && !noDataLifecycle;
                 DefaultValue = defaultValue;
                 HasDefaultValue = hasDefaultValue;
 
-                var probe = default(T);
-                HasDisable = !isTag && probe is IDisableable;
+                Masks = new ComponentMasks(componentId, isTag, hooks.HasDisable);
                 #if FFS_ECS_DEBUG
-                IsInternal = !isTag && probe is IComponentInternal;
+                IsInternal = hooks.IsInternal;
                 #endif
-                SegmentMaskLen = (byte)(HasDisable ? Const.BLOCKS_IN_SEGMENT * 2 : Const.BLOCKS_IN_SEGMENT);
 
                 IsRegistered = true;
-                #if FFS_ECS_DEBUG
-                _blockerDelete = 0;
-                _blockerAdd = 0;
-                _blockerDisable = 0;
-                _blockerEnable = 0;
-                #endif
-
-                _chunkHeuristicWorldMask = null;
                 ComponentSegments = null;
+                MaskSegments = null;
                 _componentsPool = null;
-                EntitiesMaskSegments = null;
-                HeuristicChunks = null;
-                _segmentsPool = null;
-                _chunkHeuristicWorldMaskLen = 0;
 
                 #if FFS_ECS_TRACE
                 Utils.Trace($"Registered {TypeName}:\n"
@@ -1632,15 +1408,10 @@ namespace FFS.Libraries.StaticEcs {
 
             [MethodImpl(AggressiveInlining)]
             internal void Initialize(uint chunksCapacity, ulong[][] chunkHeuristicMask, ushort chunkHeuristicMaskLen) {
-                _chunkHeuristicWorldMask = chunkHeuristicMask;
-                _chunkHeuristicWorldMaskLen = chunkHeuristicMaskLen;
-
-                var segmentsCapacity = chunksCapacity * Const.SEGMENTS_IN_CHUNK;
-
-                HeuristicChunks = new HeuristicChunk[chunksCapacity];
-                EntitiesMaskSegments = new ulong[segmentsCapacity][];
-                _segmentsPool = new ulong[segmentsCapacity][];
+                Masks.Initialize(chunksCapacity, chunkHeuristicMask, chunkHeuristicMaskLen);
+                MaskSegments = Masks.Segments;
                 if (!IsTag) {
+                    var segmentsCapacity = chunksCapacity * Const.SEGMENTS_IN_CHUNK;
                     ComponentSegments = new T[segmentsCapacity][];
                     _componentsPool = new T[segmentsCapacity][];
                 }
@@ -1648,7 +1419,6 @@ namespace FFS.Libraries.StaticEcs {
                 if (default(T) is IComponentInternal component) {
                     component.OnInitialize<TWorld>();
                 }
-                
             }
 
             [MethodImpl(AggressiveInlining)]
@@ -1658,13 +1428,11 @@ namespace FFS.Libraries.StaticEcs {
 
             [MethodImpl(NoInlining)]
             internal void HardResetInternal() {
-                var segCount = EntitiesMaskSegments.Length;
-
-                for (var i = 0; i < segCount; i++) {
+                for (var i = 0; i < Masks.Segments.Length; i++) {
                     ReleaseSegmentInternal(i);
                 }
 
-                Array.Clear(HeuristicChunks, 0, HeuristicChunks.Length);
+                Array.Clear(Masks.HeuristicChunks, 0, Masks.HeuristicChunks.Length);
             }
 
             [MethodImpl(NoInlining)]
@@ -1673,44 +1441,33 @@ namespace FFS.Libraries.StaticEcs {
                 for (var s = 0; s < Const.SEGMENTS_IN_CHUNK; s++) {
                     ReleaseSegmentInternal(baseSegmentIdx + s);
                 }
-                HeuristicChunks[chunkIdx] = default;
+                Masks.HeuristicChunks[chunkIdx] = default;
             }
 
             [MethodImpl(AggressiveInlining)]
             private void ReleaseSegmentInternal(int segIdx) {
-                ref var masks = ref EntitiesMaskSegments[segIdx];
-                if (masks == null) return;
-                Array.Clear(masks, 0, SegmentMaskLen);
-
-                if (!IsTag) {
+                if (!IsTag && Masks.Segments[segIdx] != null) {
                     ref var components = ref ComponentSegments[segIdx];
                     if (HasDefaultValue) {
                         components.AsSpan().Fill(DefaultValue);
                     } else {
                         Array.Clear(components, 0, Const.ENTITIES_IN_SEGMENT);
                     }
-                    _componentsPool[_segmentsPoolCount] = components;
+                    _componentsPool[_componentsPoolCount++] = components;
                     components = null;
                 }
-                _segmentsPool[_segmentsPoolCount] = masks;
-                masks = null;
-                _segmentsPoolCount++;
-
+                Masks.ReleaseSegment(segIdx);
             }
 
             [MethodImpl(AggressiveInlining)]
             internal void Resize(uint chunksCapacity, ulong[][] chunkHeuristicMask) {
-                var segmentsCapacity = chunksCapacity * Const.SEGMENTS_IN_CHUNK;
-                
-                _chunkHeuristicWorldMask = chunkHeuristicMask;
-                Array.Resize(ref HeuristicChunks, (int)chunksCapacity);
-                Array.Resize(ref EntitiesMaskSegments, (int)segmentsCapacity);
-                Array.Resize(ref _segmentsPool, (int)segmentsCapacity);
+                Masks.Resize(chunksCapacity, chunkHeuristicMask);
+                MaskSegments = Masks.Segments;
                 if (!IsTag) {
-                    Array.Resize(ref ComponentSegments, (int)segmentsCapacity);
-                    Array.Resize(ref _componentsPool, (int)segmentsCapacity);
+                    var segmentsCapacity = (int) (chunksCapacity * Const.SEGMENTS_IN_CHUNK);
+                    Array.Resize(ref ComponentSegments, segmentsCapacity);
+                    Array.Resize(ref _componentsPool, segmentsCapacity);
                 }
-
             }
 
             [MethodImpl(AggressiveInlining)]
@@ -1722,7 +1479,7 @@ namespace FFS.Libraries.StaticEcs {
                     if (IsTag) {
                         builder.AppendLine(TypeName);
                     } else {
-                        if (HasDisable && HasDisabled(entity)) {
+                        if (Masks.HasDisable && HasDisabled(entity)) {
                             builder.Append("[Disabled] ");
                         }
                         builder.Append(TypeName);
@@ -1744,7 +1501,7 @@ namespace FFS.Libraries.StaticEcs {
                 var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
                 var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
 
-                var maskSegment = EntitiesMaskSegments[segmentIdx];
+                var maskSegment = Masks.Segments[segmentIdx];
                 if (maskSegment != null && (maskSegment[segmentBlockIdx] & blockEntityMask) != 0) {
                     value = ComponentSegments[entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT][entityId & Const.ENTITIES_IN_SEGMENT_MASK];
                     return true;
@@ -1756,100 +1513,63 @@ namespace FFS.Libraries.StaticEcs {
 
             [MethodImpl(NoInlining)]
             private (ulong[], T[]) CreateNewSegment(uint segmentIdx) {
-                _chunkHeuristicWorldMask[segmentIdx >> Const.SEGMENTS_IN_CHUNK_SHIFT][(segmentIdx & Const.SEGMENTS_IN_CHUNK_MASK) * _chunkHeuristicWorldMaskLen + _idDiv] |= _idMask;
+                return (Masks.CreateSegment(segmentIdx), IsTag ? null : NewDataSegment());
+            }
 
-                T[] comps = null;
-                ulong[] masks;
-                if (_segmentsPoolCount > 0) {
-                    var poolIdx = --_segmentsPoolCount;
-                    masks = _segmentsPool[poolIdx];
-                    if (!IsTag) {
-                        comps = _componentsPool[poolIdx];
-                        _componentsPool[poolIdx] = null;
-                    }
-
-                    _segmentsPool[poolIdx] = null;
-
-                    return (masks, comps);
+            private T[] NewDataSegment() {
+                if (_componentsPoolCount > 0) {
+                    var poolIdx = --_componentsPoolCount;
+                    var pooled = _componentsPool[poolIdx];
+                    _componentsPool[poolIdx] = null;
+                    return pooled;
                 }
 
-                if (!IsTag) {
-                    comps = new T[Const.ENTITIES_IN_SEGMENT];
-                    if (HasDefaultValue && DataLifecycle) {
-                        comps.AsSpan().Fill(DefaultValue);
-                    }
+                var comps = new T[Const.ENTITIES_IN_SEGMENT];
+                if (HasDefaultValue && DataLifecycle) {
+                    comps.AsSpan().Fill(DefaultValue);
                 }
+                return comps;
+            }
 
-                masks = new ulong[SegmentMaskLen];
-
-                return (masks, comps);
+            private void FreeDataSegment(uint segmentIdx) {
+                _componentsPool[_componentsPoolCount++] = ComponentSegments[segmentIdx];
+                ComponentSegments[segmentIdx] = null;
             }
 
             [MethodImpl(NoInlining)]
             private void FreeSegment(uint chunkIdx, uint segmentIdx, ulong[] maskSegment, T[] componentSegment) {
-                _chunkHeuristicWorldMask[chunkIdx][(segmentIdx & Const.SEGMENTS_IN_CHUNK_MASK) * _chunkHeuristicWorldMaskLen + _idDiv] &= _idMaskInv;
-
-                EntitiesMaskSegments[segmentIdx] = null;
-                var poolIdx = _segmentsPoolCount++;
+                Masks.FreeSegment(chunkIdx, segmentIdx, maskSegment);
                 if (!IsTag) {
                     ComponentSegments[segmentIdx] = null;
-                    _componentsPool[poolIdx] = componentSegment;
+                    _componentsPool[_componentsPoolCount++] = componentSegment;
                 }
-                _segmentsPool[poolIdx] = maskSegment;
-
             }
 
             #region QUERY
             [MethodImpl(AggressiveInlining)]
-            internal readonly ulong EnabledMask(uint segmentIdx, int segmentBlockIdx) {
-                var masks = EntitiesMaskSegments[segmentIdx];
-                if (masks == null) return 0UL;
-                return HasDisable
-                    ? masks[segmentBlockIdx] & ~masks[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT]
-                    : masks[segmentBlockIdx];
-            }
+            internal readonly ulong EnabledMask(uint segmentIdx, int segmentBlockIdx) => Masks.EnabledMask(segmentIdx, segmentBlockIdx);
 
             [MethodImpl(AggressiveInlining)]
-            internal readonly ulong DisabledMask(uint segmentIdx, int segmentBlockIdx) {
-                if (!HasDisable) return 0UL;
-                var masks = EntitiesMaskSegments[segmentIdx];
-                return masks != null ? masks[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT] : 0UL;
-            }
+            internal readonly ulong DisabledMask(uint segmentIdx, int segmentBlockIdx) => Masks.DisabledMask(segmentIdx, segmentBlockIdx);
 
             [MethodImpl(AggressiveInlining)]
-            internal readonly ulong AnyMask(uint segmentIdx, int segmentBlockIdx) {
-                var masks = EntitiesMaskSegments[segmentIdx];
-                return masks != null ? masks[segmentBlockIdx] : 0UL;
-            }
+            internal readonly ulong AnyMask(uint segmentIdx, int segmentBlockIdx) => Masks.AnyMask(segmentIdx, segmentBlockIdx);
             
             #if FFS_ECS_DEBUG
             [MethodImpl(AggressiveInlining)]
-            internal void BlockDelete(int val) {
-                _blockerDelete += val;
-            }
+            internal void BlockDelete(int val) => Masks.BlockDelete(val);
 
             [MethodImpl(AggressiveInlining)]
-            internal void BlockDeleteDisable(int val) {
-                _blockerDelete += val;
-                if (!IsTag) _blockerDisable += val;
-            }
+            internal void BlockDeleteDisable(int val) => Masks.BlockDeleteDisable(val);
 
             [MethodImpl(AggressiveInlining)]
-            internal void BlockDeleteEnable(int val) {
-                _blockerDelete += val;
-                if (!IsTag) _blockerEnable += val;
-            }
+            internal void BlockDeleteEnable(int val) => Masks.BlockDeleteEnable(val);
 
             [MethodImpl(AggressiveInlining)]
-            internal void BlockAdd(int val) {
-                _blockerAdd += val;
-            }
+            internal void BlockAdd(int val) => Masks.BlockAdd(val);
 
             [MethodImpl(AggressiveInlining)]
-            internal void BlockAddEnable(int val) {
-                _blockerAdd += val;
-                if (!IsTag) _blockerEnable += val;
-            }
+            internal void BlockAddEnable(int val) => Masks.BlockAddEnable(val);
             #endif
             #endregion
 
@@ -1857,9 +1577,9 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             internal void WriteChunk(ref BinaryPackWriter writer, uint chunkIdx) {
                 writer.WriteBool(IsTag);
-                writer.WriteBool(HasDisable);
+                writer.WriteBool(Masks.HasDisable);
 
-                ref var heuristic = ref HeuristicChunks[chunkIdx];
+                ref var heuristic = ref Masks.HeuristicChunks[chunkIdx];
                 var notEmptyBlocks = heuristic.NotEmptyBlocks.Value;
                 writer.WriteUlong(notEmptyBlocks);
                 
@@ -1873,7 +1593,7 @@ namespace FFS.Libraries.StaticEcs {
                         var segmentBase = chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT;
                         for (var segment = 0; segment < Const.SEGMENTS_IN_CHUNK; segment++) {
                             if (((notEmptyBlocks >> (segment << Const.BLOCKS_IN_SEGMENT_SHIFT)) & 0b1111UL) != 0) {
-                                var masks = EntitiesMaskSegments[segmentBase + segment];
+                                var masks = Masks.Segments[segmentBase + segment];
                                 writer.WriteUlong(masks[0]);
                                 writer.WriteUlong(masks[1]);
                                 writer.WriteUlong(masks[2]);
@@ -1906,14 +1626,14 @@ namespace FFS.Libraries.StaticEcs {
                             var curSegmentIdx = (chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT) + (chunkBlockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT);
                             if (curSegmentIdx != segmentIdx) {
                                 segmentIdx = curSegmentIdx;
-                                masks = EntitiesMaskSegments[segmentIdx];
+                                masks = Masks.Segments[segmentIdx];
                                 components = ComponentSegments[segmentIdx];
                             }
 
                             var entitiesMask = masks![blockIdx];
 
                             writer.WriteUlong(entitiesMask);
-                            if (HasDisable) {
+                            if (Masks.HasDisable) {
                                 writer.WriteUlong(masks[blockIdx + Const.BLOCKS_IN_SEGMENT]);
                             }
 
@@ -1974,7 +1694,7 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
                 var hadDisable = reader.ReadBool();
 
-                ref var heuristic = ref HeuristicChunks[chunkIdx];
+                ref var heuristic = ref Masks.HeuristicChunks[chunkIdx];
                 var notEmptyBlocks = reader.ReadUlong();
                 heuristic.NotEmptyBlocks.Value = notEmptyBlocks;
                 
@@ -1989,7 +1709,7 @@ namespace FFS.Libraries.StaticEcs {
                         for (var segment = 0; segment < Const.SEGMENTS_IN_CHUNK; segment++) {
                             if (((notEmptyBlocks >> (segment << Const.BLOCKS_IN_SEGMENT_SHIFT)) & 0b1111UL) != 0) {
                                 var segmentIdx = segmentBase + segment;
-                                ref var masks = ref EntitiesMaskSegments[segmentIdx];
+                                ref var masks = ref Masks.Segments[segmentIdx];
                                 masks ??= CreateNewSegment((uint)segmentIdx).Item1;
                                 masks[0] = reader.ReadUlong();
                                 masks[1] = reader.ReadUlong();
@@ -2023,10 +1743,10 @@ namespace FFS.Libraries.StaticEcs {
                             if (curSegmentIdx != segmentIdx) {
                                 segmentIdx = curSegmentIdx;
 
-                                masks = EntitiesMaskSegments[segmentIdx];
+                                masks = Masks.Segments[segmentIdx];
                                 if (masks == null) {
                                     (masks, ComponentSegments[segmentIdx]) = CreateNewSegment(segmentIdx);
-                                    EntitiesMaskSegments[segmentIdx] = masks;
+                                    Masks.Segments[segmentIdx] = masks;
                                 }
 
                                 components = ComponentSegments[segmentIdx];
@@ -2038,7 +1758,7 @@ namespace FFS.Libraries.StaticEcs {
                                 disabledEntitiesMask = reader.ReadUlong();
                             }
                             masks![blockIdx] = entitiesMask;
-                            if (HasDisable) {
+                            if (Masks.HasDisable) {
                                 masks[blockIdx + Const.BLOCKS_IN_SEGMENT] = disabledEntitiesMask;
                             }
 
@@ -2135,7 +1855,7 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 if (size > short.MaxValue) throw new StaticEcsException($"Size of component {typeof(T)} more than {short.MaxValue} bytes");
                 #endif
-                if (HasDisable && HasDisabled(entity)) {
+                if (Masks.HasDisable && HasDisabled(entity)) {
                     writer.WriteUshortAt(offset, (ushort)(size | ComponentSerializerUtils.DisabledBit));
                 }
                 else {
@@ -2176,7 +1896,7 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
                 Set(entity, component, false);
 
-                if (HasDisable && disabled) {
+                if (Masks.HasDisable && disabled) {
                     Disable(entity);
                 }
             }
@@ -2222,23 +1942,13 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             internal static void _ReadEntity(ref BinaryPackReader reader, uint eid) => Instance.ReadEntity(ref reader, new Entity(eid));
 
-            [MethodImpl(AggressiveInlining)]
-            internal static HeuristicChunk[] _HeuristicChunks() => Instance.HeuristicChunks;
 
             [MethodImpl(AggressiveInlining)]
             internal static Array _ComponentsSegments() => Instance.ComponentSegments;
 
-            [MethodImpl(AggressiveInlining)]
-            internal static bool _IsSegmentAllocated(uint segmentIdx) => segmentIdx < Instance.EntitiesMaskSegments.Length && Instance.EntitiesMaskSegments[segmentIdx] != null;
 
-            [MethodImpl(AggressiveInlining)]
-            internal static ulong _EnabledMask(uint segmentIdx, int blockIdx) => Instance.EnabledMask(segmentIdx, blockIdx);
 
-            [MethodImpl(AggressiveInlining)]
-            internal static ulong _DisabledMask(uint segmentIdx, int blockIdx) => Instance.DisabledMask(segmentIdx, blockIdx);
 
-            [MethodImpl(AggressiveInlining)]
-            internal static ulong _AnyMask(uint segmentIdx, int blockIdx) => Instance.AnyMask(segmentIdx, blockIdx);
 
             [MethodImpl(AggressiveInlining)]
             internal static void _BatchDelete(ulong entitiesMaskFilter, uint segmentIdx, byte segmentBlockIdx, HookReason reason) {
@@ -2250,11 +1960,7 @@ namespace FFS.Libraries.StaticEcs {
                 }
             }
 
-            [MethodImpl(AggressiveInlining)]
-            internal static int _CalculateCapacity() => Instance.CalculateCapacity();
 
-            [MethodImpl(AggressiveInlining)]
-            internal static uint _CalculateCount() => Instance.CalculateCount();
 
             [MethodImpl(AggressiveInlining)]
             internal static bool _TryGetRaw(uint eid, out IComponentOrTag value) {
@@ -2302,14 +2008,8 @@ namespace FFS.Libraries.StaticEcs {
                 return added;
             }
 
-            [MethodImpl(AggressiveInlining)]
-            internal static bool _Has(uint eid) => Instance.Has(new Entity(eid));
 
-            [MethodImpl(AggressiveInlining)]
-            internal static bool _HasEnabled(uint eid) => Instance.HasEnabled(new Entity(eid));
 
-            [MethodImpl(AggressiveInlining)]
-            internal static bool _HasDisabled(uint eid) => Instance.HasDisabled(new Entity(eid));
 
             [MethodImpl(AggressiveInlining)]
             internal static ToggleResult _Enable(uint eid) => Instance.Enable(new Entity(eid));

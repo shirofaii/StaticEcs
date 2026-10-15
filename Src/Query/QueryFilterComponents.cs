@@ -48,7 +48,7 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
+            return World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
@@ -79,8 +79,8 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T1>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
+            return World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
@@ -114,9 +114,9 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T1>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T2>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
+            return World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
@@ -153,10 +153,10 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T1>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T2>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T3>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
+            return World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
@@ -196,11 +196,11 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T1>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T2>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T3>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T4>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
+            return World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
@@ -243,12 +243,12 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T1>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T2>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T3>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T4>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T5>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
+            return World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
@@ -294,13 +294,13 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T1>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T2>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T3>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T4>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T5>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T6>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
+            return World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T6>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
@@ -349,14 +349,14 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T1>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T2>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T3>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T4>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T5>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T6>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T7>.Instance.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
+            return World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T6>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World<TWorld>.Components<T7>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
@@ -416,7 +416,7 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value;
+            return ~World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
@@ -447,8 +447,8 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T1>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value;
+            return ~World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
@@ -482,9 +482,9 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T1>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T2>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value;
+            return ~World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
@@ -521,10 +521,10 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T1>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T2>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T3>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value;
+            return ~World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
@@ -564,11 +564,11 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T1>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T2>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T3>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T4>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value;
+            return ~World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
@@ -611,12 +611,12 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T1>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T2>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T3>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T4>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T5>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value;
+            return ~World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
@@ -662,13 +662,13 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T1>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T2>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T3>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T4>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T5>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T6>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value;
+            return ~World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T6>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
@@ -717,14 +717,14 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T1>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T2>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T3>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T4>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T5>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T6>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T7>.Instance.HeuristicChunks[chunkIdx].FullBlocks.Value;
+            return ~World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T6>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World<TWorld>.Components<T7>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]

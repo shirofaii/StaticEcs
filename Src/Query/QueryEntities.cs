@@ -37,14 +37,15 @@ namespace FFS.Libraries.StaticEcs {
             public int Count(EntityStatusType entities = EntityStatusType.Enabled,
                                      ReadOnlySpan<ushort> clusters = default) {
                 var count = 0;
-                if (Prepare(Filter, clusters, entities, true, out var queryData, out var firstGlobalBlockIdx)) {
+                var def = QueryDefOf(Filter);
+                if (Prepare(def, clusters, entities, true, out var queryData, out var firstGlobalBlockIdx)) {
                     while (firstGlobalBlockIdx >= 0) {
                         ref var cache = ref queryData.Blocks[firstGlobalBlockIdx];
                         count += cache.EntitiesMask.PopCnt();
                         firstGlobalBlockIdx = cache.NextGlobalBlock;
                     }
 
-                    Dispose(Filter, entities, true, queryData);
+                    Dispose(def, entities, true, queryData);
                 }
 
                 return count;
@@ -60,14 +61,15 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             public int Count(ReadOnlySpan<uint> chunks, EntityStatusType entities = EntityStatusType.Enabled) {
                 var count = 0;
-                if (Prepare(Filter, chunks, entities, true, out var queryData, out var firstGlobalBlockIdx)) {
+                var def = QueryDefOf(Filter);
+                if (Prepare(def, chunks, entities, true, out var queryData, out var firstGlobalBlockIdx)) {
                     while (firstGlobalBlockIdx >= 0) {
                         ref var cache = ref queryData.Blocks[firstGlobalBlockIdx];
                         count += cache.EntitiesMask.PopCnt();
                         firstGlobalBlockIdx = cache.NextGlobalBlock;
                     }
 
-                    Dispose(Filter, entities, true, queryData);
+                    Dispose(def, entities, true, queryData);
                 }
 
                 return count;
@@ -89,9 +91,10 @@ namespace FFS.Libraries.StaticEcs {
                                      ReadOnlySpan<ushort> clusters = default,
                                      bool withDisabledClusters = false) {
                 var strict = mode == QueryMode.Strict;
-                if (Prepare(Filter, clusters, entities, strict, out var queryData, out var firstGlobalBlockIdx, withDisabledClusters)) {
+                var def = QueryDefOf(Filter);
+                if (Prepare(def, clusters, entities, strict, out var queryData, out var firstGlobalBlockIdx, withDisabledClusters)) {
                     Data.Instance.DestroyEntitiesBatch(queryData, firstGlobalBlockIdx);
-                    Dispose(Filter, entities, strict, queryData);
+                    Dispose(def, entities, strict, queryData);
                 }
             }
 
@@ -102,9 +105,10 @@ namespace FFS.Libraries.StaticEcs {
                                                ReadOnlySpan<ushort> clusters = default,
                                                bool withDisabledClusters = false) {
                 var strict = mode == QueryMode.Strict;
-                if (Prepare(Filter, clusters, entities, strict, out var queryData, out var firstGlobalBlockIdx, withDisabledClusters)) {
+                var def = QueryDefOf(Filter);
+                if (Prepare(def, clusters, entities, strict, out var queryData, out var firstGlobalBlockIdx, withDisabledClusters)) {
                     Data.Instance.DestroyEntitiesBatch(queryData, firstGlobalBlockIdx, reason);
-                    Dispose(Filter, entities, strict, queryData);
+                    Dispose(def, entities, strict, queryData);
                 }
             }
 
@@ -114,9 +118,10 @@ namespace FFS.Libraries.StaticEcs {
                                                EntityStatusType entities = EntityStatusType.Enabled,
                                                QueryMode mode = QueryMode.Strict) {
                 var strict = mode == QueryMode.Strict;
-                if (Prepare(Filter, chunks, entities, strict, out var queryData, out var firstGlobalBlockIdx)) {
+                var def = QueryDefOf(Filter);
+                if (Prepare(def, chunks, entities, strict, out var queryData, out var firstGlobalBlockIdx)) {
                     Data.Instance.DestroyEntitiesBatch(queryData, firstGlobalBlockIdx, reason);
-                    Dispose(Filter, entities, strict, queryData);
+                    Dispose(def, entities, strict, queryData);
                     return true;
                 }
 
@@ -129,9 +134,10 @@ namespace FFS.Libraries.StaticEcs {
                                      EntityStatusType entities = EntityStatusType.Enabled,
                                      QueryMode mode = QueryMode.Strict) {
                 var strict = mode == QueryMode.Strict;
-                if (Prepare(Filter, chunks, entities, strict, out var queryData, out var firstGlobalBlockIdx)) {
+                var def = QueryDefOf(Filter);
+                if (Prepare(def, chunks, entities, strict, out var queryData, out var firstGlobalBlockIdx)) {
                     Data.Instance.DestroyEntitiesBatch(queryData, firstGlobalBlockIdx);
-                    Dispose(Filter, entities, strict, queryData);
+                    Dispose(def, entities, strict, queryData);
                 }
             }
 
@@ -151,9 +157,10 @@ namespace FFS.Libraries.StaticEcs {
                                     ReadOnlySpan<ushort> clusters = default,
                                     bool withDisabledClusters = false) {
                 var strict = mode == QueryMode.Strict;
-                if (Prepare(Filter, clusters, entities, strict, out var queryData, out var firstGlobalBlockIdx, withDisabledClusters)) {
+                var def = QueryDefOf(Filter);
+                if (Prepare(def, clusters, entities, strict, out var queryData, out var firstGlobalBlockIdx, withDisabledClusters)) {
                     Data.Instance.UnloadEntitiesBatch(queryData, firstGlobalBlockIdx);
-                    Dispose(Filter, entities, strict, queryData);
+                    Dispose(def, entities, strict, queryData);
                 }
             }
 
@@ -163,9 +170,10 @@ namespace FFS.Libraries.StaticEcs {
                                     EntityStatusType entities = EntityStatusType.Enabled,
                                     QueryMode mode = QueryMode.Strict) {
                 var strict = mode == QueryMode.Strict;
-                if (Prepare(Filter, chunks, entities, strict, out var queryData, out var firstGlobalBlockIdx)) {
+                var def = QueryDefOf(Filter);
+                if (Prepare(def, chunks, entities, strict, out var queryData, out var firstGlobalBlockIdx)) {
                     Data.Instance.UnloadEntitiesBatch(queryData, firstGlobalBlockIdx);
-                    Dispose(Filter, entities, strict, queryData);
+                    Dispose(def, entities, strict, queryData);
                 }
             }
 
@@ -189,9 +197,10 @@ namespace FFS.Libraries.StaticEcs {
                                                        ReadOnlySpan<ushort> clusters = default)
                 where T1 : struct, IComponentOrTag {
                 var strict = mode == QueryMode.Strict;
-                if (Prepare(Filter, clusters, entities, strict, out var queryData, out var firstGlobalBlockIdx)) {
+                var def = QueryDefOf(Filter);
+                if (Prepare(def, clusters, entities, strict, out var queryData, out var firstGlobalBlockIdx)) {
                     Components<T1>.Instance.BatchDelete(queryData, firstGlobalBlockIdx);
-                    Dispose(Filter, entities, strict, queryData);
+                    Dispose(def, entities, strict, queryData);
                 }
 
                 return this;
@@ -206,9 +215,10 @@ namespace FFS.Libraries.StaticEcs {
                                                        QueryMode mode = QueryMode.Strict)
                 where T1 : struct, IComponentOrTag {
                 var strict = mode == QueryMode.Strict;
-                if (Prepare(Filter, chunks, entities, strict, out var queryData, out var firstGlobalBlockIdx)) {
+                var def = QueryDefOf(Filter);
+                if (Prepare(def, chunks, entities, strict, out var queryData, out var firstGlobalBlockIdx)) {
                     Components<T1>.Instance.BatchDelete(queryData, firstGlobalBlockIdx);
-                    Dispose(Filter, entities, strict, queryData);
+                    Dispose(def, entities, strict, queryData);
                 }
 
                 return this;
@@ -220,7 +230,8 @@ namespace FFS.Libraries.StaticEcs {
                                                   SnapshotWriteParams snapshotParams,
                                                   ReadOnlySpan<uint> chunks,
                                                   EntityStatusType entities) {
-                if (Prepare(Filter, chunks, entities, true, out var queryData, out var firstGlobalBlockIdx)) {
+                var def = QueryDefOf(Filter);
+                if (Prepare(def, chunks, entities, true, out var queryData, out var firstGlobalBlockIdx)) {
                     var entity = new Entity();
                     ref var eid = ref entity.IdWithOffset;
 
@@ -255,7 +266,7 @@ namespace FFS.Libraries.StaticEcs {
                             }
                         } while (runStarts != 0);
                     }
-                    Dispose(Filter, entities, true, queryData);
+                    Dispose(def, entities, true, queryData);
                 }
             }
 
@@ -266,7 +277,8 @@ namespace FFS.Libraries.StaticEcs {
                                                  SnapshotReadParams snapshotParams,
                                                  ReadOnlySpan<uint> chunks,
                                                  EntityStatusType entities) {
-                if (Prepare(Filter, chunks, entities, true, out var queryData, out var firstGlobalBlockIdx)) {
+                var def = QueryDefOf(Filter);
+                if (Prepare(def, chunks, entities, true, out var queryData, out var firstGlobalBlockIdx)) {
                     var entity = new Entity();
                     ref var eid = ref entity.IdWithOffset;
 
@@ -301,7 +313,7 @@ namespace FFS.Libraries.StaticEcs {
                             }
                         } while (runStarts != 0);
                     }
-                    Dispose(Filter, entities, true, queryData);
+                    Dispose(def, entities, true, queryData);
                 }
             }
         }

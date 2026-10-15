@@ -343,6 +343,10 @@ namespace FFS.Libraries.StaticEcs {
 
             // CONFIG
             internal readonly bool IndependentWorld;
+            internal readonly int Generation;
+            internal readonly Dictionary<Type, ComponentMasks> MasksByType;
+            internal readonly Dictionary<Type, byte> EntityTypeIdByType;
+            private static int _generations;
 
             // SYSTEMS
             internal List<SystemsHandle> RegisteredSystems;
@@ -355,6 +359,9 @@ namespace FFS.Libraries.StaticEcs {
             public Data(WorldConfig worldConfig) {
                 worldConfig = worldConfig.MergeWith(WorldConfig.Default());
                 IndependentWorld = worldConfig.Independent.Value;
+                Generation = ++_generations;
+                MasksByType = new Dictionary<Type, ComponentMasks>();
+                EntityTypeIdByType = new Dictionary<Type, byte>();
 
                 // TEMPLATES
                 _versionEntitiesTemplate = new ushort[Const.ENTITIES_IN_SEGMENT];
@@ -2880,6 +2887,7 @@ namespace FFS.Libraries.StaticEcs {
                 T>() where T : struct, IEntityType {
                 var id = default(T).Id();
                 EntityTypeInfo<T>.Instance = new EntityTypeInfo<T>(id, EntityTypeType<T>.HasOnCreate());
+                EntityTypeIdByType[typeof(T)] = id;
 
                 ref var data = ref EntityTypes[id];
                 data.Registered = true;
@@ -2929,25 +2937,6 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
 
                 var storage = new Components<T>(_poolsCountComponents, guid, typeConfig.Version ?? 0, typeConfig.NoDataLifecycle ?? false, isTag ? null : typeConfig.ReadWriteStrategy, typeConfig.DefaultValue.HasValue, typeConfig.DefaultValue ?? default, isTag, nonSerializable, typeName);
-                StoreComponentStorage(in storage, guid, nonSerializable, typeName);
-            }
-
-            #if NET5_0_OR_GREATER
-            [UnconditionalSuppressMessage("AOT", "IL2091", Justification = "Component/tag metadata is preserved by the registration path and DynamicDependency on RegisterAll.")]
-            #endif
-            [MethodImpl(AggressiveInlining)]
-            internal void RegisterDefaultComponentOrTagTypeInternal<T>(bool isTag, bool nonSerializable, string typeName) where T : struct, IComponentOrTag {
-                var guid = typeof(T).GuidFromAQN();
-                #if FFS_ECS_DEBUG
-                AssertGuidNotEmpty(WorldTypeName, guid, typeName);
-                #endif
-
-                var storage = new Components<T>(_poolsCountComponents, guid, 0, false, null, false, default, isTag, nonSerializable, typeName);
-                StoreComponentStorage(in storage, guid, nonSerializable, typeName);
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            private void StoreComponentStorage<T>(in Components<T> storage, Guid guid, bool nonSerializable, string typeName) where T : struct, IComponentOrTag {
                 #if FFS_ECS_DEBUG
                 Components<T>.instance = storage;
                 #else
@@ -2957,7 +2946,9 @@ namespace FFS.Libraries.StaticEcs {
                 RegisterComponentPool(Components<T>.Handle, guid, nonSerializable, typeName);
             }
 
-            private void RegisterComponentPool(ComponentsHandle handle, Guid guid, bool nonSerializable, string typeName) {
+            internal ushort ComponentPoolsCount => _poolsCountComponents;
+
+            internal void RegisterComponentPool(ComponentsHandle handle, Guid guid, bool nonSerializable, string typeName) {
                 if (_componentPoolByGuid.ContainsKey(guid)) {
                     throw new StaticEcsException($"Type {typeName} with guid {guid} already registered");
                 }
@@ -2974,6 +2965,7 @@ namespace FFS.Libraries.StaticEcs {
                 }
 
                 _componentPoolByGuid[guid] = handle;
+                MasksByType[handle.ComponentType] = handle.Masks;
             }
 
             [MethodImpl(AggressiveInlining)]

@@ -448,12 +448,12 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         internal static void AssertComponentDisableable<T>(string type, [CallerMemberName] string method = "") where T : struct, IComponentOrTag {
-            if (!Components<T>.Instance.HasDisable) AssertComponentDisableableFailed<T>(type, method);
+            if (!Components<T>.Instance.Masks.HasDisable) AssertComponentDisableableFailed<T>(type, method);
         }
 
         [MethodImpl(NoInlining)]
         private static void AssertComponentDisableableFailed<T>(string type, string method) where T : struct, IComponentOrTag {
-            if (!Components<T>.Instance.HasDisable) {
+            if (!Components<T>.Instance.Masks.HasDisable) {
                 throw new StaticEcsException(type, method, $"Component {typeof(T).GenericName()} does not implement IDisableable.");
             }
         }

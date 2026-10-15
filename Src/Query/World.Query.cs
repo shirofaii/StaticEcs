@@ -132,9 +132,9 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             /// <param name="entities">Which entity lifecycle states to include (default: only enabled).</param>
             /// <param name="clusters">Optional cluster IDs to restrict iteration scope. Empty = all clusters.</param>
-            /// <returns>A <see cref="QueryStrictIterator{TWorld, TFilter}"/> for foreach enumeration.</returns>
+            /// <returns>A <see cref="QueryStrictIterator{TWorld}"/> for foreach enumeration.</returns>
             [MethodImpl(AggressiveInlining)]
-            public QueryStrictIterator<TWorld, TFilter> GetEnumerator() => new(default(ReadOnlySpan<ushort>), Filter, EntityStatusType.Enabled);
+            public QueryStrictIterator<TWorld> GetEnumerator() => new(default(ReadOnlySpan<ushort>), QueryDefOf(Filter), EntityStatusType.Enabled);
 
             [MethodImpl(AggressiveInlining)]
             public WorldQuery<And<TFilter, None<T0>>> Without<T0>()
@@ -197,9 +197,9 @@ namespace FFS.Libraries.StaticEcs {
                 where T7 : struct, IComponentOrTag => new(new And<TFilter, None<T0, T1, T2, T3, T4, T5, T6, T7>>(Filter, default));
 
             [MethodImpl(AggressiveInlining)]
-            public QueryStrictIterator<TWorld, TFilter> Entities(EntityStatusType entities = EntityStatusType.Enabled,
+            public QueryStrictIterator<TWorld> Entities(EntityStatusType entities = EntityStatusType.Enabled,
                                                                  ReadOnlySpan<ushort> clusters = default) {
-                return new QueryStrictIterator<TWorld, TFilter>(clusters, Filter, entities);
+                return new QueryStrictIterator<TWorld>(clusters, QueryDefOf(Filter), entities);
             }
             
             /// <summary>
@@ -216,21 +216,21 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             /// <param name="entities">Which entity lifecycle states to include (default: only enabled).</param>
             /// <param name="clusters">Optional cluster IDs to restrict iteration scope. Empty = all clusters.</param>
-            /// <returns>A <see cref="QueryFlexibleIterator{TWorld, TFilter}"/> for foreach enumeration.</returns>
+            /// <returns>A <see cref="QueryFlexibleIterator{TWorld}"/> for foreach enumeration.</returns>
             [MethodImpl(AggressiveInlining)]
-            public QueryFlexibleIterator<TWorld, TFilter> EntitiesFlexible(EntityStatusType entities = EntityStatusType.Enabled,
+            public QueryFlexibleIterator<TWorld> EntitiesFlexible(EntityStatusType entities = EntityStatusType.Enabled,
                                                                            ReadOnlySpan<ushort> clusters = default) {
-                return new QueryFlexibleIterator<TWorld, TFilter>(clusters, Filter, entities);
+                return new QueryFlexibleIterator<TWorld>(clusters, QueryDefOf(Filter), entities);
             }
             
             [MethodImpl(AggressiveInlining)]
-            internal QueryStrictIterator<TWorld, TFilter> Entities(ReadOnlySpan<uint> chunks, EntityStatusType entities = EntityStatusType.Enabled) {
-                return new QueryStrictIterator<TWorld, TFilter>(chunks, Filter, entities);
+            internal QueryStrictIterator<TWorld> Entities(ReadOnlySpan<uint> chunks, EntityStatusType entities = EntityStatusType.Enabled) {
+                return new QueryStrictIterator<TWorld>(chunks, QueryDefOf(Filter), entities);
             }
 
             [MethodImpl(AggressiveInlining)]
-            internal QueryFlexibleIterator<TWorld, TFilter> EntitiesFlexible(ReadOnlySpan<uint> chunks, EntityStatusType entities = EntityStatusType.Enabled) {
-                return new QueryFlexibleIterator<TWorld, TFilter>(chunks, Filter, entities);
+            internal QueryFlexibleIterator<TWorld> EntitiesFlexible(ReadOnlySpan<uint> chunks, EntityStatusType entities = EntityStatusType.Enabled) {
+                return new QueryFlexibleIterator<TWorld>(chunks, QueryDefOf(Filter), entities);
             }
 
             /// <summary>
@@ -244,7 +244,7 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             public bool Any(out Entity entity, EntityStatusType entities = EntityStatusType.Enabled,
                             ReadOnlySpan<ushort> clusters = default) {
-                return FindFirst(Filter, clusters, entities, out entity, false);
+                return FindFirst(QueryDefOf(Filter), clusters, entities, out entity, false);
             }
 
             /// <summary>
@@ -260,7 +260,7 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             public bool One(out Entity entity, EntityStatusType entities = EntityStatusType.Enabled,
                             ReadOnlySpan<ushort> clusters = default) {
-                return FindFirst(Filter, clusters, entities, out entity, true);
+                return FindFirst(QueryDefOf(Filter), clusters, entities, out entity, true);
             }
 
             /// <summary>

@@ -14,7 +14,41 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     [Il2CppEagerStaticClassConstruction]
     #endif
+    internal readonly struct ComponentHooks {
+        internal readonly bool HasOnAdd;
+        internal readonly bool HasOnDelete;
+        internal readonly bool HasCopyTo;
+        internal readonly bool HasWrite;
+        internal readonly bool HasRead;
+        internal readonly bool HasDisable;
+        internal readonly bool IsInternal;
+
+        internal ComponentHooks(bool hasOnAdd, bool hasOnDelete, bool hasCopyTo, bool hasWrite, bool hasRead, bool hasDisable, bool isInternal) {
+            HasOnAdd = hasOnAdd;
+            HasOnDelete = hasOnDelete;
+            HasCopyTo = hasCopyTo;
+            HasWrite = hasWrite;
+            HasRead = hasRead;
+            HasDisable = hasDisable;
+            IsInternal = isInternal;
+        }
+    }
+
     internal static class TypeHooks {
+        internal static ComponentHooks DescribeComponent(Type type, object probe, bool isTag) {
+            if (isTag) {
+                return default;
+            }
+
+            if (probe is IComponentHookOverride hookOverride) {
+                return new ComponentHooks(hookOverride.HasOnAdd(), hookOverride.HasOnDelete(), hookOverride.HasCopyTo(),
+                    ComponentHasWrite(type), ComponentHasRead(type), probe is IDisableable, probe is IComponentInternal);
+            }
+
+            return new ComponentHooks(ComponentHasOnAdd(type), ComponentHasOnDelete(type), ComponentHasCopyTo(type),
+                ComponentHasWrite(type), ComponentHasRead(type), probe is IDisableable, probe is IComponentInternal);
+        }
+
         private static readonly Type[] ComponentOnAddParams = { typeof(World<>.Entity) };
         private static readonly Type[] ComponentOnDeleteParams = { typeof(World<>.Entity), typeof(HookReason) };
         private static readonly Type[] ComponentCopyToParams = { typeof(World<>.Entity), typeof(World<>.Entity), typeof(bool) };

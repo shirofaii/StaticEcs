@@ -547,23 +547,13 @@ namespace FFS.Libraries.StaticEcs {
         private readonly unsafe delegate*<ref BinaryPackWriter, uint, bool, bool> _writeEntity;
         private readonly unsafe delegate*<ref BinaryPackReader, uint, void> _readEntity;
         // chunks & segments
-        private readonly unsafe delegate*<HeuristicChunk[]> _heuristicChunks;
         private readonly unsafe delegate*<Array> _componentsSegments;
-        private readonly unsafe delegate*<uint, bool> _isSegmentAllocated;
-        private readonly unsafe delegate*<uint, int, ulong> _enabledMask;
-        private readonly unsafe delegate*<uint, int, ulong> _disabledMask;
-        private readonly unsafe delegate*<uint, int, ulong> _anyMask;
         private readonly unsafe delegate*<ulong, uint, byte, HookReason, void> _batchDelete;
-        private readonly unsafe delegate*<int> _calculateCapacity;
-        private readonly unsafe delegate*<uint> _calculateCount;
         // entity
         private readonly unsafe delegate*<uint, out IComponentOrTag, bool> _tryGetRaw;
         private readonly unsafe delegate*<uint, IComponentOrTag, void> _setRaw;
         private readonly unsafe delegate*<uint, IComponentOrTag, void> _setRawDirect;
         private readonly unsafe delegate*<uint, bool> _add;
-        private readonly unsafe delegate*<uint, bool> _has;
-        private readonly unsafe delegate*<uint, bool> _hasEnabled;
-        private readonly unsafe delegate*<uint, bool> _hasDisabled;
         private readonly unsafe delegate*<uint, ToggleResult> _enable;
         private readonly unsafe delegate*<uint, ToggleResult> _disable;
         private readonly unsafe delegate*<uint, HookReason, bool> _delete;
@@ -605,6 +595,10 @@ namespace FFS.Libraries.StaticEcs {
         /// </summary>
         public readonly bool NonSerializable;
 
+        private readonly ComponentMasks _masks;
+
+        internal ComponentMasks Masks => _masks;
+
         #if NET5_0_OR_GREATER
         [UnconditionalSuppressMessage("AOT", "IL2091", Justification = "Component metadata is preserved by the registration path.")]
         #endif
@@ -627,6 +621,7 @@ namespace FFS.Libraries.StaticEcs {
                 instance.DynamicId,
                 instance.IsTag,
                 instance.NonSerializable,
+                instance.Masks,
                 &World<TWorld>.Components<TComponent>._Initialize,
                 &World<TWorld>.Components<TComponent>._Resize,
                 &World<TWorld>.Components<TComponent>._Destroy,
@@ -637,22 +632,12 @@ namespace FFS.Libraries.StaticEcs {
                 &World<TWorld>.Components<TComponent>._ReadChunk,
                 &World<TWorld>.Components<TComponent>._WriteEntity,
                 &World<TWorld>.Components<TComponent>._ReadEntity,
-                &World<TWorld>.Components<TComponent>._HeuristicChunks,
                 &World<TWorld>.Components<TComponent>._ComponentsSegments,
-                &World<TWorld>.Components<TComponent>._IsSegmentAllocated,
-                &World<TWorld>.Components<TComponent>._EnabledMask,
-                &World<TWorld>.Components<TComponent>._DisabledMask,
-                &World<TWorld>.Components<TComponent>._AnyMask,
                 &World<TWorld>.Components<TComponent>._BatchDelete,
-                &World<TWorld>.Components<TComponent>._CalculateCapacity,
-                &World<TWorld>.Components<TComponent>._CalculateCount,
                 &World<TWorld>.Components<TComponent>._TryGetRaw,
                 &World<TWorld>.Components<TComponent>._SetRaw,
                 &World<TWorld>.Components<TComponent>._SetRawDirect,
                 &World<TWorld>.Components<TComponent>._Add,
-                &World<TWorld>.Components<TComponent>._Has,
-                &World<TWorld>.Components<TComponent>._HasEnabled,
-                &World<TWorld>.Components<TComponent>._HasDisabled,
                 &World<TWorld>.Components<TComponent>._Enable,
                 &World<TWorld>.Components<TComponent>._Disable,
                 &World<TWorld>.Components<TComponent>._Delete,
@@ -670,6 +655,7 @@ namespace FFS.Libraries.StaticEcs {
             ushort dynamicId,
             bool isTag,
             bool nonSerializable,
+            ComponentMasks masks,
             delegate*<uint, ulong[][], ushort, void> initialize,
             delegate*<uint, ulong[][], void> resize,
             delegate*<void> destroy,
@@ -680,22 +666,12 @@ namespace FFS.Libraries.StaticEcs {
             delegate*<ref BinaryPackReader, uint, void> readChunk,
             delegate*<ref BinaryPackWriter, uint, bool, bool> writeEntity,
             delegate*<ref BinaryPackReader, uint, void> readEntity,
-            delegate*<HeuristicChunk[]> heuristicChunks,
             delegate*<Array> componentsSegments,
-            delegate*<uint, bool> isSegmentAllocated,
-            delegate*<uint, int, ulong> enabledMask,
-            delegate*<uint, int, ulong> disabledMask,
-            delegate*<uint, int, ulong> anyMask,
             delegate*<ulong, uint, byte, HookReason, void> batchDelete,
-            delegate*<int> calculateCapacity,
-            delegate*<uint> calculateCount,
             delegate*<uint, out IComponentOrTag, bool> tryGetRaw,
             delegate*<uint, IComponentOrTag, void> setRaw,
             delegate*<uint, IComponentOrTag, void> setRawDirect,
             delegate*<uint, bool> add,
-            delegate*<uint, bool> has,
-            delegate*<uint, bool> hasEnabled,
-            delegate*<uint, bool> hasDisabled,
             delegate*<uint, ToggleResult> enable,
             delegate*<uint, ToggleResult> disable,
             delegate*<uint, HookReason, bool> delete,
@@ -710,6 +686,7 @@ namespace FFS.Libraries.StaticEcs {
             DynamicId = dynamicId;
             IsTag = isTag;
             NonSerializable = nonSerializable;
+            _masks = masks;
             _initialize = initialize;
             _resize = resize;
             _destroy = destroy;
@@ -720,22 +697,12 @@ namespace FFS.Libraries.StaticEcs {
             _readChunk = readChunk;
             _writeEntity = writeEntity;
             _readEntity = readEntity;
-            _heuristicChunks = heuristicChunks;
             _componentsSegments = componentsSegments;
-            _isSegmentAllocated = isSegmentAllocated;
-            _enabledMask = enabledMask;
-            _disabledMask = disabledMask;
-            _anyMask = anyMask;
             _batchDelete = batchDelete;
-            _calculateCapacity = calculateCapacity;
-            _calculateCount = calculateCount;
             _tryGetRaw = tryGetRaw;
             _setRaw = setRaw;
             _setRawDirect = setRawDirect;
             _add = add;
-            _has = has;
-            _hasEnabled = hasEnabled;
-            _hasDisabled = hasDisabled;
             _enable = enable;
             _disable = disable;
             _delete = delete;
@@ -806,7 +773,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns>Heuristic bitmap data for the specified chunk.</returns>
         [MethodImpl(AggressiveInlining)]
         public HeuristicChunk HeuristicChunk(uint chunkIdx) {
-            unsafe { return _heuristicChunks()[chunkIdx]; }
+            return _masks.HeuristicChunks[chunkIdx];
         }
 
         /// <summary>
@@ -823,7 +790,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns>Bitmask where set bits indicate entities with this component enabled.</returns>
         [MethodImpl(AggressiveInlining)]
         public ulong EnabledMask(uint segmentIdx, int blockIdx) {
-            unsafe { return _enabledMask(segmentIdx, blockIdx); }
+            return _masks.EnabledMask(segmentIdx, blockIdx);
         }
 
         /// <summary>
@@ -836,7 +803,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns>Bitmask where set bits indicate entities with this component disabled.</returns>
         [MethodImpl(AggressiveInlining)]
         public ulong DisabledMask(uint segmentIdx, int blockIdx) {
-            unsafe { return _disabledMask(segmentIdx, blockIdx); }
+            return _masks.DisabledMask(segmentIdx, blockIdx);
         }
 
         /// <summary>
@@ -849,7 +816,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns>Bitmask where set bits indicate entities that have this component (any state).</returns>
         [MethodImpl(AggressiveInlining)]
         public ulong AnyMask(uint segmentIdx, int blockIdx) {
-            unsafe { return _anyMask(segmentIdx, blockIdx); }
+            return _masks.AnyMask(segmentIdx, blockIdx);
         }
 
         /// <summary>
@@ -879,7 +846,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns><c>true</c> if the segment is allocated; <c>false</c> if null (no memory).</returns>
         [MethodImpl(AggressiveInlining)]
         public bool IsSegmentAllocated(uint segmentIdx) {
-            unsafe { return _isSegmentAllocated(segmentIdx); }
+            return segmentIdx < _masks.Segments.Length && _masks.Segments[segmentIdx] != null;
         }
 
         /// <summary>
@@ -889,7 +856,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns>Total allocated slot count.</returns>
         [MethodImpl(AggressiveInlining)]
         public int CalculateCapacity() {
-            unsafe { return _calculateCapacity(); }
+            return _masks.CalculateCapacity();
         }
 
         /// <summary>
@@ -899,7 +866,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns>Number of entities with this component.</returns>
         [MethodImpl(AggressiveInlining)]
         public uint CalculateCount() {
-            unsafe { return _calculateCount(); }
+            return _masks.CalculateCount();
         }
         #endregion
 
@@ -988,7 +955,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns><c>true</c> if the entity has this component.</returns>
         [MethodImpl(AggressiveInlining)]
         public bool Has(uint entityId) {
-            unsafe { return _has(entityId); }
+            return _masks.Has(entityId);
         }
 
         /// <summary>
@@ -999,7 +966,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns><c>true</c> if the entity has this component and it is enabled.</returns>
         [MethodImpl(AggressiveInlining)]
         public bool HasEnabled(uint entityId) {
-            unsafe { return _hasEnabled(entityId); }
+            return _masks.HasEnabled(entityId);
         }
 
         /// <summary>
@@ -1010,7 +977,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns><c>true</c> if the entity has this component and it is disabled.</returns>
         [MethodImpl(AggressiveInlining)]
         public bool HasDisabled(uint entityId) {
-            unsafe { return _hasDisabled(entityId); }
+            return _masks.HasDisabled(entityId);
         }
 
         /// <summary>
