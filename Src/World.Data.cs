@@ -3283,7 +3283,7 @@ namespace FFS.Libraries.StaticEcs {
             Type structType, string methodName) {
             var methods = structType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
             foreach (var methodInfo in methods) {
-                if (methodInfo.Name == methodName && methodInfo.IsGenericMethodDefinition) {
+                if (methodInfo.Name == methodName && !methodInfo.IsGenericMethodDefinition) {
                     return true;
                 }
             }

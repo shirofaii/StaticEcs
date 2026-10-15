@@ -5,6 +5,12 @@ namespace FFS.Libraries.StaticEcs.Tests {
         public byte Id() => 1;
     }
 
+    public struct Spawned : IEntityType {
+        public int Start;
+        public byte Id() => 2;
+        public void OnCreate(World.Entity entity) => entity.Set(new Pos { X = Start });
+    }
+
     public class QueryTests : WorldTest {
         [Fact]
         public void WithWithoutCountsAndIterates() {
@@ -57,6 +63,14 @@ namespace FFS.Libraries.StaticEcs.Tests {
             Assert.Equal(30, W.Is<Npc>().Count());
             Assert.Equal(15, W.Is<Npc>().Without<Red>().Count());
             Assert.Equal(60, W.Is<Default>().Count());
+        }
+
+        [Fact]
+        public void AnEntityTypeOnCreateHookRunsWithItsData() {
+            var e = W.NewEntity(new Spawned { Start = 7 });
+            Assert.True(e.Has<Pos>());
+            Assert.Equal(7, e.Ref<Pos>().X);
+            Assert.Equal(1, W.Is<Spawned>().Count());
         }
 
         [Fact]
