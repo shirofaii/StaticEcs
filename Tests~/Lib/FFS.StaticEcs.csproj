@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <Nullable>disable</Nullable>
+        <IsPackable>false</IsPackable>
+        <AssemblyName>FFS.StaticEcs</AssemblyName>
+        <RootNamespace>FFS.Libraries.StaticEcs</RootNamespace>
+        <NoWarn>$(NoWarn);IL2091;CS1591</NoWarn>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+        <DefineConstants>$(DefineConstants);FFS_ECS_ENABLE_DEBUG</DefineConstants>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="../../Src/**/*.cs" Link="Src/%(RecursiveDir)%(Filename)%(Extension)" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(Configuration)' == 'Debug'">
+        <PackageReference Include="FFS.StaticPack.Debug" Version="1.2.6" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(Configuration)' != 'Debug'">
+        <PackageReference Include="FFS.StaticPack" Version="1.2.6" />
+    </ItemGroup>
+
+</Project>
