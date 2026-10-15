@@ -25,7 +25,7 @@ namespace FFS.Libraries.StaticEcs {
     /// <summary>
     /// Marker interface that excludes a type from all world snapshot serialization.
     /// <para>
-    /// Apply to any type implementing <c>IComponent</c>, <c>ITag</c>, <c>IEvent</c>,
+    /// Apply to any type implementing <c>IComponent</c>, <c>ITag</c>,
     /// <c>ILinkType</c>, <c>ILinksType</c> or <c>IMultiComponent</c>. Data of such a type
     /// is never written into <c>WorldSnapshot</c>, <c>ChunkSnapshot</c>, <c>ClusterSnapshot</c>
     /// or <c>EntitiesSnapshot</c>.
@@ -310,18 +310,6 @@ namespace FFS.Libraries.StaticEcs {
         }
         
         [MethodImpl(AggressiveInlining)]
-        internal static void AssertRegisteredEvent<T>(string type, [CallerMemberName] string method = "") where T : struct, IEvent {
-            if (!Events<T>.Instance.Initialized) AssertRegisteredEventFailed<T>(type, method);
-        }
-
-        [MethodImpl(NoInlining)]
-        private static void AssertRegisteredEventFailed<T>(string type, string method) where T : struct, IEvent {
-            if (!Events<T>.Instance.Initialized) {
-                throw new StaticEcsException(type, method, $"Event {typeof(T).GenericName()} is not registered.");
-            }
-        }
-        
-        [MethodImpl(AggressiveInlining)]
         internal static void AssertWorldIsInitialized(string type, [CallerMemberName] string method = "") {
             if (Data.Instance.WorldStatus != WorldStatus.Initialized) AssertWorldIsInitializedFailed(type, method);
         }
@@ -455,18 +443,6 @@ namespace FFS.Libraries.StaticEcs {
         private static void AssertComponentDisableableFailed<T>(string type, string method) where T : struct, IComponentOrTag {
             if (!Components<T>.Instance.Masks.HasDisable) {
                 throw new StaticEcsException(type, method, $"Component {typeof(T).GenericName()} does not implement IDisableable.");
-            }
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        internal static void AssertNotRegisteredEvent<T>(string type, [CallerMemberName] string method = "") where T : struct, IEvent {
-            if (Events<T>.Instance.Initialized) AssertNotRegisteredEventFailed<T>(type, method);
-        }
-
-        [MethodImpl(NoInlining)]
-        private static void AssertNotRegisteredEventFailed<T>(string type, string method) where T : struct, IEvent {
-            if (Events<T>.Instance.Initialized) {
-                throw new StaticEcsException(type, method, $"Event {typeof(T).GenericName()} already registered.");
             }
         }
 
@@ -881,7 +857,6 @@ namespace FFS.Libraries.StaticEcs {
     /// <item><see cref="IComponent"/> — registered via <c>RegisterComponentType&lt;T&gt;(default)</c>.
     /// Internal framework components (implementing <c>IComponentInternal</c>) are excluded.</item>
     /// <item><see cref="ITag"/> — registered via <c>RegisterTagType&lt;T&gt;(default)</c>.</item>
-    /// <item><see cref="IEvent"/> — registered via <c>RegisterEventType&lt;T&gt;(default)</c>.</item>
     /// <item><see cref="ILinkType"/> — wrapped as <c>Link&lt;T&gt;</c> and registered as a component.</item>
     /// <item><see cref="ILinksType"/> — wrapped as <c>Links&lt;T&gt;</c> and registered as a component.</item>
     /// <item><see cref="IMultiComponent"/> — wrapped as <c>Multi&lt;T&gt;</c> and registered as a component.</item>
@@ -922,7 +897,6 @@ namespace FFS.Libraries.StaticEcs {
         [DynamicDependency(DynamicallyAccessedMemberTypes.NonPublicNestedTypes, typeof(World<>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, typeof(ComponentTypeConfig<>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicMethods, typeof(TagTypeConfig<>))]
-        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, typeof(EventTypeConfig<>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicFields | DynamicallyAccessedMemberTypes.NonPublicFields, typeof(World<>.EntityTypeInfo<>))]
         [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Types are preserved by static usage in consuming code.")]
         [UnconditionalSuppressMessage("Trimming", "IL2055", Justification = "Config types are preserved by DynamicDependency above.")]
@@ -942,8 +916,6 @@ namespace FFS.Libraries.StaticEcs {
 
             var componentsOpenType = worldType.GetNestedType("Components`1", BindingFlags.Public)
                                      ?? throw new StaticEcsException($"AutoRegistration: type Components`1 not found on {worldType.Name}");
-            var eventsOpenType = worldType.GetNestedType("Events`1", BindingFlags.NonPublic)
-                                     ?? throw new StaticEcsException($"AutoRegistration: type Events`1 not found on {worldType.Name}");
             var linkOpenType = worldType.GetNestedType("Link`1", BindingFlags.Public)
                                ?? throw new StaticEcsException($"AutoRegistration: nested type Link`1 not found on {worldType.Name}");
             var linksOpenType = worldType.GetNestedType("Links`1", BindingFlags.Public)
@@ -976,10 +948,6 @@ namespace FFS.Libraries.StaticEcs {
                     }
                     else if (typeof(ILinkType).IsAssignableFrom(type)) {
                         GetAutoRegisterGenericMethod(type, linkOpenType, tWorld).Invoke(null, null);
-                    }
-
-                    if (typeof(IEvent).IsAssignableFrom(type)) {
-                        GetAutoRegisterGenericMethod(type, eventsOpenType, tWorld).Invoke(null, null);
                     }
 
                     if (typeof(IEntityType).IsAssignableFrom(type) && type != typeof(Default)) {

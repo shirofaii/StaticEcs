@@ -21,7 +21,7 @@ namespace FFS.Libraries.StaticEcs {
     /// (singleton <see cref="World{TWorld}.Resource{T}"/> and keyed <see cref="World{TWorld}.NamedResource{T}"/>).
     /// <para>
     /// All resource types must implement this interface. This provides an explicit contract
-    /// (alongside <see cref="IComponent"/>, <see cref="ITag"/>, <see cref="IEvent"/>),
+    /// (alongside <see cref="IComponent"/>, <see cref="ITag"/>),
     /// prevents accidental use of arbitrary types as resources, and allows tooling/editors
     /// to distinguish resources from other types.
     /// </para>

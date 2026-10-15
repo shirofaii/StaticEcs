@@ -219,7 +219,6 @@ namespace FFS.Libraries.StaticEcs {
             AssertWorldIsInitialized(WorldTypeName);
             #endif
             Data.Instance.HardResetInternal();
-            Data.Instance.ClearEvents();
             Data.Instance.RegisterClusterInternal(default);
         }
 
@@ -489,64 +488,6 @@ namespace FFS.Libraries.StaticEcs {
         #endregion
 
         #region EVENTS
-        /// <summary>
-        /// Sends an event to all registered receivers of this event type.
-        /// Events are buffered and delivered to receivers on their next read.
-        /// </summary>
-        /// <remarks>
-        /// Thread-safe for concurrent sends of the same event type, but only when there is no concurrent reading
-        /// of the same type. Reading of one event type must occur in a single thread. Different event types
-        /// can be read from different threads simultaneously. Receiver operations are main-thread only.
-        /// </remarks>
-        /// <typeparam name="TEvent">The event type to send.</typeparam>
-        /// <param name="value">Event data. Default value sends an empty/default-initialized event.</param>
-        /// <returns><c>true</c> if the event was successfully added to the buffer; <c>false</c> if there are no registered receivers.</returns>
-        #if NET5_0_OR_GREATER
-        [UnconditionalSuppressMessage("AOT", "IL2091", Justification = "Event metadata is preserved by the registration path.")]
-        #endif
-        [MethodImpl(AggressiveInlining)]
-        public static bool SendEvent<TEvent>(TEvent value = default) where TEvent : struct, IEvent {
-            #if FFS_ECS_DEBUG
-            AssertWorldIsInitialized(WorldTypeName);
-            AssertRegisteredEvent<TEvent>(WorldTypeName);
-            #endif
-            return Events<TEvent>.Instance.Add(value);
-        }
-
-        /// <summary>
-        /// Creates and returns a new event receiver for the specified event type.
-        /// The receiver can be used to read events sent via <see cref="SendEvent{TEvent}"/>.
-        /// Each receiver maintains its own read cursor — multiple receivers can independently
-        /// consume the same event stream.
-        /// </summary>
-        /// <typeparam name="TEvent">The event type to receive.</typeparam>
-        /// <returns>A new <see cref="EventReceiver{TWorld, TEvent}"/> that can read events of this type.</returns>
-        #if NET5_0_OR_GREATER
-        [UnconditionalSuppressMessage("AOT", "IL2091", Justification = "Event metadata is preserved by the registration path.")]
-        #endif
-        [MethodImpl(AggressiveInlining)]
-        public static EventReceiver<TWorld, TEvent> RegisterEventReceiver<TEvent>() where TEvent : struct, IEvent {
-            #if FFS_ECS_DEBUG
-            AssertWorldIsInitialized(WorldTypeName);
-            AssertRegisteredEvent<TEvent>(WorldTypeName);
-            #endif
-            return Events<TEvent>.Instance.CreateReceiver();
-        }
-
-        /// <summary>
-        /// Deletes an event receiver, freeing its internal resources. The receiver becomes invalid
-        /// after this call and must not be used.
-        /// </summary>
-        /// <typeparam name="TEvent">The event type.</typeparam>
-        /// <param name="receiver">Reference to the receiver to delete. Will be invalidated.</param>
-        [MethodImpl(AggressiveInlining)]
-        public static void DeleteEventReceiver<TEvent>(ref EventReceiver<TWorld, TEvent> receiver) where TEvent : struct, IEvent {
-            #if FFS_ECS_DEBUG
-            AssertWorldIsInitialized(WorldTypeName);
-            AssertRegisteredEvent<TEvent>(WorldTypeName);
-            #endif
-            Events<TEvent>.Instance.DeleteReceiver(ref receiver);
-        }
         #endregion
 
         #region RESOURCES
@@ -1229,7 +1170,6 @@ namespace FFS.Libraries.StaticEcs {
             /// <list type="bullet">
             /// <item><see cref="IComponent"/> — registered as component (excludes internal framework components).</item>
             /// <item><see cref="ITag"/> — registered as tag.</item>
-            /// <item><see cref="IEvent"/> — registered as event.</item>
             /// <item><see cref="ILinkType"/> — wrapped in <c>Link&lt;T&gt;</c> and registered as a component.</item>
             /// <item><see cref="ILinksType"/> — wrapped in <c>Links&lt;T&gt;</c> and registered as a component.</item>
             /// <item><see cref="IMultiComponent"/> — wrapped in <c>Multi&lt;T&gt;</c> and registered as a component.</item>
@@ -1338,22 +1278,6 @@ namespace FFS.Libraries.StaticEcs {
                     config = cfg.Config();
                 }
                 RegisterTagType(config);
-                return this;
-            }
-
-            /// <summary>
-            /// Registers an event type for use in this world.
-            /// Configuration is provided by implementing <see cref="IEventConfig{T}"/> on the event type.
-            /// </summary>
-            /// <typeparam name="T">Event type — must be a struct implementing <see cref="IEvent"/>.</typeparam>
-            /// <returns>This registrar for chaining.</returns>
-            [MethodImpl(AggressiveInlining)]
-            public TypeRegistrar Event<T>() where T : struct, IEvent {
-                EventTypeConfig<T> config = default;
-                if (default(T) is IEventConfig<T> cfg) {
-                    config = cfg.Config();
-                }
-                RegisterEventType(config);
                 return this;
             }
 

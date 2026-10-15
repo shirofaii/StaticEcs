@@ -221,7 +221,6 @@ namespace FFS.Libraries.StaticEcs {
         ///   <item><b>Cluster</b> — all chunks of a single cluster, optionally with entity metadata (<c>withEntitiesData</c>).</item>
         ///   <item><b>Chunk</b> — a single chunk's entity metadata and component/tag data.</item>
         ///   <item><b>Entities</b> — selective per-entity serialization with full component/tag data via <see cref="EntitiesWriter"/>.</item>
-        ///   <item><b>Events</b> — standalone event ring-buffer serialization.</item>
         /// </list>
         /// </para>
         /// <para>
@@ -255,7 +254,7 @@ namespace FFS.Libraries.StaticEcs {
             /// <see cref="BinaryPackReader.RentAndFillFromFile"/> would mistake a raw snapshot for a
             /// gzip-compressed one. There is plenty of headroom; this is a future-proofing note.</para>
             /// </summary>
-            internal const ushort SnapshotFormatVersion = 3;
+            internal const ushort SnapshotFormatVersion = 4;
 
             /// <summary>
             /// Size in bytes of the snapshot header: <c>ushort</c> version (2 bytes) +
@@ -430,19 +429,6 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             /// <summary>
-            /// Registers a migration handler for a removed event type.
-            /// When an events snapshot contains events with the specified <paramref name="id"/> (GUID) but no matching
-            /// event type is registered, the <paramref name="migrator"/> is invoked to handle the legacy event data.
-            /// Without a migrator, unknown events are silently skipped.
-            /// </summary>
-            /// <param name="id">The GUID of the removed event type.</param>
-            /// <param name="migrator">Delegate that processes legacy event data during deserialization.</param>
-            [MethodImpl(AggressiveInlining)]
-            public static void SetEventDeleteMigrator(Guid id, EcsEventDeleteMigrationReader migrator) {
-                Data.Instance.SetDeleteEventsMigrator(id, migrator);
-            }
-
-            /// <summary>
             /// Writes all registered custom global snapshot data into the binary stream.
             /// Each handler registered via <see cref="SetSnapshotHandler"/> is invoked, and its output is framed
             /// with the handler's GUID, version, and a byte-size prefix for forward-compatible skipping.
@@ -530,144 +516,6 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             #region EVENTS
-            /// <summary>
-            /// Serializes the current event ring-buffer state into an existing binary writer.
-            /// Only event types registered with a non-empty GUID are included.
-            /// Requires the world to be initialized.
-            /// <para>The output starts with the standard 10-byte snapshot header
-            /// (<see cref="SnapshotFormatVersion"/> + payload size), matching the format consumed by
-            /// <see cref="LoadEventsSnapshot(BinaryPackReader)"/> and the byte/file overloads.
-            /// Embedded serialization inside a world snapshot uses an internal header-less path and is unaffected.</para>
-            /// </summary>
-            /// <param name="writer">The binary writer to serialize events into.</param>
-            [MethodImpl(AggressiveInlining)]
-            public static void CreateEventsSnapshot(ref BinaryPackWriter writer) {
-                #if ((DEBUG || FFS_ECS_ENABLE_DEBUG) && !FFS_ECS_DISABLE_DEBUG)
-                if (!IsWorldInitialized) throw new StaticEcsException($"World<{typeof(TWorld)}>.Event, Method: CreateSnapshot, World not initialized");
-                #endif
-                WriteEventsWithHeader(ref writer);
-            }
-            
-            /// <summary>
-            /// Serializes the current event ring-buffer state and returns it as a byte array.
-            /// </summary>
-            /// <param name="byteSizeHint">Initial buffer size hint to reduce reallocations.</param>
-            /// <param name="gzip">When <c>true</c>, the output is gzip-compressed.</param>
-            /// <returns>A byte array containing the serialized events, optionally gzip-compressed.</returns>
-            [MethodImpl(AggressiveInlining)]
-            public static byte[] CreateEventsSnapshot(uint byteSizeHint = 512, bool gzip = false) {
-                #if ((DEBUG || FFS_ECS_ENABLE_DEBUG) && !FFS_ECS_DISABLE_DEBUG)
-                if (!IsWorldInitialized) throw new StaticEcsException($"World<{typeof(TWorld)}>.Event, Method: CreateSnapshot, World not initialized");
-                #endif
-                var writer = BinaryPackWriter.CreateFromPool(byteSizeHint);
-                WriteEventsWithHeader(ref writer);
-                var result = writer.CopyToBytes(gzip);
-                writer.Dispose();
-                return result;
-            }
-
-            /// <summary>
-            /// Serializes the current event ring-buffer state into an existing byte array, resizing it if necessary.
-            /// </summary>
-            /// <param name="result">Reference to the destination byte array. Will be resized if the serialized data exceeds its length.</param>
-            /// <param name="gzip">When <c>true</c>, the output is gzip-compressed.</param>
-            [MethodImpl(AggressiveInlining)]
-            public static void CreateEventsSnapshot(ref byte[] result, bool gzip = false) {
-                #if ((DEBUG || FFS_ECS_ENABLE_DEBUG) && !FFS_ECS_DISABLE_DEBUG)
-                if (!IsWorldInitialized) throw new StaticEcsException($"World<{typeof(TWorld)}>.Event, Method: CreateSnapshot, World not initialized");
-                #endif
-                var writer = BinaryPackWriter.CreateFromPool((uint) result.Length);
-                WriteEventsWithHeader(ref writer);
-                writer.CopyToBytes(ref result, gzip);
-                writer.Dispose();
-            }
-
-            /// <summary>
-            /// Serializes the current event ring-buffer state and writes it directly to a file.
-            /// </summary>
-            /// <param name="filePath">Destination file path.</param>
-            /// <param name="gzip">When <c>true</c>, the output is gzip-compressed before writing.</param>
-            /// <param name="flushToDisk">When <c>true</c>, forces the OS to flush file buffers to physical storage.</param>
-            /// <param name="byteSizeHint">Initial buffer size hint.</param>
-            [MethodImpl(AggressiveInlining)]
-            public static void CreateEventsSnapshot(string filePath, bool gzip = false, bool flushToDisk = false, uint byteSizeHint = 512) {
-                #if ((DEBUG || FFS_ECS_ENABLE_DEBUG) && !FFS_ECS_DISABLE_DEBUG)
-                if (!IsWorldInitialized) throw new StaticEcsException($"World<{typeof(TWorld)}>.Event, Method: CreateSnapshot, World not initialized");
-                #endif
-                var writer = BinaryPackWriter.CreateFromPool(byteSizeHint);
-                WriteEventsWithHeader(ref writer);
-                writer.FlushToFile(filePath, gzip, flushToDisk);
-                writer.Dispose();
-            }
-
-            /// <summary>
-            /// Restores the event ring-buffer state from a binary reader.
-            /// All existing events are cleared before loading. Event types not registered in the current world
-            /// are handled by delete migrators if registered, otherwise silently skipped.
-            /// <para>Expects the reader to be positioned at the standard 10-byte snapshot header produced by
-            /// <see cref="CreateEventsSnapshot(ref BinaryPackWriter)"/> and the byte/file overloads.</para>
-            /// </summary>
-            /// <param name="reader">The binary reader containing serialized event data.</param>
-            [MethodImpl(AggressiveInlining)]
-            public static void LoadEventsSnapshot(BinaryPackReader reader) {
-                #if ((DEBUG || FFS_ECS_ENABLE_DEBUG) && !FFS_ECS_DISABLE_DEBUG)
-                if (!IsWorldInitialized) throw new StaticEcsException($"World<{typeof(TWorld)}>.Event, Method: LoadSnapshot, World not initialized");
-                #endif
-                ReadEventsWithHeader(ref reader);
-            }
-
-            /// <inheritdoc cref="LoadEventsSnapshot(BinaryPackReader)"/>
-            /// <param name="snapshot">Byte array containing the serialized event data. Gzip compression is autodetected.</param>
-            [MethodImpl(AggressiveInlining)]
-            public static void LoadEventsSnapshot(byte[] snapshot) {
-                #if ((DEBUG || FFS_ECS_ENABLE_DEBUG) && !FFS_ECS_DISABLE_DEBUG)
-                if (!IsWorldInitialized) throw new StaticEcsException($"World<{typeof(TWorld)}>.Event, Method: LoadSnapshot, World not initialized");
-                #endif
-                var reader = BinaryPackReader.RentAndFillFromBytes(snapshot, SnapshotHeaderSize, SnapshotTotalSizeParser);
-                ReadEventsWithHeader(ref reader);
-                reader.Dispose();
-            }
-
-            /// <inheritdoc cref="LoadEventsSnapshot(BinaryPackReader)"/>
-            /// <param name="worldSnapshotFilePath">Path to the file containing serialized event data. Gzip compression is autodetected.</param>
-            [MethodImpl(AggressiveInlining)]
-            public static void LoadEventsSnapshot(string worldSnapshotFilePath) {
-                #if ((DEBUG || FFS_ECS_ENABLE_DEBUG) && !FFS_ECS_DISABLE_DEBUG)
-                if (!IsWorldInitialized) throw new StaticEcsException($"World<{typeof(TWorld)}>.Event, Method: LoadSnapshot, World not initialized");
-                #endif
-                var reader = BinaryPackReader.RentAndFillFromFile(worldSnapshotFilePath, SnapshotHeaderSize, SnapshotTotalSizeParser);
-                ReadEventsWithHeader(ref reader);
-                reader.Dispose();
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            private static void WriteEventsWithHeader(ref BinaryPackWriter writer) {
-                writer.WriteUshort(SnapshotFormatVersion);
-                var sizePos = writer.MakePoint(sizeof(ulong));
-                Data.Instance.WriteEvents(ref writer);
-                writer.WriteUlongAt(sizePos, writer.Position - (sizePos + sizeof(ulong)));
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            private static void ReadEventsWithHeader(ref BinaryPackReader reader) {
-                var version = reader.ReadUshort();
-                if (version != SnapshotFormatVersion) {
-                    throw new StaticEcsException($"World<{typeof(TWorld)}>", "ReadEvents", $"Unsupported snapshot format version: saved={version}, expected={SnapshotFormatVersion}");
-                }
-                #if FFS_ECS_DEBUG
-                var savedSize = reader.ReadUlong();
-                var sizeStartPos = reader.Position;
-                #else
-                _ = reader.ReadUlong();
-                #endif
-                Data.Instance.ReadEvents(ref reader);
-                #if FFS_ECS_DEBUG
-                var actualSize = (ulong)(reader.Position - sizeStartPos);
-                if (actualSize != savedSize) {
-                    throw new StaticEcsException($"World<{typeof(TWorld)}>", "ReadEvents", $"Snapshot size mismatch: saved={savedSize}, actual={actualSize}. Stream is corrupted or format diverged.");
-                }
-                #endif
-            }
             #endregion
 
             #region RESOURCES
@@ -943,15 +791,14 @@ namespace FFS.Libraries.StaticEcs {
             /// <param name="strategy">Controls which chunks to include based on ownership.
             /// <c>All</c> includes all chunks; <c>SelfOwner</c> only self-owned; <c>OtherOwner</c> only externally-owned.</param>
             /// <param name="clusters">Specific cluster IDs to include. When empty (default), all active clusters are included.</param>
-            /// <param name="writeEvents">When <c>true</c>, the event ring-buffer is included in the snapshot.</param>
             /// <returns>A byte array containing the serialized world state.</returns>
             [MethodImpl(AggressiveInlining)]
-            public static byte[] CreateWorldSnapshot(bool withCustomSnapshotData = true, bool gzip = false, ChunkWritingStrategy strategy = ChunkWritingStrategy.All, ReadOnlySpan<ushort> clusters = default, bool writeEvents = true) {
+            public static byte[] CreateWorldSnapshot(bool withCustomSnapshotData = true, bool gzip = false, ChunkWritingStrategy strategy = ChunkWritingStrategy.All, ReadOnlySpan<ushort> clusters = default) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(WorldTypeName);
                 #endif
                 var writer = BinaryPackWriter.CreateFromPool(CalculateByteSizeHint());
-                WriteWorld(ref writer, withCustomSnapshotData, strategy, clusters, writeEvents);
+                WriteWorld(ref writer, withCustomSnapshotData, strategy, clusters);
                 var result = writer.CopyToBytes(gzip);
                 writer.Dispose();
                 return result;
@@ -960,12 +807,12 @@ namespace FFS.Libraries.StaticEcs {
             /// <inheritdoc cref="CreateWorldSnapshot(bool, bool, ChunkWritingStrategy, ReadOnlySpan{ushort}, bool)"/>
             /// <param name="result">Reference to the destination byte array. Resized if necessary.</param>
             [MethodImpl(AggressiveInlining)]
-            public static void CreateWorldSnapshot(ref byte[] result, bool withCustomSnapshotData = true, bool gzip = false, ChunkWritingStrategy strategy = ChunkWritingStrategy.All, ReadOnlySpan<ushort> clusters = default, bool writeEvents = true) {
+            public static void CreateWorldSnapshot(ref byte[] result, bool withCustomSnapshotData = true, bool gzip = false, ChunkWritingStrategy strategy = ChunkWritingStrategy.All, ReadOnlySpan<ushort> clusters = default) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(WorldTypeName);
                 #endif
                 var writer = BinaryPackWriter.CreateFromPool(CalculateByteSizeHint());
-                WriteWorld(ref writer, withCustomSnapshotData, strategy, clusters, writeEvents);
+                WriteWorld(ref writer, withCustomSnapshotData, strategy, clusters);
                 writer.CopyToBytes(ref result, gzip);
                 writer.Dispose();
             }
@@ -996,13 +843,12 @@ namespace FFS.Libraries.StaticEcs {
             /// <param name="withCustomSnapshotData">When <c>true</c>, includes custom snapshot handler data.</param>
             /// <param name="strategy">Chunk ownership filter.</param>
             /// <param name="clusters">Specific cluster IDs to include, or empty for all active clusters.</param>
-            /// <param name="writeEvents">When <c>true</c>, includes the event ring-buffer.</param>
             [MethodImpl(AggressiveInlining)]
-            public static void CreateWorldSnapshot(ref BinaryPackWriter writer, bool withCustomSnapshotData = true, ChunkWritingStrategy strategy = ChunkWritingStrategy.All, ReadOnlySpan<ushort> clusters = default, bool writeEvents = true) {
+            public static void CreateWorldSnapshot(ref BinaryPackWriter writer, bool withCustomSnapshotData = true, ChunkWritingStrategy strategy = ChunkWritingStrategy.All, ReadOnlySpan<ushort> clusters = default) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(WorldTypeName);
                 #endif
-                WriteWorld(ref writer, withCustomSnapshotData, strategy, clusters, writeEvents);
+                WriteWorld(ref writer, withCustomSnapshotData, strategy, clusters);
             }
 
             /// <summary>
@@ -1016,13 +862,12 @@ namespace FFS.Libraries.StaticEcs {
             /// <param name="flushToDisk">When <c>true</c>, forces the OS to flush file buffers to physical storage.</param>
             /// <param name="strategy">Chunk ownership filter.</param>
             /// <param name="clusters">Specific cluster IDs to include, or empty for all active clusters.</param>
-            /// <param name="writeEvents">When <c>true</c>, includes the event ring-buffer.</param>
             [MethodImpl(AggressiveInlining)]
-            public static void CreateWorldSnapshot(ref BinaryPackWriter writer, string filePath, bool withCustomSnapshotData = true, bool gzip = false, bool flushToDisk = false, ChunkWritingStrategy strategy = ChunkWritingStrategy.All, ReadOnlySpan<ushort> clusters = default, bool writeEvents = true) {
+            public static void CreateWorldSnapshot(ref BinaryPackWriter writer, string filePath, bool withCustomSnapshotData = true, bool gzip = false, bool flushToDisk = false, ChunkWritingStrategy strategy = ChunkWritingStrategy.All, ReadOnlySpan<ushort> clusters = default) {
                 #if FFS_ECS_DEBUG
                 AssertWorldIsInitialized(WorldTypeName);
                 #endif
-                WriteWorld(ref writer, withCustomSnapshotData, strategy, clusters, writeEvents);
+                WriteWorld(ref writer, withCustomSnapshotData, strategy, clusters);
                 writer.FlushToFile(filePath, gzip, flushToDisk);
             }
 
@@ -1328,21 +1173,16 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             [MethodImpl(AggressiveInlining)]
-            private static void WriteWorld(ref BinaryPackWriter writer, bool withCustomSnapshotData, ChunkWritingStrategy strategy, ReadOnlySpan<ushort> clusters, bool writeEvents) {
+            private static void WriteWorld(ref BinaryPackWriter writer, bool withCustomSnapshotData, ChunkWritingStrategy strategy, ReadOnlySpan<ushort> clusters) {
                 var snapshotParams = new SnapshotWriteParams(SnapshotType.World);
                 BeforeWrite(snapshotParams);
 
                 var tempChunks = TempChunksData.Create();
                 writer.WriteUshort(SnapshotFormatVersion);
                 var sizePos = writer.MakePoint(sizeof(ulong));
-                writer.WriteBool(writeEvents);
                 Data.Instance.Write(ref writer, strategy, clusters, ref tempChunks, true);
                 writer.WriteUint(tempChunks.ChunksCount);
                 writer.WriteArrayUnmanaged(tempChunks.Chunks, 0, (int) tempChunks.ChunksCount);
-                if (writeEvents) {
-                    Data.Instance.WriteEvents(ref writer);
-                }
-
                 WriteResources(ref writer);
                 WriteSystems(ref writer);
 
@@ -1367,14 +1207,9 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 var sizeStartPos = reader.Position;
                 #endif
-                var readEvents = reader.ReadBool();
                 Data.Instance.Read(ref reader, true, hardReset);
                 var chunksCount = reader.ReadUint();
                 var tempChunks = reader.ReadArrayUnmanagedPooled<uint>(out var h).Array;
-                if (readEvents) {
-                    Data.Instance.ReadEvents(ref reader);
-                }
-
                 ReadResources(ref reader);
                 ReadSystems(ref reader);
 

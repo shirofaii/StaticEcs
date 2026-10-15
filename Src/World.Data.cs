@@ -208,17 +208,6 @@ namespace FFS.Libraries.StaticEcs {
         }
 
         [MethodImpl(AggressiveInlining)]
-        internal static void RegisterEventType<T>(EventTypeConfig<T> config) where T : struct, IEvent {
-            #if FFS_ECS_DEBUG
-            AssertWorldIsCreatedOrInitialized(WorldTypeName);
-            AssertNotRegisteredEvent<T>(WorldTypeName);
-            #else
-            if (IsEventTypeRegistered<T>()) return;
-            #endif
-            Data.Instance.RegisterEventTypeInternal(config, typeof(INonSerializable).IsAssignableFrom(typeof(T)));
-        }
-
-        [MethodImpl(AggressiveInlining)]
         internal static void RegisterEntityType<
             #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)]
@@ -248,14 +237,6 @@ namespace FFS.Libraries.StaticEcs {
         /// </summary>
         [MethodImpl(AggressiveInlining)]
         public static bool IsTagTypeRegistered<T>() where T : struct, ITag => Components<T>.IsTypeRegistered;
-
-        /// <summary>
-        /// Safe registration check for an event type. Does not throw and works in any world state
-        /// (returns <c>false</c> before <c>Types().Event&lt;T&gt;()</c> is called and after
-        /// <see cref="Destroy"/>).
-        /// </summary>
-        [MethodImpl(AggressiveInlining)]
-        public static bool IsEventTypeRegistered<T>() where T : struct, IEvent => Events<T>.Instance.Initialized;
 
         [MethodImpl(AggressiveInlining)]
         internal static bool IsEntityTypeRegistered(byte id) => Data.Instance.EntityTypes[id].Registered;
@@ -308,12 +289,7 @@ namespace FFS.Libraries.StaticEcs {
             
             // EVENTS
             #if FFS_ECS_DEBUG
-            internal IEventsDebugEventListener EventListener;
             #endif
-            private readonly Dictionary<Guid, EventsHandle> _poolEventsByGuid;
-            private readonly Dictionary<Guid, EcsEventDeleteMigrationReader> _deleteEventMigratorByGuid;
-            private EventsHandle[] _poolsEvents;
-            private ushort _poolsCountEvents;
             
             // MULTI COMPONENTS
             private Action<uint>[] _multiStorageResizers;
@@ -428,10 +404,6 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
                 
                 // EVENTS
-                _poolsEvents = new EventsHandle[64];
-                _poolEventsByGuid = new Dictionary<Guid, EventsHandle>();
-                _deleteEventMigratorByGuid = new Dictionary<Guid, EcsEventDeleteMigrationReader>();
-                _poolsCountEvents = default;
 
                 // SYSTEMS
                 RegisteredSystems = new List<SystemsHandle>();
@@ -446,7 +418,6 @@ namespace FFS.Libraries.StaticEcs {
                 
                 #if FFS_ECS_DEBUG
                 _currentEntitiesRange = null;
-                EventListener = null;
                 #endif
                 
                 // MULTI STORAGES
@@ -568,9 +539,6 @@ namespace FFS.Libraries.StaticEcs {
             internal readonly void DestroyInternal() {
                 for (var i = 0; i < _poolsCountComponents; i++) {
                     _poolsComponents[i].Destroy();
-                }
-                for (var i = 0; i < _poolsCountEvents; i++) {
-                    _poolsEvents[i].Destroy();
                 }
 
                 for (var i = 0; i < EntityTypeResettersCount; i++) {
@@ -2667,7 +2635,7 @@ namespace FFS.Libraries.StaticEcs {
 
             [MethodImpl(AggressiveInlining)]
             internal void ReadDataChunk(ref BinaryPackReader reader, uint chunkIdx, uint componentsPoolsCount) {
-                var tempDeletedPoolIds = ArrayPool<(Guid, uint)>.Shared.Rent((_poolsComponents.Length + _poolsEvents.Length) * 2);
+                var tempDeletedPoolIds = ArrayPool<(Guid, uint)>.Shared.Rent(_poolsComponents.Length * 2);
                 var tempDeletedPoolIdsCount = 0;
                 var hasEntities = reader.ReadBool();
 
@@ -3107,114 +3075,6 @@ namespace FFS.Libraries.StaticEcs {
             #endregion
 
             #region EVENTS
-            #if NET5_0_OR_GREATER
-            [UnconditionalSuppressMessage("AOT", "IL2091", Justification = "Event metadata is preserved by the registration path and DynamicDependency on RegisterAll.")]
-            #endif
-            [MethodImpl(AggressiveInlining)]
-            internal void RegisterEventTypeInternal<T>(EventTypeConfig<T> config, bool nonSerializable) where T : struct, IEvent {
-                if (Events<T>.Instance.Initialized) throw new StaticEcsException($"Event {typeof(T)} already registered");
-
-                var typeConfig = config.MergeWith(EventTypeConfig<T>.Default);
-
-                #if FFS_ECS_DEBUG
-                AssertGuidNotEmpty(WorldTypeName, typeConfig.Guid.Value, typeof(T).GenericName());
-                #endif
-
-                Events<T>.Instance = new Events<T>(_poolsCountEvents, typeConfig, nonSerializable);
-
-                if (_poolsCountEvents == _poolsEvents.Length) {
-                    Array.Resize(ref _poolsEvents, _poolsCountEvents << 1);
-                }
-
-                _poolsEvents[_poolsCountEvents] = EventsHandle.Create<TWorld, T>();
-
-                var guid = typeConfig.Guid.Value;
-                if (_poolEventsByGuid.ContainsKey(guid)) {
-                    throw new StaticEcsException($"Event type {typeof(T)} with guid {guid} already registered");
-                }
-
-                _poolEventsByGuid[guid] = _poolsEvents[_poolsCountEvents];
-
-                _poolsCountEvents++;
-            }
-            
-            [MethodImpl(AggressiveInlining)]
-            internal readonly void SetDeleteEventsMigrator(Guid id, EcsEventDeleteMigrationReader migrator) {
-                _deleteEventMigratorByGuid[id] = migrator;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal void WriteEvents(ref BinaryPackWriter writer) {
-                ushort len = 0;
-                var point = writer.MakePoint(sizeof(ushort));
-                for (var i = 0; i < _poolsCountEvents; i++) {
-                    var pool = _poolsEvents[i];
-                    if (pool.NonSerializable) continue;
-                    var guid = pool.Guid;
-
-                    if (_poolEventsByGuid.TryGetValue(guid, out var wrapper)) {
-                        writer.WriteGuid(guid);
-                        var offset = writer.MakePoint(sizeof(uint));
-                        wrapper.WriteAll(ref writer);
-                        writer.WriteUintAt(offset, writer.Position - (offset + sizeof(uint)));
-                        len++;
-                    }
-                }
-
-                writer.WriteUshortAt(point, len);
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal void ReadEvents(ref BinaryPackReader reader) {
-                ClearEvents();
-                var tempDeletedPoolIds = ArrayPool<(Guid, uint)>.Shared.Rent((_poolsComponents.Length + _poolsEvents.Length) * 2);
-                var tempDeletedPoolIdsCount = 0;
-
-                var poolsCount = reader.ReadUshort();
-                for (var i = 0; i < poolsCount; i++) {
-                    var guid = reader.ReadGuid();
-                    var byteSize = reader.ReadUint();
-                    if (_poolEventsByGuid.TryGetValue(guid, out var pool)) {
-                        pool.ReadAll(ref reader);
-                    }
-                    else {
-                        tempDeletedPoolIds[tempDeletedPoolIdsCount++] = (guid, reader.Position);
-                        reader.SkipNext(byteSize);
-                    }
-                }
-
-                if (_deleteEventMigratorByGuid.Count > 0) {
-                    for (var i = 0; i < tempDeletedPoolIdsCount; i++) {
-                        var (id, offset) = tempDeletedPoolIds[i];
-                        if (_deleteEventMigratorByGuid.TryGetValue(id, out var migration)) {
-                            var pReader = reader.AsReader(offset);
-                            pReader.DeleteAllEventMigration<TWorld>(migration);
-                        }
-                    }
-                }
-                
-                ArrayPool<(Guid, uint)>.Shared.Return(tempDeletedPoolIds);
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ReadOnlySpan<EventsHandle> GetAllEventsHandles() => new(_poolsEvents, 0, _poolsCountEvents);
-
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ref EventsHandle GetEventsHandleRef(Type type) {
-                for (var i = 0; i < _poolsCountEvents; i++) {
-                    if (_poolsEvents[i].EventType == type) {
-                        return ref _poolsEvents[i];
-                    }
-                }
-                throw new StaticEcsException($"Events type {type} not registered");
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal readonly void ClearEvents() {
-                for (var i = 0; i < _poolsCountEvents; i++) {
-                    _poolsEvents[i].Reset();
-                }
-            }
             #endregion
 
             [MethodImpl(AggressiveInlining)]
@@ -3332,28 +3192,6 @@ namespace FFS.Libraries.StaticEcs {
         #endregion
 
         #region EVENTS
-        [MethodImpl(AggressiveInlining)]
-        internal static bool _TryGetEventsHandle(Type type, out EventsHandle pool) {
-            var pools = Data.Instance.GetAllEventsHandles();
-            for (var i = 0; i < pools.Length; i++) {
-                ref readonly var p = ref pools[i];
-                if (p.EventType == type) {
-                    pool = p;
-                    return true;
-                }
-            }
-
-            pool = default;
-            return false;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        internal static ref EventsHandle _GetEventsHandle(Type type) {
-            return ref Data.Instance.GetEventsHandleRef(type);
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        internal static ReadOnlySpan<EventsHandle> _GetAllEventsHandles() => Data.Instance.GetAllEventsHandles();
         #endregion
 
         #region SYSTEMS_HANDLES

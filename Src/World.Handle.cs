@@ -50,9 +50,6 @@ namespace FFS.Libraries.StaticEcs {
         private readonly unsafe delegate*<Type, out ComponentsHandle, bool> _tryGetComponentsHandle;
         private readonly unsafe delegate*<Type, ref ComponentsHandle> _getComponentsHandle;
         private readonly unsafe delegate*<ReadOnlySpan<ComponentsHandle>> _getAllComponentsHandles;
-        private readonly unsafe delegate*<Type, out EventsHandle, bool> _tryGetEventsHandle;
-        private readonly unsafe delegate*<Type, ref EventsHandle> _getEventsHandle;
-        private readonly unsafe delegate*<ReadOnlySpan<EventsHandle>> _getAllEventsHandles;
         private readonly unsafe delegate*<Type, bool> _hasResource;
         private readonly unsafe delegate*<Type, IResource, bool, void> _setResource;
         private readonly unsafe delegate*<Type, IResource> _getResource;
@@ -91,9 +88,6 @@ namespace FFS.Libraries.StaticEcs {
                 &World<TWorld>._TryGetComponentsHandle,
                 &World<TWorld>._GetComponentsHandle,
                 &World<TWorld>._GetAllComponentsHandles,
-                &World<TWorld>._TryGetEventsHandle,
-                &World<TWorld>._GetEventsHandle,
-                &World<TWorld>._GetAllEventsHandles,
                 &World<TWorld>._HasResource,
                 &World<TWorld>._SetResource,
                 &World<TWorld>._GetResource,
@@ -126,9 +120,6 @@ namespace FFS.Libraries.StaticEcs {
             delegate*<Type, out ComponentsHandle, bool> tryGetComponentsHandle,
             delegate*<Type, ref ComponentsHandle> getComponentsHandle,
             delegate*<ReadOnlySpan<ComponentsHandle>> getAllComponentsHandles,
-            delegate*<Type, out EventsHandle, bool> tryGetEventsHandle,
-            delegate*<Type, ref EventsHandle> getEventsHandle,
-            delegate*<ReadOnlySpan<EventsHandle>> getAllEventsHandles,
             delegate*<Type, bool> hasResource,
             delegate*<Type, IResource, bool, void> setResource,
             delegate*<Type, IResource> getResource,
@@ -157,9 +148,6 @@ namespace FFS.Libraries.StaticEcs {
             _tryGetComponentsHandle = tryGetComponentsHandle;
             _getComponentsHandle = getComponentsHandle;
             _getAllComponentsHandles = getAllComponentsHandles;
-            _tryGetEventsHandle = tryGetEventsHandle;
-            _getEventsHandle = getEventsHandle;
-            _getAllEventsHandles = getAllEventsHandles;
             _hasResource = hasResource;
             _setResource = setResource;
             _getResource = getResource;
@@ -345,42 +333,6 @@ namespace FFS.Libraries.StaticEcs {
         #endregion
 
         #region EVENTS
-        /// <summary>
-        /// Attempts to obtain a type-erased <see cref="EventsHandle"/> for the specified event type.
-        /// Returns <c>false</c> if the event type is not registered.
-        /// </summary>
-        /// <param name="eventType">The <see cref="Type"/> of the event struct (must implement <see cref="IEvent"/>).</param>
-        /// <param name="handle">The resulting handle. Valid only when the method returns <c>true</c>.</param>
-        /// <returns><c>true</c> if the event type is registered.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public bool TryGetEventsHandle(Type eventType, out EventsHandle handle) {
-            unsafe { return _tryGetEventsHandle(eventType, out handle); }
-        }
-
-        /// <summary>
-        /// Returns a reference to the <see cref="EventsHandle"/> for the specified event type.
-        /// Throws <see cref="StaticEcsException"/> if the event type is not registered.
-        /// <para>
-        /// Unlike <see cref="TryGetEventsHandle"/>, this method avoids copying the entire handle
-        /// struct by returning a direct reference into the internal storage.
-        /// Use when the event type is guaranteed to be registered.
-        /// </para>
-        /// </summary>
-        /// <param name="eventType">The <see cref="Type"/> of the event struct (must implement <see cref="IEvent"/>).</param>
-        /// <returns>A readonly reference to the <see cref="EventsHandle"/>.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public ref readonly EventsHandle GetEventsHandle(Type eventType) {
-            unsafe { return ref _getEventsHandle(eventType); }
-        }
-
-        /// <summary>
-        /// Returns handles for all event types registered in this world.
-        /// </summary>
-        /// <returns>Read-only span of all registered <see cref="EventsHandle"/> instances.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public ReadOnlySpan<EventsHandle> GetAllEventsHandles() {
-            unsafe { return _getAllEventsHandles(); }
-        }
         #endregion
 
         #region RESOURCES
@@ -1064,286 +1016,4 @@ namespace FFS.Libraries.StaticEcs {
         #endregion
     }
 
-    /// <summary>
-    /// Type-erased handle for accessing a specific event type's storage without knowing the concrete
-    /// event type at compile time. Provides runtime-dynamic operations: send events (boxed),
-    /// read events by index, delete, query pool state, and manage the event buffer.
-    /// <para>
-    /// Events in StaticEcs use a ring-buffer pool model. Each event gets an index in the pool.
-    /// Receivers track their own read cursor. Events can be individually deleted (soft-deleted)
-    /// and the pool tracks deletion state per slot.
-    /// </para>
-    /// <para>
-    /// Obtained via <see cref="WorldHandle.TryGetEventsHandle"/> or
-    /// <see cref="WorldHandle.GetAllEventsHandles"/>.
-    /// </para>
-    /// </summary>
-    #if ENABLE_IL2CPP
-    [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
-    [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
-    #endif
-    public readonly struct EventsHandle {
-        private readonly unsafe delegate*<IEvent, bool> _addRaw;
-        private readonly unsafe delegate*<bool> _add;
-        private readonly unsafe delegate*<int, IEvent> _getRaw;
-        private readonly unsafe delegate*<int, void> _delete;
-        private readonly unsafe delegate*<void> _destroy;
-        private readonly unsafe delegate*<int, bool> _isDeleted;
-        private readonly unsafe delegate*<int, int> _unreadCount;
-        private readonly unsafe delegate*<int> _notDeletedCount;
-        private readonly unsafe delegate*<int> _capacity;
-        private readonly unsafe delegate*<int> _receiversCount;
-        private readonly unsafe delegate*<int> _last;
-        private readonly unsafe delegate*<int, ushort> _version;
-        private readonly unsafe delegate*<int, IEvent, void> _putRaw;
-        private readonly unsafe delegate*<void> _reset;
-        private readonly unsafe delegate*<ref BinaryPackWriter, void> _writeAll;
-        private readonly unsafe delegate*<ref BinaryPackReader, void> _readAll;
-
-        /// <summary>
-        /// The <see cref="Type"/> of the event struct this handle operates on.
-        /// </summary>
-        public readonly Type EventType;
-
-        /// <summary>
-        /// Stable GUID assigned to this event type for serialization identification.
-        /// </summary>
-        public readonly Guid Guid;
-
-        /// <summary>
-        /// Runtime-assigned numeric ID for this event type within the world.
-        /// </summary>
-        public readonly ushort DynamicId;
-
-        /// <summary>
-        /// When <c>true</c>, events of this type are excluded from all world snapshot serialization.
-        /// Mirrors <see cref="INonSerializable"/> on the registered event type.
-        /// </summary>
-        public readonly bool NonSerializable;
-
-        #if NET5_0_OR_GREATER
-        [UnconditionalSuppressMessage("AOT", "IL2091", Justification = "Event metadata is preserved by the registration path.")]
-        #endif
-        internal static unsafe EventsHandle Create<TWorld, TEvent>()
-            where TWorld : struct, IWorldType
-            where TEvent : struct, IEvent {
-            return new EventsHandle(
-                typeof(TEvent),
-                World<TWorld>.Events<TEvent>.Instance.Guid,
-                World<TWorld>.Events<TEvent>.Instance.Id,
-                World<TWorld>.Events<TEvent>.Instance.NonSerializable,
-                &World<TWorld>.Events<TEvent>._AddRaw,
-                &World<TWorld>.Events<TEvent>._Add,
-                &World<TWorld>.Events<TEvent>._GetRaw,
-                &World<TWorld>.Events<TEvent>._Del,
-                &World<TWorld>.Events<TEvent>._Destroy,
-                &World<TWorld>.Events<TEvent>._IsDeleted,
-                &World<TWorld>.Events<TEvent>._UnreadCount,
-                &World<TWorld>.Events<TEvent>._NotDeletedCount,
-                &World<TWorld>.Events<TEvent>._Capacity,
-                &World<TWorld>.Events<TEvent>._ReceiversCount,
-                &World<TWorld>.Events<TEvent>._Last,
-                &World<TWorld>.Events<TEvent>._Version,
-                &World<TWorld>.Events<TEvent>._PutRaw,
-                &World<TWorld>.Events<TEvent>._Reset,
-                &World<TWorld>.Events<TEvent>._WriteAll,
-                &World<TWorld>.Events<TEvent>._ReadAll
-            );
-        }
-
-        internal unsafe EventsHandle(
-            Type eventType,
-            Guid guid,
-            ushort dynamicId,
-            bool nonSerializable,
-            delegate*<IEvent, bool> addRaw,
-            delegate*<bool> add,
-            delegate*<int, IEvent> getRaw,
-            delegate*<int, void> delete,
-            delegate*<void> destroy,
-            delegate*<int, bool> isDeleted,
-            delegate*<int, int> unreadCount,
-            delegate*<int> notDeletedCount,
-            delegate*<int> capacity,
-            delegate*<int> receiversCount,
-            delegate*<int> last,
-            delegate*<int, ushort> version,
-            delegate*<int, IEvent, void> putRaw,
-            delegate*<void> reset,
-            delegate*<ref BinaryPackWriter, void> writeAll,
-            delegate*<ref BinaryPackReader, void> readAll) {
-            EventType = eventType;
-            Guid = guid;
-            DynamicId = dynamicId;
-            NonSerializable = nonSerializable;
-            _addRaw = addRaw;
-            _add = add;
-            _getRaw = getRaw;
-            _delete = delete;
-            _destroy = destroy;
-            _isDeleted = isDeleted;
-            _unreadCount = unreadCount;
-            _notDeletedCount = notDeletedCount;
-            _capacity = capacity;
-            _receiversCount = receiversCount;
-            _last = last;
-            _version = version;
-            _putRaw = putRaw;
-            _reset = reset;
-            _writeAll = writeAll;
-            _readAll = readAll;
-        }
-
-        #region POOL_OPERATIONS
-        /// <summary>
-        /// Sends an event with the given boxed value to all receivers.
-        /// The value is unboxed internally and added to the event pool.
-        /// </summary>
-        /// <param name="value">Boxed event value. Must match the event type.</param>
-        /// <returns><c>true</c> if the event was added to the pool; <c>false</c> if the pool is full.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public bool AddRaw(IEvent value) {
-            unsafe { return _addRaw(value); }
-        }
-
-        /// <summary>
-        /// Sends a default-initialized event to all receivers.
-        /// Useful for signal-style events that carry no data.
-        /// </summary>
-        /// <returns><c>true</c> if the event was added; <c>false</c> if the pool is full.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public bool Add() {
-            unsafe { return _add(); }
-        }
-
-        /// <summary>
-        /// Retrieves the event at the given pool index as a boxed <see cref="IEvent"/>.
-        /// The index must be within the valid range of the pool.
-        /// </summary>
-        /// <param name="idx">Pool index of the event.</param>
-        /// <returns>The boxed event value.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public IEvent GetRaw(int idx) {
-            unsafe { return _getRaw(idx); }
-        }
-
-        /// <summary>
-        /// Soft-deletes the event at the given pool index. The slot is marked as deleted but
-        /// the pool index remains occupied until the pool wraps around. Deleted events are
-        /// skipped by receivers.
-        /// </summary>
-        /// <param name="idx">Pool index of the event to delete.</param>
-        [MethodImpl(AggressiveInlining)]
-        public void Delete(int idx) {
-            unsafe { _delete(idx); }
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        internal void Destroy() {
-            unsafe { _destroy(); }
-        }
-
-        /// <summary>
-        /// Checks whether the event at the given pool index has been soft-deleted.
-        /// </summary>
-        /// <param name="idx">Pool index to check.</param>
-        /// <returns><c>true</c> if the event at this index is deleted.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public bool IsDeleted(int idx) {
-            unsafe { return _isDeleted(idx); }
-        }
-
-        /// <summary>
-        /// Returns the number of unread events for a specific receiver (identified by receiver index).
-        /// Each receiver maintains its own read cursor.
-        /// </summary>
-        /// <param name="idx">Receiver index.</param>
-        /// <returns>Number of events the receiver has not yet read.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public int UnreadCount(int idx) {
-            unsafe { return _unreadCount(idx); }
-        }
-
-        /// <summary>
-        /// Returns the total number of events in the pool that have not been soft-deleted.
-        /// </summary>
-        /// <returns>Count of live (non-deleted) events.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public int NotDeletedCount() {
-            unsafe { return _notDeletedCount(); }
-        }
-
-        /// <summary>
-        /// Returns the current capacity of the event pool (maximum number of events
-        /// it can hold before old events are overwritten).
-        /// </summary>
-        /// <returns>Pool capacity.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public int Capacity() {
-            unsafe { return _capacity(); }
-        }
-
-        /// <summary>
-        /// Returns the number of currently registered receivers for this event type.
-        /// </summary>
-        /// <returns>Receiver count.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public int ReceiversCount() {
-            unsafe { return _receiversCount(); }
-        }
-
-        /// <summary>
-        /// Returns the pool index of the most recently added event.
-        /// Returns -1 or an invalid value if no events have been added.
-        /// </summary>
-        /// <returns>Index of the last added event.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public int Last() {
-            unsafe { return _last(); }
-        }
-
-        /// <summary>
-        /// Returns the version counter for the event slot at the given index.
-        /// The version increments each time the slot is reused (overwritten by a new event).
-        /// Used internally to detect stale event references.
-        /// </summary>
-        /// <param name="idx">Pool index.</param>
-        /// <returns>Version counter for this slot.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public ushort Version(int idx) {
-            unsafe { return _version(idx); }
-        }
-
-        /// <summary>
-        /// Directly writes a boxed event value into a specific pool slot, overwriting whatever
-        /// was there. This is a low-level operation — prefer <see cref="AddRaw"/> for normal
-        /// event sending. Used by serialization and migration tools.
-        /// </summary>
-        /// <param name="idx">Pool index to write to.</param>
-        /// <param name="value">Boxed event value.</param>
-        [MethodImpl(AggressiveInlining)]
-        public void PutRaw(int idx, IEvent value) {
-            unsafe { _putRaw(idx, value); }
-        }
-
-        /// <summary>
-        /// Clears all events from the pool and resets all receiver cursors.
-        /// All unread events are lost.
-        /// </summary>
-        [MethodImpl(AggressiveInlining)]
-        public void Reset() {
-            unsafe { _reset(); }
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        internal void WriteAll(ref BinaryPackWriter writer) {
-            unsafe { _writeAll(ref writer); }
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        internal void ReadAll(ref BinaryPackReader reader) {
-            unsafe { _readAll(ref reader); }
-        }
-        #endregion
-    }
 }
