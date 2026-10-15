@@ -1626,24 +1626,6 @@ namespace FFS.Libraries.StaticEcs {
         public uint? BaseComponentTypesCount;
 
         /// <summary>
-        /// Number of threads to use for parallel query execution.
-        /// 0 = single-threaded only (default).
-        /// <see cref="MaxThreadCount"/> = use all available CPU threads (<see cref="MaxThreads"/> configuration).
-        /// </summary>
-        public uint? ThreadCount;
-
-        /// <summary>
-        /// Number of spin-wait iterations worker threads perform before blocking on a kernel event.
-        /// Higher values reduce wake-up latency when multiple parallel queries run per frame
-        /// (the worker stays in a CPU spin loop and catches the next query without a kernel transition).
-        /// Lower values save CPU when queries are infrequent.
-        /// <para>
-        /// Default 256 (4096 in <see cref="MaxThreads"/> configuration).
-        /// </para>
-        /// </summary>
-        public uint? WorkerSpinCount;
-
-        /// <summary>
         /// Initial capacity for the cluster registry. Minimum 16. Grows automatically if more
         /// clusters are registered.
         /// </summary>
@@ -1677,49 +1659,20 @@ namespace FFS.Libraries.StaticEcs {
 
         /// <summary>
         /// Returns a default configuration suitable for most applications:
-        /// 64 component types, 64 tag types, 16 clusters, single-threaded, independent world.
+        /// 64 component types, 64 tag types, 16 clusters, independent world.
         /// </summary>
         /// <param name="independent">Whether the world should be independent (default: true).</param>
         /// <returns>A <see cref="WorldConfig"/> with sensible defaults.</returns>
         public static WorldConfig Default(bool independent = true) => new() {
             BaseComponentTypesCount = 64,
-            ThreadCount = 0,
-            WorkerSpinCount = 256,
             BaseClustersCapacity = 16,
             Independent = independent,
             TrackCreated = false,
             TrackingBufferSize = 8,
         };
 
-        /// <summary>
-        /// Returns a configuration that uses all available CPU threads for parallel queries.
-        /// Otherwise, identical to <see cref="Default"/>.
-        /// </summary>
-        /// <param name="independent">Whether the world should be independent (default: true).</param>
-        /// <returns>A <see cref="WorldConfig"/> with max-threads parallelism enabled.</returns>
-        public static WorldConfig MaxThreads(bool? independent = null) => new() {
-            ThreadCount = MaxThreadCount,
-            WorkerSpinCount = 4096,
-            Independent = independent,
-        };
-
-        /// <summary>
-        /// All available CPU threads (typically <c>Environment.ProcessorCount</c>).
-        /// </summary>
-        public static uint MaxThreadCount {
-            get {
-                #if UNITY_WEBGL
-                return 1;
-                #else
-                return (uint)Environment.ProcessorCount;
-                #endif
-            }
-        }
-
         internal WorldConfig MergeWith(WorldConfig other) => new() {
             BaseComponentTypesCount = BaseComponentTypesCount ?? other.BaseComponentTypesCount,
-            ThreadCount = ThreadCount ?? other.ThreadCount,
-            WorkerSpinCount = WorkerSpinCount ?? other.WorkerSpinCount,
             BaseClustersCapacity = BaseClustersCapacity ?? other.BaseClustersCapacity,
             Independent = Independent ?? other.Independent,
             TrackCreated = TrackCreated ?? other.TrackCreated,

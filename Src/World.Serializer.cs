@@ -1654,11 +1654,11 @@ namespace FFS.Libraries.StaticEcs {
                 }
 
                 if (OnCreateEntitySnapshotActions.Count > 0) {
-                    Query().For(ref snapshotParams, chunks, static (ref SnapshotWriteParams p, Entity entity) => {
+                    foreach (var entity in Query().EntitiesFlexible(chunks, EntityStatusType.Any)) {
                         for (var j = 0; j < OnCreateEntitySnapshotActions.Count; j++) {
-                            OnCreateEntitySnapshotActions[j](entity, p);
+                            OnCreateEntitySnapshotActions[j](entity, snapshotParams);
                         }
-                    }, EntityStatusType.Any, QueryMode.Flexible);
+                    }
                 }
             }
             
@@ -1669,11 +1669,11 @@ namespace FFS.Libraries.StaticEcs {
                 }
                 
                 if (OnRestoreEntityFromSnapshotActions.Count > 0) {
-                    Query().For(ref snapshotParams, chunks, static (ref SnapshotReadParams p, Entity entity) => {
+                    foreach (var entity in Query().EntitiesFlexible(chunks, EntityStatusType.Any)) {
                         for (var j = 0; j < OnRestoreEntityFromSnapshotActions.Count; j++) {
-                            OnRestoreEntityFromSnapshotActions[j](entity, p);
+                            OnRestoreEntityFromSnapshotActions[j](entity, snapshotParams);
                         }
-                    }, EntityStatusType.Any, QueryMode.Flexible);
+                    }
                 }
             }
             #endregion
@@ -2061,7 +2061,7 @@ namespace FFS.Libraries.StaticEcs {
                     Assert("EntitiesWriter", !Destroyed, "EntitiesWriter is destroyed");
                     #endif
                     
-                    Query().For(ref this, (ref EntitiesWriter self, Entity entity) => self.Write(entity), EntityStatusType.Any);
+                    foreach (var entity in Query().Entities(EntityStatusType.Any)) Write(entity);
                 }
 
                 /// <summary>
@@ -2075,7 +2075,7 @@ namespace FFS.Libraries.StaticEcs {
                     Assert("EntitiesWriter", !Destroyed, "EntitiesWriter is destroyed");
                     #endif
                     
-                    Query().For(ref this, (ref EntitiesWriter self, Entity entity) => self.WriteAndUnload(entity), EntityStatusType.Any);
+                    foreach (var entity in Query().Entities(EntityStatusType.Any)) WriteAndUnload(entity);
                 }
 
                 /// <summary>

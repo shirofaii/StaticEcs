@@ -507,18 +507,6 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
         
-        internal static void AssertNotMoreThanOneParallelQuery(string type, [CallerMemberName] string method = "") {
-            if (Data.Instance.QueryDataCount != 0) {
-                throw new StaticEcsException(type, method, "Nested query are not available with parallel query");
-            }
-        }
-        
-        internal static void AssertParallelAvailable(string type, [CallerMemberName] string method = "") {
-            if (Data.Instance.ZeroThreadCount) {
-                throw new StaticEcsException(type, method, "ThreadCount = 0, change World config");
-            }
-        }
-        
         internal static void AssertMultiThreadNotActive(string type, [CallerMemberName] string method = "") {
             if (Data.Instance.MultiThreadActive) {
                 throw new StaticEcsException(type, method, "Forbidden in a parallel query.");

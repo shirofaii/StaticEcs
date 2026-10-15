@@ -349,7 +349,6 @@ namespace FFS.Libraries.StaticEcs {
 
             // CONFIG
             internal readonly bool IndependentWorld;
-            internal readonly bool ZeroThreadCount;
             internal readonly bool TrackCreated;
             internal readonly byte TrackingBufferSize;
 
@@ -375,7 +374,6 @@ namespace FFS.Libraries.StaticEcs {
             public Data(WorldConfig worldConfig) {
                 worldConfig = worldConfig.MergeWith(WorldConfig.Default());
                 IndependentWorld = worldConfig.Independent.Value;
-                ZeroThreadCount = worldConfig.ThreadCount.Value == 0;
                 TrackCreated = worldConfig.TrackCreated.Value;
                 TrackingBufferSize = worldConfig.TrackingBufferSize.Value;
                 CurrentTick = 1;
@@ -448,7 +446,6 @@ namespace FFS.Libraries.StaticEcs {
                 _poolsCountSerializableComponents = default;
                 BitMaskComponentsLen = default;
 
-                ParallelRunner<TWorld>.Create(worldConfig.ThreadCount.Value, worldConfig.WorkerSpinCount.Value);
                 
                 QueryDataCount = 0;
                 #if FFS_ECS_DEBUG
@@ -655,7 +652,6 @@ namespace FFS.Libraries.StaticEcs {
                     EntityTypeResetters[i]();
                 }
 
-                ParallelRunner<TWorld>.Destroy();
 
                 #if FFS_ECS_BURST
                 LifecycleHandle.OnDestroy();

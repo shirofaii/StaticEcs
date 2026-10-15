@@ -1346,58 +1346,6 @@ namespace FFS.Libraries.StaticEcs {
             #region INTERNAL API
             #region BATCH
             [MethodImpl(AggressiveInlining)]
-            internal void BatchAdd(QueryData queryData, int nextGlobalBlockIdx) {
-                #if FFS_ECS_DEBUG
-                AssertMultiThreadNotActive(ComponentsTypeName);
-                #endif
-
-                while (nextGlobalBlockIdx >= 0) {
-                    ref var blocks = ref queryData.Blocks[nextGlobalBlockIdx];
-
-                    var globalBlockIdx = (uint)nextGlobalBlockIdx;
-                    nextGlobalBlockIdx = blocks.NextGlobalBlock;
-
-                    var segmentIdx = globalBlockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT;
-                    var segmentBlockIdx = (byte) (globalBlockIdx & Const.BLOCKS_IN_SEGMENT_MASK);
-
-                    BatchAdd(blocks.EntitiesMask, segmentIdx, segmentBlockIdx);
-                }
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal void BatchSet(QueryData queryData, int nextGlobalBlockIdx, T value) {
-                #if FFS_ECS_DEBUG
-                AssertMultiThreadNotActive(ComponentsTypeName);
-                #endif
-                if (IsTag) {
-                    while (nextGlobalBlockIdx >= 0) {
-                        ref var blocks = ref queryData.Blocks[nextGlobalBlockIdx];
-                    
-                        var globalBlockIdx = (uint)nextGlobalBlockIdx;
-                        nextGlobalBlockIdx = blocks.NextGlobalBlock;
-                    
-                        var segmentIdx = globalBlockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT;
-                        var segmentBlockIdx = (byte) (globalBlockIdx & Const.BLOCKS_IN_SEGMENT_MASK);
-
-                        BatchSetTag(blocks.EntitiesMask, segmentIdx, segmentBlockIdx);
-                    }
-                }
-                else {
-                    while (nextGlobalBlockIdx >= 0) {
-                        ref var blocks = ref queryData.Blocks[nextGlobalBlockIdx];
-
-                        var globalBlockIdx = (uint)nextGlobalBlockIdx;
-                        nextGlobalBlockIdx = blocks.NextGlobalBlock;
-
-                        var segmentIdx = globalBlockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT;
-                        var segmentBlockIdx = (byte)(globalBlockIdx & Const.BLOCKS_IN_SEGMENT_MASK);
-
-                        BatchSet(value, blocks.EntitiesMask, segmentIdx, segmentBlockIdx);
-                    }
-                }
-            }
-
-            [MethodImpl(AggressiveInlining)]
             internal void BatchDelete(QueryData queryData, int nextGlobalBlockIdx, HookReason reason = HookReason.Default) {
                 #if FFS_ECS_DEBUG
                 AssertMultiThreadNotActive(ComponentsTypeName);
@@ -1430,77 +1378,7 @@ namespace FFS.Libraries.StaticEcs {
                     }
                 }
             }
-            
-            [MethodImpl(AggressiveInlining)]
-            internal void BatchDisable(QueryData queryData, int nextGlobalBlockIdx) {
-                #if FFS_ECS_DEBUG
-                AssertMultiThreadNotActive(ComponentsTypeName);
-                #endif
 
-                while (nextGlobalBlockIdx >= 0) {
-                    ref var blocks = ref queryData.Blocks[nextGlobalBlockIdx];
-                    
-                    var globalBlockIdx = (uint)nextGlobalBlockIdx;
-                    nextGlobalBlockIdx = blocks.NextGlobalBlock;
-                    
-                    var segmentIdx = globalBlockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT;
-                    var segmentBlockIdx = (byte) (globalBlockIdx & Const.BLOCKS_IN_SEGMENT_MASK);
-
-                    BatchDisable(blocks.EntitiesMask, segmentIdx, segmentBlockIdx);
-                }
-            }
-            
-            [MethodImpl(AggressiveInlining)]
-            internal void BatchEnable(QueryData queryData, int nextGlobalBlockIdx) {
-                #if FFS_ECS_DEBUG
-                AssertMultiThreadNotActive(ComponentsTypeName);
-                #endif
-
-                while (nextGlobalBlockIdx >= 0) {
-                    ref var blocks = ref queryData.Blocks[nextGlobalBlockIdx];
-                    
-                    var globalBlockIdx = (uint)nextGlobalBlockIdx;
-                    nextGlobalBlockIdx = blocks.NextGlobalBlock;
-                    
-                    var segmentIdx = globalBlockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT;
-                    var segmentBlockIdx = (byte) (globalBlockIdx & Const.BLOCKS_IN_SEGMENT_MASK);
-
-                    BatchEnable(blocks.EntitiesMask, segmentIdx, segmentBlockIdx);
-                }
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal void BatchToggle(QueryData queryData, int nextGlobalBlockIdx) {
-                #if FFS_ECS_DEBUG
-                AssertMultiThreadNotActive(ComponentsTypeName);
-                #endif
-
-                while (nextGlobalBlockIdx >= 0) {
-                    ref var blocks = ref queryData.Blocks[nextGlobalBlockIdx];
-                    
-                    var globalBlockIdx = (uint)nextGlobalBlockIdx;
-                    nextGlobalBlockIdx = blocks.NextGlobalBlock;
-                    
-                    var segmentIdx = globalBlockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT;
-                    var segmentBlockIdx = (byte) (globalBlockIdx & Const.BLOCKS_IN_SEGMENT_MASK);
-
-                    BatchToggle(blocks.EntitiesMask, segmentIdx, segmentBlockIdx);
-                }
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal void BatchApply(QueryData queryData, int nextGlobalBlockIdx, bool state) {
-                #if FFS_ECS_DEBUG
-                AssertMultiThreadNotActive(ComponentsTypeName);
-                #endif
-                if (state) {
-                    BatchSet(queryData, nextGlobalBlockIdx, default);
-                }
-                else {
-                    BatchDelete(queryData, nextGlobalBlockIdx);
-                }
-            }
-            
             [MethodImpl(AggressiveInlining)]
             internal void BatchAdd(ulong entitiesMaskFilter, uint segmentIdx, byte segmentBlockIdx) {
                 #if !NET6_0_OR_GREATER
@@ -1819,44 +1697,6 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             [MethodImpl(AggressiveInlining)]
-            internal void BatchDisable(ulong entitiesMaskFilter, uint segmentIdx, byte segmentBlockIdx) {
-                #if FFS_ECS_DEBUG
-                AssertComponentDisableable<T>(ComponentsTypeName);
-                #endif
-
-                var maskSegment = EntitiesMaskSegments[segmentIdx];
-                if (maskSegment == null) {
-                    return;
-                }
-
-                entitiesMaskFilter &= maskSegment[segmentBlockIdx];
-                if (entitiesMaskFilter == 0) {
-                    return;
-                }
-
-                maskSegment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT] |= entitiesMaskFilter;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal void BatchEnable(ulong entitiesMaskFilter, uint segmentIdx, byte segmentBlockIdx) {
-                #if FFS_ECS_DEBUG
-                AssertComponentDisableable<T>(ComponentsTypeName);
-                #endif
-
-                var maskSegment = EntitiesMaskSegments[segmentIdx];
-                if (maskSegment == null) {
-                    return;
-                }
-
-                entitiesMaskFilter &= maskSegment[segmentBlockIdx];
-                if (entitiesMaskFilter == 0) {
-                    return;
-                }
-
-                maskSegment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT] &= ~entitiesMaskFilter;
-            }
-            
-            [MethodImpl(AggressiveInlining)]
             internal void BatchSetTag(ulong entitiesMaskFilter, uint segmentIdx, byte segmentBlockIdx) {
                 var baseGlobalBlockEntityIdx = (uint)((segmentIdx << Const.ENTITIES_IN_SEGMENT_SHIFT) + (segmentBlockIdx << Const.ENTITIES_IN_BLOCK_SHIFT));
                 var chunkBlockIdx = (byte)((baseGlobalBlockEntityIdx >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
@@ -1930,46 +1770,6 @@ namespace FFS.Libraries.StaticEcs {
                 }
             }
 
-            [MethodImpl(AggressiveInlining)]
-            internal void BatchToggle(ulong entitiesMaskFilter, uint segmentIdx, byte segmentBlockIdx) {
-                #if FFS_ECS_DEBUG
-                AssertMultiThreadNotActive(ComponentsTypeName);
-                #endif
-
-                ref var maskSegment = ref EntitiesMaskSegments[segmentIdx];
-
-                if (maskSegment == null) {
-                    if (IsTag) {
-                        BatchSetTag(entitiesMaskFilter, segmentIdx, segmentBlockIdx);
-                    }
-                    else {
-                        BatchSet(default, entitiesMaskFilter, segmentIdx, segmentBlockIdx);
-                    }
-                    return;
-                }
-
-                var entitiesMask = maskSegment[segmentBlockIdx];
-                var toDelete = entitiesMaskFilter & entitiesMask;
-                var toSet = entitiesMaskFilter & ~entitiesMask;
-
-                if (toDelete != 0) {
-                    if (IsTag) {
-                        BatchDeleteTag(toDelete, segmentIdx, segmentBlockIdx);
-                    }
-                    else {
-                        BatchDelete(toDelete, segmentIdx, segmentBlockIdx);
-                    }
-                }
-
-                if (toSet != 0) {
-                    if (IsTag) {
-                        BatchSetTag(toSet, segmentIdx, segmentBlockIdx);
-                    }
-                    else {
-                        BatchSet(default, toSet, segmentIdx, segmentBlockIdx);
-                    }
-                }
-            }
             #endregion
 
             #if NET5_0_OR_GREATER
