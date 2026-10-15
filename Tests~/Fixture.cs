@@ -12,7 +12,7 @@ namespace FFS.Libraries.StaticEcs.Tests {
     public struct Pos : IComponent { public int X; }
     public struct Vel : IComponent { public int V; }
     public struct Hp : IComponent, IDisableable { public int Value; }
-    public struct Tracked : IComponent, ITrackableAdded, ITrackableDeleted, ITrackableChanged { public int V; }
+    public struct Tracked : IComponent { public int V; }
 
     public struct Name : IComponent {
         public string Value;
@@ -30,7 +30,6 @@ namespace FFS.Libraries.StaticEcs.Tests {
     public struct Red : ITag { }
     public struct Blue : ITag { }
     public struct Green : ITag { }
-    public struct TrackedTag : ITag, ITrackableAdded, ITrackableDeleted { }
 
     public abstract class WorldTest : IDisposable {
         protected WorldTest() {

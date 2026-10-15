@@ -108,7 +108,6 @@ namespace FFS.Libraries.StaticEcs {
     internal struct SystemData {
         public ISystem System;
         public Guid Guid;
-        public ulong LastTick;
         public int Index;
         public short Order;
         public bool HasUpdate;
@@ -230,9 +229,6 @@ namespace FFS.Libraries.StaticEcs {
                         if (UpdateSystemsCount == UpdateSystemsIndex.Length) {
                             Array.Resize(ref UpdateSystemsIndex, (int)(UpdateSystemsCount << 1));
                         }
-                        if (systemData.LastTick == 0) {
-                            AllSystems[i].LastTick = Data.Instance.CurrentTick;
-                        }
                         UpdateSystemsIndex[UpdateSystemsCount] = i;
                         UpdateSystemsCount++;
                     }
@@ -257,19 +253,16 @@ namespace FFS.Libraries.StaticEcs {
                     throw new StaticEcsException($"Systems<{typeof(TSystemsType)}>, Method: Update, systems pipeline must be initialized first.");
                 }
                 #endif
-                ref var currentLastTick = ref Data.Instance.CurrentLastTick;
                 for (var i = 0; i < UpdateSystemsCount; i++) {
                     ref var systemData = ref AllSystems[UpdateSystemsIndex[i]];
                     #if FFS_ECS_DEBUG
                     if (systemData.DebugDisabled) continue;
                     #endif
-                    currentLastTick = systemData.LastTick;
                     if (systemData.System.UpdateIsActive()) {
                         #if FFS_ECS_DEBUG
                         Stopwatch.Restart();
                         #endif
                         systemData.System.Update();
-                        systemData.LastTick = Data.Instance.CurrentTick;
                         #if FFS_ECS_DEBUG
                         Stopwatch.Stop();
                         ref var time = ref systemData.AvgUpdateTime;
@@ -278,7 +271,6 @@ namespace FFS.Libraries.StaticEcs {
                         #endif
                     }
                 }
-                currentLastTick = 0;
             }
 
             /// <summary>
@@ -330,19 +322,6 @@ namespace FFS.Libraries.StaticEcs {
                 Guid = default;
             }
 
-            /// <summary>
-            /// Resets the tracking tick of every registered system to <paramref name="tick"/>.
-            /// Called on world snapshot load right after the world tick is restored, so that systems
-            /// missing from the snapshot start from the restored tick instead of a stale one.
-            /// </summary>
-            internal static void ResetLastTicks(ulong tick) {
-                if (Status == SystemsStatus.NotCreated) return;
-
-                for (var i = 0; i < AllSystemsCount; i++) {
-                    AllSystems[i].LastTick = tick;
-                }
-            }
-
             internal static void WriteSnapshot(ref BinaryPackWriter writer) {
                 ResourcesData<TSystemsType>.Instance.WriteSnapshot(ref writer);
 
@@ -350,7 +329,6 @@ namespace FFS.Libraries.StaticEcs {
                 for (var i = 0; i < AllSystemsCount; i++) {
                     ref var data = ref AllSystems[i];
                     writer.WriteGuid(data.Guid);
-                    writer.WriteUlong(data.LastTick);
                     writer.WriteBool(data.HasSnapshotState);
                     if (data.HasSnapshotState) {
                         writer.WriteByte(data.Version);
@@ -364,22 +342,10 @@ namespace FFS.Libraries.StaticEcs {
             internal static void ReadSnapshot(ref BinaryPackReader reader) {
                 ResourcesData<TSystemsType>.Instance.ReadSnapshot(ref reader);
 
-                var currentTick = Data.Instance.CurrentTick;
-                var oldestTrackedTick = currentTick > Data.Instance.TrackingBufferSize
-                    ? currentTick - Data.Instance.TrackingBufferSize
-                    : 0UL;
-
                 var systemCount = reader.ReadUshort();
                 for (var i = 0; i < systemCount; i++) {
                     var guid = reader.ReadGuid();
-                    var lastTick = reader.ReadUlong();
                     var hasSnapshotState = reader.ReadBool();
-
-                    if (lastTick > currentTick) {
-                        lastTick = currentTick;
-                    } else if (lastTick < oldestTrackedTick) {
-                        lastTick = oldestTrackedTick;
-                    }
 
                     var found = -1;
                     for (var j = 0; j < AllSystemsCount; j++) {
@@ -387,10 +353,6 @@ namespace FFS.Libraries.StaticEcs {
                             found = j;
                             break;
                         }
-                    }
-
-                    if (found >= 0) {
-                        AllSystems[found].LastTick = lastTick;
                     }
 
                     if (!hasSnapshotState) continue;
@@ -758,7 +720,6 @@ namespace FFS.Libraries.StaticEcs {
         private readonly unsafe delegate*<IReadOnlyCollection<Type>> _getAllResourcesTypes;
         private readonly unsafe delegate*<ref BinaryPackWriter, void> _writeSnapshot;
         private readonly unsafe delegate*<ref BinaryPackReader, void> _readSnapshot;
-        private readonly unsafe delegate*<ulong, void> _resetLastTicks;
         private readonly unsafe delegate*<Span<SystemData>> _getAllSystems;
 
         /// <summary>The <see cref="Type"/> of the <c>TWorld</c> struct that owns this systems pipeline.</summary>
@@ -794,7 +755,6 @@ namespace FFS.Libraries.StaticEcs {
                 &World<TWorld>.Systems<TSystemsType>._GetAllResourcesTypes,
                 &World<TWorld>.Systems<TSystemsType>.WriteSnapshot,
                 &World<TWorld>.Systems<TSystemsType>.ReadSnapshot,
-                &World<TWorld>.Systems<TSystemsType>.ResetLastTicks,
                 &World<TWorld>.Systems<TSystemsType>._GetAllSystems
             );
         }
@@ -816,7 +776,6 @@ namespace FFS.Libraries.StaticEcs {
             delegate*<IReadOnlyCollection<Type>> getAllResourcesTypes,
             delegate*<ref BinaryPackWriter, void> writeSnapshot,
             delegate*<ref BinaryPackReader, void> readSnapshot,
-            delegate*<ulong, void> resetLastTicks,
             delegate*<Span<SystemData>> getAllSystems) {
             WorldType = worldType;
             SystemsType = systemsType;
@@ -834,7 +793,6 @@ namespace FFS.Libraries.StaticEcs {
             _getAllResourcesTypes = getAllResourcesTypes;
             _writeSnapshot = writeSnapshot;
             _readSnapshot = readSnapshot;
-            _resetLastTicks = resetLastTicks;
             _getAllSystems = getAllSystems;
         }
 
@@ -846,11 +804,6 @@ namespace FFS.Libraries.StaticEcs {
         [MethodImpl(AggressiveInlining)]
         internal void ReadSnapshot(ref BinaryPackReader reader) {
             unsafe { _readSnapshot(ref reader); }
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        internal void ResetLastTicks(ulong tick) {
-            unsafe { _resetLastTicks(tick); }
         }
 
         [MethodImpl(AggressiveInlining)]

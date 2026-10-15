@@ -490,177 +490,6 @@ namespace FFS.Libraries.StaticEcs {
         public static ChunkOwnerType GetChunkOwner(uint chunkIdx) => Data.Instance.GetChunkOwnerType(chunkIdx);
         #endregion
 
-        #region TICK
-        /// <summary>
-        /// Advances the world tick counter and rotates the tracking ring buffer.
-        /// Call once per frame after all system groups have run.
-        /// After calling, the current tracking slot is cleared and ready for new changes.
-        /// Systems automatically track their last tick to see changes since their previous execution.
-        /// <para>Requires <see cref="WorldConfig.TrackingBufferSize"/> &gt; 0.</para>
-        /// </summary>
-        [MethodImpl(AggressiveInlining)]
-        public static void Tick() {
-            #if FFS_ECS_DEBUG
-            AssertWorldIsInitialized(WorldTypeName);
-            if (Data.Instance.TrackingBufferSize == 0) {
-                throw new StaticEcsException(WorldTypeName, "Tick", "TrackingBufferSize is 0. Tick-based tracking is disabled.");
-            }
-            if (Data.Instance.MultiThreadActive) {
-                throw new StaticEcsException(WorldTypeName, "Tick", "Cannot advance tick while parallel queries are active.");
-            }
-            #endif
-            Data.Instance.AdvanceTickInternal();
-        }
-
-        /// <summary>
-        /// The current world tick. Monotonically increasing, starts at 1.
-        /// Incremented by <see cref="Tick"/>.
-        /// </summary>
-        public static ulong CurrentTick {
-            [MethodImpl(AggressiveInlining)]
-            get => Data.Instance.CurrentTick;
-        }
-
-        /// <summary>
-        /// The last tick of the currently executing system (set by <see cref="Systems{TSystemsType}.Update"/>).
-        /// Used by tracking filters to determine the range of ticks to check.
-        /// </summary>
-        public static ulong CurrentLastTick {
-            [MethodImpl(AggressiveInlining)]
-            get => Data.Instance.CurrentLastTick;
-        }
-        #endregion
-
-        #region TRACKING
-        /// <summary>
-        /// Clears tracking state for component type <typeparamref name="T"/>.
-        /// After calling, <c>Added&lt;T&gt;</c> and <c>Deleted&lt;T&gt;</c> query filters will match no entities
-        /// until new structural changes occur.
-        /// </summary>
-        /// <remarks>
-        /// Normally not needed — tracking is managed automatically by `W.Tick()`. Clears ALL ring buffer slots.
-        /// Only affects the specified component type — other tracked types retain their state.
-        /// </remarks>
-        /// <typeparam name="T">Component type with tracking enabled.</typeparam>
-        /// <example><code>
-        /// // At the start of each frame, reset tracking for Position:
-        /// MyWorld.ClearTracking&lt;Position&gt;();
-        /// </code></example>
-        [MethodImpl(AggressiveInlining)]
-        public static void ClearTracking<T>() where T : struct, IComponentOrTag {
-            Components<T>.Instance.ClearTrackingInternal();
-        }
-
-        /// <summary>
-        /// Clears tracking state for all registered component types.
-        /// After calling, <c>Added&lt;T&gt;</c> and <c>Deleted&lt;T&gt;</c> query filters will match no entities
-        /// for any component type until new structural changes occur.
-        /// </summary>
-        /// <remarks>
-        /// Iterates over every registered component type and clears its tracking bitmasks.
-        /// Prefer <see cref="ClearTracking{T}"/> when only a single type needs to be reset.
-        /// </remarks>
-        [MethodImpl(AggressiveInlining)]
-        public static void ClearAllComponentsTracking() {
-            Data.Instance.ClearAllComponentsTrackingInternal();
-        }
-
-        /// <summary>
-        /// Clears tracking state for all registered component and tag types.
-        /// After calling, all <c>AllAdded</c>, <c>AllDeleted</c>, and <c>Created</c> query filters
-        /// will match no entities until new structural changes occur.
-        /// </summary>
-        /// <remarks>
-        /// Normally not needed — tracking is managed automatically by `W.Tick()`. Clears ALL ring buffer slots.
-        /// </remarks>
-        /// <example><code>
-        /// // Typical game loop usage:
-        /// MyWorld.ClearTracking();
-        /// systems.Update();
-        /// </code></example>
-        [MethodImpl(AggressiveInlining)]
-        public static void ClearTracking() {
-            ClearAllComponentsTracking();
-            ClearCreatedTracking();
-        }
-
-        /// <summary>
-        /// Clears entity creation tracking state.
-        /// After calling, the <c>Created</c> query filter will match no entities
-        /// until new entities are created.
-        /// </summary>
-        /// <remarks>
-        /// Requires <see cref="WorldConfig.TrackCreated"/> to be <c>true</c>.
-        /// Normally not needed — tracking is managed automatically by `W.Tick()`. Clears ALL ring buffer slots.
-        /// </remarks>
-        [MethodImpl(AggressiveInlining)]
-        public static void ClearCreatedTracking() {
-            Data.Instance.ClearCreatedTrackingInternal();
-        }
-
-        /// <summary>
-        /// Clears only the Added tracking state for component type <typeparamref name="T"/>.
-        /// Deleted tracking state is preserved. After calling, <c>Added&lt;T&gt;</c> query filters will match
-        /// no entities until new Add operations occur.
-        /// </summary>
-        /// <typeparam name="T">Component type with tracking enabled.</typeparam>
-        [MethodImpl(AggressiveInlining)]
-        public static void ClearAddedTracking<T>() where T : struct, IComponentOrTag {
-            Components<T>.Instance.ClearAddedTracking();
-        }
-
-        /// <summary>
-        /// Clears only the Deleted tracking state for component type <typeparamref name="T"/>.
-        /// Added tracking state is preserved. After calling, <c>Deleted&lt;T&gt;</c> query filters will match
-        /// no entities until new Delete operations occur.
-        /// </summary>
-        /// <typeparam name="T">Component type with tracking enabled.</typeparam>
-        [MethodImpl(AggressiveInlining)]
-        public static void ClearDeletedTracking<T>() where T : struct, IComponentOrTag {
-            Components<T>.Instance.ClearDeletedTracking();
-        }
-
-        #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-        /// <summary>
-        /// Clears only the Changed tracking state for component type <typeparamref name="T"/>.
-        /// Added and Deleted tracking state is preserved. After calling, <c>Changed&lt;T&gt;</c> query filters will match
-        /// no entities until new Ref/Add operations occur.
-        /// </summary>
-        /// <typeparam name="T">Component type with tracking enabled.</typeparam>
-        [MethodImpl(AggressiveInlining)]
-        public static void ClearChangedTracking<T>() where T : struct, IComponent {
-            Components<T>.Instance.ClearChangedTracking();
-        }
-
-        /// <summary>
-        /// Clears Changed tracking state for all registered component types.
-        /// After calling, <c>Changed&lt;T&gt;</c> query filters will match no entities until new Ref/Add operations occur.
-        /// </summary>
-        [MethodImpl(AggressiveInlining)]
-        public static void ClearAllChangedTracking() {
-            Data.Instance.ClearChangedComponentTrackingInternal();
-        }
-        #endif
-
-        /// <summary>
-        /// Clears only the Added tracking state for all registered component types.
-        /// Deleted tracking state is preserved for all types.
-        /// </summary>
-        [MethodImpl(AggressiveInlining)]
-        public static void ClearAllAddedTracking() {
-            Data.Instance.ClearAddedComponentTrackingInternal();
-        }
-
-        /// <summary>
-        /// Clears only the Deleted tracking state for all registered component types.
-        /// Added tracking state is preserved for all types.
-        /// </summary>
-        [MethodImpl(AggressiveInlining)]
-        public static void ClearAllDeletedTracking() {
-            Data.Instance.ClearDeletedComponentTrackingInternal();
-        }
-        #endregion
-
         #region EVENTS
         /// <summary>
         /// Sends an event to all registered receivers of this event type.
@@ -1640,24 +1469,6 @@ namespace FFS.Libraries.StaticEcs {
         public bool? Independent;
 
         /// <summary>
-        /// If <c>true</c>, the world tracks entity creation events in per-block bitmasks.
-        /// This enables the <c>Created</c> query filter to match entities that were created
-        /// since the last <see cref="World{TWorld}.ClearCreatedTracking"/> call.
-        /// Default: <c>false</c> (opt-in).
-        /// </summary>
-        public bool? TrackCreated;
-
-        /// <summary>
-        /// Size of the tracking ring buffer (number of ticks of history to retain).
-        /// When non-zero, change tracking (Added/Deleted/Changed) is versioned per tick.
-        /// Each <see cref="World{TWorld}.Tick"/> call advances the world tick and rotates
-        /// the ring buffer, preserving up to this many ticks of tracking history.
-        /// Systems automatically see changes since their last execution via per-system tick tracking.
-        /// <para>Default: 8. Minimum: 2.</para>
-        /// </summary>
-        public byte? TrackingBufferSize;
-
-        /// <summary>
         /// Returns a default configuration suitable for most applications:
         /// 64 component types, 64 tag types, 16 clusters, independent world.
         /// </summary>
@@ -1667,16 +1478,12 @@ namespace FFS.Libraries.StaticEcs {
             BaseComponentTypesCount = 64,
             BaseClustersCapacity = 16,
             Independent = independent,
-            TrackCreated = false,
-            TrackingBufferSize = 8,
         };
 
         internal WorldConfig MergeWith(WorldConfig other) => new() {
             BaseComponentTypesCount = BaseComponentTypesCount ?? other.BaseComponentTypesCount,
             BaseClustersCapacity = BaseClustersCapacity ?? other.BaseClustersCapacity,
-            Independent = Independent ?? other.Independent,
-            TrackCreated = TrackCreated ?? other.TrackCreated,
-            TrackingBufferSize = TrackingBufferSize ?? other.TrackingBufferSize
+            Independent = Independent ?? other.Independent
         };
     }
 }

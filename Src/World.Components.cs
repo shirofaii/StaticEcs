@@ -27,25 +27,6 @@ namespace FFS.Libraries.StaticEcs {
     public interface ITag : IComponentOrTag { }
 
     /// <summary>
-    /// Marker: enables tracking of additions for this component/tag type. When present,
-    /// registration stores the type in the tracking index and <c>Components&lt;T&gt;.Instance.TrackAdded</c> is <c>true</c>,
-    /// unlocking the <c>AllAdded</c>/<c>NoneAdded</c>/<c>AnyAdded</c> query filters and <c>Entity.HasAdded&lt;T&gt;()</c>.
-    /// </summary>
-    public interface ITrackableAdded { }
-
-    /// <summary>
-    /// Marker: enables tracking of deletions for this component/tag type. Unlocks
-    /// <c>AllDeleted</c>/<c>NoneDeleted</c>/<c>AnyDeleted</c> filters and <c>Entity.HasDeleted&lt;T&gt;()</c>.
-    /// </summary>
-    public interface ITrackableDeleted { }
-
-    /// <summary>
-    /// Marker: enables tracking of value changes for this component. Applies to <see cref="IComponent"/> only —
-    /// ignored on tag types. Unlocks <c>AllChanged</c>/<c>NoneChanged</c>/<c>AnyChanged</c> filters and <c>Entity.HasChanged&lt;T&gt;()</c>.
-    /// </summary>
-    public interface ITrackableChanged { }
-
-    /// <summary>
     /// Marker: opts a component into Disable/Enable support. Standalone marker — Disable/Enable APIs
     /// (<c>Entity.Disable&lt;T&gt;()</c>/<c>Enable&lt;T&gt;()</c>/<c>HasDisabled&lt;T&gt;()</c>/<c>HasEnabled&lt;T&gt;()</c>)
     /// and the <c>AllOnlyDisabled</c>/<c>AllWithDisabled</c>/<c>NoneWithDisabled</c>/<c>AnyOnlyDisabled</c>/<c>AnyWithDisabled</c>
@@ -432,23 +413,9 @@ namespace FFS.Libraries.StaticEcs {
             internal readonly bool DataLifecycle;
             internal readonly bool HasOnAdd;
             internal readonly bool HasOnDelete;
-            internal readonly bool TrackAdded;
-            internal readonly bool TrackDeleted;
             internal readonly bool HasDisable;
             internal readonly byte SegmentMaskLen;
-            #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-            internal readonly bool TrackChanged;
-            #endif
-            internal readonly bool TrackAddedOrChanged;
-            internal readonly bool AnyTracking;
-            internal readonly byte AddedTrackingOffset;
-            internal readonly byte DeletedTrackingOffset;
-            internal readonly byte TrackingBlocksCount;
             internal readonly T DefaultValue;
-            internal ulong[][] TrackingMaskSegments;
-            internal HeuristicComponentsTracking[] TrackingHeuristicChunks;
-            internal HeuristicComponentsTracking[][] TrackingHistoryHeuristic;
-            internal ulong[][][] TrackingHistoryMasks;
 
             #if FFS_ECS_BURST
             internal ComponentLifecycleHandle<T> LifecycleHandle;
@@ -480,8 +447,6 @@ namespace FFS.Libraries.StaticEcs {
             private IPackArrayStrategy<T> _readWriteArrayStrategy;
             private IPackArrayStrategyResettable _resettableStrategy;
 
-            internal ulong[][] _trackingSegmentsPool;
-            internal int _trackingSegmentsPoolCount;
 
             /// <summary>
             /// Stable serialization identifier for this component type, as specified in
@@ -542,111 +507,6 @@ namespace FFS.Libraries.StaticEcs {
                 return maskSegment != null && (maskSegment[segmentBlockIdx] & blockEntityMask) != 0;
             }
 
-            /// <summary>
-            /// Checks whether component <typeparamref name="T"/> was added to this entity since the system's last tick (or since `fromTick` if specified).
-            /// Requires <typeparamref name="T"/> to implement <see cref="ITrackableAdded"/> (asserted in debug mode).
-            /// </summary>
-            [MethodImpl(AggressiveInlining)]
-            public readonly bool HasAdded(Entity entity) {
-                #if FFS_ECS_DEBUG
-                AssertComponentTrackAdded<T>(ComponentsTypeName);
-                AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                #endif
-                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
-                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-                var trackingSegments = TrackingMaskSegments;
-                if (trackingSegments == null) return false;
-                var maskSegment = trackingSegments[segmentIdx];
-                return maskSegment != null && (maskSegment[segmentBlockIdx + AddedTrackingOffset] & blockEntityMask) != 0;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            public readonly bool HasAdded(Entity entity, ulong fromTick) {
-                #if FFS_ECS_DEBUG
-                AssertComponentTrackAdded<T>(ComponentsTypeName);
-                AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                #endif
-                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
-                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-                ref var data = ref Data.Instance;
-                return (AddedMaskHistory(fromTick, data.CurrentTick, data.TrackingBufferSize, segmentIdx, segmentBlockIdx) & blockEntityMask) != 0;
-            }
-
-            /// <summary>
-            /// Checks whether component <typeparamref name="T"/> was deleted from this entity since the system's last tick (or since `fromTick` if specified).
-            /// Requires <typeparamref name="T"/> to implement <see cref="ITrackableDeleted"/> (asserted in debug mode).
-            /// </summary>
-            [MethodImpl(AggressiveInlining)]
-            public readonly bool HasDeleted(Entity entity) {
-                #if FFS_ECS_DEBUG
-                AssertComponentTrackDeleted<T>(ComponentsTypeName);
-                AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                #endif
-                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
-                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-                var trackingSegments = TrackingMaskSegments;
-                if (trackingSegments == null) return false;
-                var maskSegment = trackingSegments[segmentIdx];
-                return maskSegment != null && (maskSegment[segmentBlockIdx + DeletedTrackingOffset] & blockEntityMask) != 0;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            public readonly bool HasDeleted(Entity entity, ulong fromTick) {
-                #if FFS_ECS_DEBUG
-                AssertComponentTrackDeleted<T>(ComponentsTypeName);
-                AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                #endif
-                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
-                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-                ref var data = ref Data.Instance;
-                return (DeletedMaskHistory(fromTick, data.CurrentTick, data.TrackingBufferSize, segmentIdx, segmentBlockIdx) & blockEntityMask) != 0;
-            }
-
-            #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-            /// <summary>
-            /// Checks whether component <typeparamref name="T"/> was changed on this entity since the system's last tick (or since `fromTick` if specified).
-            /// Requires <typeparamref name="T"/> to implement <see cref="ITrackableChanged"/> (asserted in debug mode).
-            /// </summary>
-            [MethodImpl(AggressiveInlining)]
-            public readonly bool HasChanged(Entity entity) {
-                #if FFS_ECS_DEBUG
-                AssertIsNotTag<T>(ComponentsTypeName);
-                AssertComponentTrackChanged<T>(ComponentsTypeName);
-                AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                #endif
-                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
-                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-                var trackingSegments = TrackingMaskSegments;
-                if (trackingSegments == null) return false;
-                var maskSegment = trackingSegments[segmentIdx];
-                return maskSegment != null && (maskSegment[segmentBlockIdx] & blockEntityMask) != 0;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            public readonly bool HasChanged(Entity entity, ulong fromTick) {
-                #if FFS_ECS_DEBUG
-                AssertIsNotTag<T>(ComponentsTypeName);
-                AssertComponentTrackChanged<T>(ComponentsTypeName);
-                AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                #endif
-                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
-                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-                ref var data = ref Data.Instance;
-                return (ChangedMaskHistory(fromTick, data.CurrentTick, data.TrackingBufferSize, segmentIdx, segmentBlockIdx) & blockEntityMask) != 0;
-            }
-            #endif
 
             /// <summary>
             /// Checks whether the entity has component <typeparamref name="T"/> in the disabled state.
@@ -821,36 +681,6 @@ namespace FFS.Libraries.StaticEcs {
                 return ref ComponentSegments[entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT][entityId & Const.ENTITIES_IN_SEGMENT_MASK];
             }
 
-            #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-            /// <summary>
-            /// Returns a mutable reference to component <typeparamref name="T"/> on the given entity
-            /// and marks it as Changed if change tracking is enabled for this component type.
-            /// Use when you need tracked mutable access for <c>AllChanged&lt;T&gt;</c> queries.
-            /// </summary>
-            /// <param name="entity">Entity that must have component <typeparamref name="T"/>.</param>
-            /// <returns>A mutable reference to the stored component data.</returns>
-            [MethodImpl(AggressiveInlining)]
-            public ref T Mut(Entity entity) {
-                #if FFS_ECS_DEBUG
-                AssertIsNotTag<T>(ComponentsTypeName);
-                AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                AssertEntityHasComponent<T>(ComponentsTypeName, entity);
-                #endif
-
-                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
-                if (TrackChanged) {
-                    var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                    var segmentBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                    var blockEntityMask = 1UL << (byte)(entityId & Const.ENTITIES_IN_BLOCK_MASK);
-                    ref var seg = ref TrackingMaskSegments[segmentIdx];
-                    seg ??= AllocateTrackingSegment(segmentIdx);
-                    seg[segmentBlockIdx] |= blockEntityMask;
-                    var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
-                    TrackingHeuristicChunks[entityId >> Const.ENTITIES_IN_CHUNK_SHIFT].ChangedBlocks.SetBit(chunkBlockIdx);
-                }
-                return ref ComponentSegments[entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT][entityId & Const.ENTITIES_IN_SEGMENT_MASK];
-            }
-            #endif
 
             /// <summary>
             /// Ensures entity has component <typeparamref name="T"/> and returns a mutable reference to it.
@@ -889,11 +719,6 @@ namespace FFS.Libraries.StaticEcs {
                 ref var entitiesMask = ref maskSegment[segmentBlockIdx];
 
                 if ((entitiesMask & blockEntityMask) != 0) {
-                    #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                    if (TrackChanged) {
-                        SetChangedBit(entityId, segmentIdx, segmentBlockIdx, blockEntityMask);
-                    }
-                    #endif
                     return ref componentSegment[segmentEntityIdx];
                 }
 
@@ -905,10 +730,6 @@ namespace FFS.Libraries.StaticEcs {
                 if (entitiesMask == ulong.MaxValue) {
                     var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
                     HeuristicChunks[segmentIdx >> Const.SEGMENTS_IN_CHUNK_SHIFT].FullBlocks.SetBit(chunkBlockIdx);
-                }
-
-                if (TrackAddedOrChanged) {
-                    SetOnAddTrackingBits(entityId, segmentIdx, segmentBlockIdx, blockEntityMask);
                 }
 
                 ref var component = ref componentSegment[segmentEntityIdx];
@@ -952,11 +773,6 @@ namespace FFS.Libraries.StaticEcs {
                 
                 isNew = (entitiesMask & blockEntityMask) == 0;
                 if (!isNew) {
-                    #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                    if (TrackChanged) {
-                        SetChangedBit(entityId, segmentIdx, segmentBlockIdx, blockEntityMask);
-                    }
-                    #endif
                     return ref componentSegment[segmentEntityIdx];
                 }
 
@@ -968,10 +784,6 @@ namespace FFS.Libraries.StaticEcs {
                 if (entitiesMask == ulong.MaxValue) {
                     var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
                     HeuristicChunks[segmentIdx >> Const.SEGMENTS_IN_CHUNK_SHIFT].FullBlocks.SetBit(chunkBlockIdx);
-                }
-
-                if (TrackAddedOrChanged) {
-                    SetOnAddTrackingBits(entityId, segmentIdx, segmentBlockIdx, blockEntityMask);
                 }
 
                 ref var component = ref componentSegment[segmentEntityIdx];
@@ -1033,19 +845,11 @@ namespace FFS.Libraries.StaticEcs {
                         HeuristicChunks[segmentIdx >> Const.SEGMENTS_IN_CHUNK_SHIFT].FullBlocks.SetBit(chunkBlockIdx);
                     }
 
-                    if (TrackAdded) {
-                        SetAddedBit(entityId, segmentIdx, segmentBlockIdx, blockEntityMask);
-                    }
                 }
                 else if (HasOnDelete) {
                     CallOnDelete(ref component, entity, HookReason.Default);
                 }
 
-                #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                if (TrackChanged) {
-                    SetChangedBit(entityId, segmentIdx, segmentBlockIdx, blockEntityMask);
-                }
-                #endif
 
                 component = value;
 
@@ -1101,10 +905,6 @@ namespace FFS.Libraries.StaticEcs {
                 if (entitiesMask == ulong.MaxValue) {
                     var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
                     HeuristicChunks[entityId >> Const.ENTITIES_IN_CHUNK_SHIFT].FullBlocks.ClearBit(chunkBlockIdx);
-                }
-
-                if (TrackDeleted) {
-                    SetDeletedBit(entityId, segmentIdx, segmentBlockIdx, blockEntityMask);
                 }
 
                 entitiesMask &= invertedBlockEntityMask;
@@ -1245,10 +1045,6 @@ namespace FFS.Libraries.StaticEcs {
                 entitiesMask |= blockEntityMask;
                 if (entitiesMask == ulong.MaxValue) {
                     HeuristicChunks[entityId >> Const.ENTITIES_IN_CHUNK_SHIFT].FullBlocks.SetBit(chunkBlockIdx);
-                }
-
-                if (TrackAdded) {
-                    SetAddedBit(entityId, segmentIdx, segmentBlockIdx, blockEntityMask);
                 }
 
                 return true;
@@ -1402,10 +1198,6 @@ namespace FFS.Libraries.StaticEcs {
                     return;
                 }
 
-                if (TrackAddedOrChanged) {
-                    SetOnAddTrackingBitsBatch(entitiesMaskFilter, segmentIdx, segmentBlockIdx, chunkBlockIdx, chunkIdx);
-                }
-
                 if (entitiesMask == 0) {
                     HeuristicChunks[chunkIdx].NotEmptyBlocks.SetBit(chunkBlockIdx);
                 }
@@ -1472,10 +1264,6 @@ namespace FFS.Libraries.StaticEcs {
                 ref var entitiesMask = ref maskSegment[segmentBlockIdx];
                 var existingEntitiesMask = entitiesMaskFilter & entitiesMask;
                 var newEntitiesMaskFilter = entitiesMaskFilter & ~entitiesMask;
-
-                if (TrackAddedOrChanged) {
-                    SetOnAddTrackingBitsBatch(entitiesMaskFilter, segmentIdx, segmentBlockIdx, chunkBlockIdx, chunkIdx);
-                }
 
                 if (HasOnDelete && existingEntitiesMask != 0) {
                     var entity = new Entity(baseGlobalBlockEntityIdx);
@@ -1596,10 +1384,6 @@ namespace FFS.Libraries.StaticEcs {
                     return;
                 }
 
-                if (TrackDeleted) {
-                    SetDeletedBitBatch(entitiesMaskFilter, segmentIdx, segmentBlockIdx, chunkBlockIdx, chunkIdx);
-                }
-
                 ulong scratch = 0;
                 ref var disabledEntitiesMask = ref HasDisable 
                     ? ref maskSegment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT] 
@@ -1711,10 +1495,6 @@ namespace FFS.Libraries.StaticEcs {
                     return;
                 }
 
-                if (TrackAdded) {
-                    SetAddedBitBatch(entitiesMaskFilter, segmentIdx, segmentBlockIdx, chunkBlockIdx, chunkIdx);
-                }
-
                 if (entitiesMask == 0) {
                     HeuristicChunks[chunkIdx].NotEmptyBlocks.SetBit(chunkBlockIdx);
                 }
@@ -1741,10 +1521,6 @@ namespace FFS.Libraries.StaticEcs {
                 entitiesMaskFilter &= entitiesMask;
                 if (entitiesMaskFilter == 0) {
                     return;
-                }
-
-                if (TrackDeleted) {
-                    SetDeletedBitBatch(entitiesMaskFilter, segmentIdx, segmentBlockIdx, chunkBlockIdx, chunkIdx);
                 }
 
                 if (entitiesMask == ulong.MaxValue) {
@@ -1817,33 +1593,11 @@ namespace FFS.Libraries.StaticEcs {
                 HasDefaultValue = hasDefaultValue;
 
                 var probe = default(T);
-                TrackAdded = probe is ITrackableAdded;
-                TrackDeleted = probe is ITrackableDeleted;
                 HasDisable = !isTag && probe is IDisableable;
                 #if FFS_ECS_DEBUG
                 IsInternal = !isTag && probe is IComponentInternal;
                 #endif
                 SegmentMaskLen = (byte)(HasDisable ? Const.BLOCKS_IN_SEGMENT * 2 : Const.BLOCKS_IN_SEGMENT);
-                #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                TrackChanged = !isTag && probe is ITrackableChanged;
-                #endif
-                TrackAddedOrChanged = TrackAdded
-                    #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                    || TrackChanged
-                    #endif
-                ;
-                {
-                    byte trackingOff = 0;
-                    #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                    if (TrackChanged) trackingOff += Const.BLOCKS_IN_SEGMENT;
-                    #endif
-                    AddedTrackingOffset = trackingOff;
-                    if (TrackAdded) trackingOff += Const.BLOCKS_IN_SEGMENT;
-                    DeletedTrackingOffset = trackingOff;
-                    if (TrackDeleted) trackingOff += Const.BLOCKS_IN_SEGMENT;
-                    TrackingBlocksCount = trackingOff;
-                    AnyTracking = trackingOff > 0;
-                }
 
                 IsRegistered = true;
                 #if FFS_ECS_DEBUG
@@ -1860,12 +1614,6 @@ namespace FFS.Libraries.StaticEcs {
                 HeuristicChunks = null;
                 _segmentsPool = null;
                 _chunkHeuristicWorldMaskLen = 0;
-                TrackingMaskSegments = null;
-                TrackingHeuristicChunks = null;
-                _trackingSegmentsPool = null;
-                _trackingSegmentsPoolCount = 0;
-                TrackingHistoryHeuristic = null;
-                TrackingHistoryMasks = null;
 
                 #if FFS_ECS_BURST
                 LifecycleHandle = default;
@@ -1884,11 +1632,6 @@ namespace FFS.Libraries.StaticEcs {
                             + $"HasOnDelete {HasOnDelete}\n"
                             + $"HasWrite {HasWrite}\n"
                             + $"HasRead {HasRead}\n"
-                            + $"TrackAdded {TrackAdded}\n"
-                            + $"TrackDeleted {TrackDeleted}\n"
-                            #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                            + $"TrackChanged {TrackChanged}\n"
-                            #endif
                             + "\n"
                 );
                 #endif
@@ -1919,29 +1662,6 @@ namespace FFS.Libraries.StaticEcs {
                     _componentsPool = new T[segmentsCapacity][];
                 }
 
-                if (AnyTracking) {
-                    var bufferSize = Data.Instance.TrackingBufferSize;
-                    var totalSlots = (uint)bufferSize + 1;
-                    var poolSize = bufferSize > 0 ? segmentsCapacity * totalSlots : segmentsCapacity;
-                    _trackingSegmentsPool = new ulong[poolSize][];
-                    _trackingSegmentsPoolCount = 0;
-                    if (bufferSize > 0) {
-                        TrackingHistoryHeuristic = new HeuristicComponentsTracking[totalSlots][];
-                        TrackingHistoryMasks = new ulong[totalSlots][][];
-                        for (var i = 0; i < totalSlots; i++) {
-                            TrackingHistoryHeuristic[i] = new HeuristicComponentsTracking[chunksCapacity];
-                            TrackingHistoryMasks[i] = new ulong[segmentsCapacity][];
-                        }
-                        var writeSlot = (int)((Data.Instance.CurrentTick + 1) % totalSlots);
-                        TrackingHeuristicChunks = TrackingHistoryHeuristic[writeSlot];
-                        TrackingMaskSegments = TrackingHistoryMasks[writeSlot];
-                    }
-                    else {
-                        TrackingMaskSegments = new ulong[segmentsCapacity][];
-                        TrackingHeuristicChunks = new HeuristicComponentsTracking[chunksCapacity];
-                    }
-                }
-
                 if (default(T) is IComponentInternal component) {
                     component.OnInitialize<TWorld>();
                 }
@@ -1962,30 +1682,12 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(NoInlining)]
             internal void HardResetInternal() {
                 var segCount = EntitiesMaskSegments.Length;
-                var hasTracking = AnyTracking;
 
                 for (var i = 0; i < segCount; i++) {
                     ReleaseSegmentInternal(i);
-                    if (hasTracking) {
-                        ReleaseTrackingSegmentInternal(i);
-                    }
                 }
 
                 Array.Clear(HeuristicChunks, 0, HeuristicChunks.Length);
-                if (hasTracking) {
-                    var bufferSize = Data.Instance.TrackingBufferSize;
-                    if (bufferSize > 0) {
-                        for (var slot = 0; slot < bufferSize + 1; slot++) {
-                            Array.Clear(TrackingHistoryHeuristic[slot], 0, TrackingHistoryHeuristic[slot].Length);
-                        }
-                        var writeSlot = (int)((Data.Instance.CurrentTick + 1) % (uint)(bufferSize + 1));
-                        TrackingHeuristicChunks = TrackingHistoryHeuristic[writeSlot];
-                        TrackingMaskSegments = TrackingHistoryMasks[writeSlot];
-                    }
-                    else {
-                        Array.Clear(TrackingHeuristicChunks, 0, TrackingHeuristicChunks.Length);
-                    }
-                }
             }
 
             [MethodImpl(NoInlining)]
@@ -2023,32 +1725,6 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             [MethodImpl(AggressiveInlining)]
-            private void ReleaseTrackingSegmentInternal(int segIdx) {
-                var bufferSize = Data.Instance.TrackingBufferSize;
-                if (bufferSize > 0) {
-                    for (var slot = 0; slot < bufferSize + 1; slot++) {
-                        ref var trackingSeg = ref TrackingHistoryMasks[slot][segIdx];
-                        if (trackingSeg != null) {
-                            Array.Clear(trackingSeg, 0, trackingSeg.Length);
-                            _trackingSegmentsPool[_trackingSegmentsPoolCount++] = trackingSeg;
-                            trackingSeg = null;
-                        }
-                    }
-                }
-                else {
-                    ref var trackingSeg = ref TrackingMaskSegments[segIdx];
-                    if (trackingSeg != null) {
-                        Array.Clear(trackingSeg, 0, trackingSeg.Length);
-                        #if FFS_ECS_BURST
-                        LifecycleHandle.OnTrackingSegmentPooled((uint)segIdx);
-                        #endif
-                        _trackingSegmentsPool[_trackingSegmentsPoolCount++] = trackingSeg;
-                        trackingSeg = null;
-                    }
-                }
-            }
-
-            [MethodImpl(AggressiveInlining)]
             internal void Resize(uint chunksCapacity, ulong[][] chunkHeuristicMask) {
                 var segmentsCapacity = chunksCapacity * Const.SEGMENTS_IN_CHUNK;
                 
@@ -2059,26 +1735,6 @@ namespace FFS.Libraries.StaticEcs {
                 if (!IsTag) {
                     Array.Resize(ref ComponentSegments, (int)segmentsCapacity);
                     Array.Resize(ref _componentsPool, (int)segmentsCapacity);
-                }
-
-                if (AnyTracking) {
-                    var bufferSize = Data.Instance.TrackingBufferSize;
-                    var totalSlots = (uint)bufferSize + 1;
-                    var poolSize = bufferSize > 0 ? segmentsCapacity * totalSlots : segmentsCapacity;
-                    Array.Resize(ref _trackingSegmentsPool, (int)poolSize);
-                    if (bufferSize > 0) {
-                        for (var i = 0; i < totalSlots; i++) {
-                            Array.Resize(ref TrackingHistoryHeuristic[i], (int)chunksCapacity);
-                            Array.Resize(ref TrackingHistoryMasks[i], (int)segmentsCapacity);
-                        }
-                        var writeSlot = (int)((Data.Instance.CurrentTick + 1) % totalSlots);
-                        TrackingHeuristicChunks = TrackingHistoryHeuristic[writeSlot];
-                        TrackingMaskSegments = TrackingHistoryMasks[writeSlot];
-                    }
-                    else {
-                        Array.Resize(ref TrackingMaskSegments, (int)segmentsCapacity);
-                        Array.Resize(ref TrackingHeuristicChunks, (int)chunksCapacity);
-                    }
                 }
 
                 #if FFS_ECS_BURST
@@ -2126,528 +1782,6 @@ namespace FFS.Libraries.StaticEcs {
                 value = default;
                 return false;
             }
-
-            #region TRACKING
-            [MethodImpl(NoInlining)]
-            private void SetAddedBit(uint entityId, uint segmentIdx, byte segmentBlockIdx, ulong blockEntityMask) {
-                ref var seg = ref TrackingMaskSegments[segmentIdx];
-                seg ??= AllocateTrackingSegment(segmentIdx);
-                seg[segmentBlockIdx + AddedTrackingOffset] |= blockEntityMask;
-                var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
-                TrackingHeuristicChunks[entityId >> Const.ENTITIES_IN_CHUNK_SHIFT].AddedBlocks.SetBit(chunkBlockIdx);
-            }
-
-            [MethodImpl(NoInlining)]
-            private void SetDeletedBit(uint entityId, uint segmentIdx, byte segmentBlockIdx, ulong blockEntityMask) {
-                ref var seg = ref TrackingMaskSegments[segmentIdx];
-                seg ??= AllocateTrackingSegment(segmentIdx);
-                seg[segmentBlockIdx + DeletedTrackingOffset] |= blockEntityMask;
-                var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
-                TrackingHeuristicChunks[entityId >> Const.ENTITIES_IN_CHUNK_SHIFT].DeletedBlocks.SetBit(chunkBlockIdx);
-            }
-
-            [MethodImpl(NoInlining)]
-            private void SetOnAddTrackingBits(uint entityId, uint segmentIdx, byte segmentBlockIdx, ulong blockEntityMask) {
-                ref var seg = ref TrackingMaskSegments[segmentIdx];
-                seg ??= AllocateTrackingSegment(segmentIdx);
-                var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
-                ref var heuristic = ref TrackingHeuristicChunks[entityId >> Const.ENTITIES_IN_CHUNK_SHIFT];
-                if (TrackAdded) {
-                    seg[segmentBlockIdx + AddedTrackingOffset] |= blockEntityMask;
-                    heuristic.AddedBlocks.SetBit(chunkBlockIdx);
-                }
-                #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                if (TrackChanged) {
-                    seg[segmentBlockIdx] |= blockEntityMask;
-                    heuristic.ChangedBlocks.SetBit(chunkBlockIdx);
-                }
-                #endif
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            private void SetOnAddTrackingBitsBatch(ulong entitiesMaskFilter, uint segmentIdx, byte segmentBlockIdx, byte chunkBlockIdx, uint chunkIdx) {
-                ref var seg = ref TrackingMaskSegments[segmentIdx];
-                seg ??= AllocateTrackingSegment(segmentIdx);
-                ref var heuristic = ref TrackingHeuristicChunks[chunkIdx];
-                if (TrackAdded) {
-                    seg[segmentBlockIdx + AddedTrackingOffset] |= entitiesMaskFilter;
-                    heuristic.AddedBlocks.SetBit(chunkBlockIdx);
-                }
-                #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                if (TrackChanged) {
-                    seg[segmentBlockIdx] |= entitiesMaskFilter;
-                    heuristic.ChangedBlocks.SetBit(chunkBlockIdx);
-                }
-                #endif
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            private void SetAddedBitBatch(ulong entitiesMaskFilter, uint segmentIdx, byte segmentBlockIdx, byte chunkBlockIdx, uint chunkIdx) {
-                ref var seg = ref TrackingMaskSegments[segmentIdx];
-                seg ??= AllocateTrackingSegment(segmentIdx);
-                seg[segmentBlockIdx + AddedTrackingOffset] |= entitiesMaskFilter;
-                TrackingHeuristicChunks[chunkIdx].AddedBlocks.SetBit(chunkBlockIdx);
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            private void SetDeletedBitBatch(ulong entitiesMaskFilter, uint segmentIdx, byte segmentBlockIdx, byte chunkBlockIdx, uint chunkIdx) {
-                ref var seg = ref TrackingMaskSegments[segmentIdx];
-                seg ??= AllocateTrackingSegment(segmentIdx);
-                seg[segmentBlockIdx + DeletedTrackingOffset] |= entitiesMaskFilter;
-                TrackingHeuristicChunks[chunkIdx].DeletedBlocks.SetBit(chunkBlockIdx);
-            }
-
-            #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-            [MethodImpl(NoInlining)]
-            internal void SetChangedBit(uint entityId, uint segmentIdx, byte segmentBlockIdx, ulong blockEntityMask) {
-                ref var seg = ref TrackingMaskSegments[segmentIdx];
-                seg ??= AllocateTrackingSegment(segmentIdx);
-                seg[segmentBlockIdx] |= blockEntityMask;
-                var chunkBlockIdx = (byte)((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_CHUNK_MASK);
-                TrackingHeuristicChunks[entityId >> Const.ENTITIES_IN_CHUNK_SHIFT].ChangedBlocks.SetBit(chunkBlockIdx);
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal void SetChangedBitBatch(ulong entitiesMaskFilter, uint segmentIdx, byte segmentBlockIdx, byte chunkBlockIdx, uint chunkIdx) {
-                ref var seg = ref TrackingMaskSegments[segmentIdx];
-                seg ??= AllocateTrackingSegment(segmentIdx);
-                seg[segmentBlockIdx] |= entitiesMaskFilter;
-                TrackingHeuristicChunks[chunkIdx].ChangedBlocks.SetBit(chunkBlockIdx);
-            }
-            #endif
-
-            [MethodImpl(NoInlining)]
-            // ReSharper disable once UnusedParameter.Local
-            private ulong[] AllocateTrackingSegment(uint segmentIdx) {
-                var trackingBlocksCount = TrackingBlocksCount;
-                var poolIdx = Interlocked.Decrement(ref _trackingSegmentsPoolCount);
-                if (poolIdx >= 0) {
-                    var seg = _trackingSegmentsPool[poolIdx];
-                    _trackingSegmentsPool[poolIdx] = null;
-                    Array.Clear(seg, 0, trackingBlocksCount);
-                    #if FFS_ECS_BURST
-                    LifecycleHandle.OnTrackingSegmentCreated(segmentIdx, seg, true);
-                    #endif
-                    return seg;
-                }
-                Interlocked.Increment(ref _trackingSegmentsPoolCount);
-                var newSeg = new ulong[trackingBlocksCount];
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnTrackingSegmentCreated(segmentIdx, newSeg, false);
-                #endif
-                return newSeg;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            // ReSharper disable once UnusedParameter.Local
-            private void ReturnTrackingSegment(uint segmentIdx, ulong[] seg) {
-                #if FFS_ECS_BURST
-                LifecycleHandle.OnTrackingSegmentPooled(segmentIdx);
-                #endif
-                _trackingSegmentsPool[Interlocked.Increment(ref _trackingSegmentsPoolCount) - 1] = seg;
-            }
-
-            [MethodImpl(NoInlining)]
-            internal void AdvanceTrackingSlot() {
-                var bufferSize = Data.Instance.TrackingBufferSize;
-                if (bufferSize == 0) return;
-                if (!AnyTracking) return;
-
-                var newSlot = (int)((Data.Instance.CurrentTick + 1) % (uint)(bufferSize + 1));
-                var heuristic = TrackingHistoryHeuristic[newSlot];
-                var masks = TrackingHistoryMasks[newSlot];
-
-                for (var chunkIdx = 0; chunkIdx < heuristic.Length; chunkIdx++) {
-                    ref var h = ref heuristic[chunkIdx];
-                    var notEmpty = h.AddedBlocks.Value | h.DeletedBlocks.Value
-                        #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                        | h.ChangedBlocks.Value
-                        #endif
-                        ;
-                    if (notEmpty == 0) continue;
-                    h.AddedBlocks.Value = 0;
-                    h.DeletedBlocks.Value = 0;
-                    #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                    h.ChangedBlocks.Value = 0;
-                    #endif
-                    var baseSegment = (uint)(chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT);
-                    while (notEmpty != 0) {
-                        #if NET6_0_OR_GREATER
-                        var blockIdx = System.Numerics.BitOperations.TrailingZeroCount(notEmpty);
-                        #else
-                        var blockIdx = Utils.DeBruijn[(uint)(((notEmpty & (ulong)-(long)notEmpty) * 0x37E84A99DAE458FUL) >> 58)];
-                        #endif
-                        var segmentOffset = blockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT;
-                        var segmentIdx = (uint)(baseSegment + segmentOffset);
-                        ref var segRef = ref masks[segmentIdx];
-                        if (segRef != null) {
-                            ReturnTrackingSegment(segmentIdx, segRef);
-                            segRef = null;
-                        }
-                        notEmpty &= ~(0xFUL << (segmentOffset << Const.BLOCKS_IN_SEGMENT_SHIFT));
-                    }
-                }
-
-                TrackingHeuristicChunks = heuristic;
-                TrackingMaskSegments = masks;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong AddedHeuristicHistory(ulong fromTick, ulong toTick, byte bufferSize, uint chunkIdx) {
-                #if FFS_ECS_DEBUG
-                AssertComponentTrackAdded<T>(ComponentsTypeName);
-                AssertTrackingBufferNotOverflow(ComponentsTypeName, fromTick, toTick, bufferSize);
-                #endif
-                var ticksToCheck = toTick - fromTick;
-                if (ticksToCheck == 0) return 0UL;
-                if (ticksToCheck > bufferSize) ticksToCheck = bufferSize;
-                var totalSlots = (ulong)bufferSize + 1;
-                if (ticksToCheck == 1) {
-                    return TrackingHistoryHeuristic[(int)(toTick % totalSlots)][chunkIdx].AddedBlocks.Value;
-                }
-                ulong result = 0;
-                for (ulong i = 0; i < ticksToCheck; i++) {
-                    result |= TrackingHistoryHeuristic[(int)((toTick - i) % totalSlots)][chunkIdx].AddedBlocks.Value;
-                }
-                return result;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong DeletedHeuristicHistory(ulong fromTick, ulong toTick, byte bufferSize, uint chunkIdx) {
-                #if FFS_ECS_DEBUG
-                AssertComponentTrackDeleted<T>(ComponentsTypeName);
-                AssertTrackingBufferNotOverflow(ComponentsTypeName, fromTick, toTick, bufferSize);
-                #endif
-                var ticksToCheck = toTick - fromTick;
-                if (ticksToCheck == 0) return 0UL;
-                if (ticksToCheck > bufferSize) ticksToCheck = bufferSize;
-                var totalSlots = (ulong)bufferSize + 1;
-                if (ticksToCheck == 1) {
-                    return TrackingHistoryHeuristic[(int)(toTick % totalSlots)][chunkIdx].DeletedBlocks.Value;
-                }
-                ulong result = 0;
-                for (ulong i = 0; i < ticksToCheck; i++) {
-                    result |= TrackingHistoryHeuristic[(int)((toTick - i) % totalSlots)][chunkIdx].DeletedBlocks.Value;
-                }
-                return result;
-            }
-
-            #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong ChangedHeuristicHistory(ulong fromTick, ulong toTick, byte bufferSize, uint chunkIdx) {
-                #if FFS_ECS_DEBUG
-                AssertComponentTrackChanged<T>(ComponentsTypeName);
-                AssertTrackingBufferNotOverflow(ComponentsTypeName, fromTick, toTick, bufferSize);
-                #endif
-                var ticksToCheck = toTick - fromTick;
-                if (ticksToCheck == 0) return 0UL;
-                if (ticksToCheck > bufferSize) ticksToCheck = bufferSize;
-                var totalSlots = (ulong)bufferSize + 1;
-                if (ticksToCheck == 1) {
-                    return TrackingHistoryHeuristic[(int)(toTick % totalSlots)][chunkIdx].ChangedBlocks.Value;
-                }
-                ulong result = 0;
-                for (ulong i = 0; i < ticksToCheck; i++) {
-                    result |= TrackingHistoryHeuristic[(int)((toTick - i) % totalSlots)][chunkIdx].ChangedBlocks.Value;
-                }
-                return result;
-            }
-            #endif
-
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong AddedMaskHistory(ulong fromTick, ulong toTick, byte bufferSize, uint segmentIdx, int segmentBlockIdx) {
-                #if FFS_ECS_DEBUG
-                AssertComponentTrackAdded<T>(ComponentsTypeName);
-                AssertTrackingBufferNotOverflow(ComponentsTypeName, fromTick, toTick, bufferSize);
-                #endif
-                var ticksToCheck = toTick - fromTick;
-                if (ticksToCheck == 0) return 0UL;
-                if (ticksToCheck > bufferSize) ticksToCheck = bufferSize;
-                var totalSlots = (ulong)bufferSize + 1;
-                if (ticksToCheck == 1) {
-                    var m = TrackingHistoryMasks[(int)(toTick % totalSlots)][segmentIdx];
-                    return m != null ? m[segmentBlockIdx + AddedTrackingOffset] : 0UL;
-                }
-                ulong result = 0;
-                for (ulong i = 0; i < ticksToCheck; i++) {
-                    var m = TrackingHistoryMasks[(int)((toTick - i) % totalSlots)][segmentIdx];
-                    if (m != null) result |= m[segmentBlockIdx + AddedTrackingOffset];
-                }
-                return result;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong DeletedMaskHistory(ulong fromTick, ulong toTick, byte bufferSize, uint segmentIdx, int segmentBlockIdx) {
-                #if FFS_ECS_DEBUG
-                AssertComponentTrackDeleted<T>(ComponentsTypeName);
-                AssertTrackingBufferNotOverflow(ComponentsTypeName, fromTick, toTick, bufferSize);
-                #endif
-                var ticksToCheck = toTick - fromTick;
-                if (ticksToCheck == 0) return 0UL;
-                if (ticksToCheck > bufferSize) ticksToCheck = bufferSize;
-                var totalSlots = (ulong)bufferSize + 1;
-                if (ticksToCheck == 1) {
-                    var m = TrackingHistoryMasks[(int)(toTick % totalSlots)][segmentIdx];
-                    return m != null ? m[segmentBlockIdx + DeletedTrackingOffset] : 0UL;
-                }
-                ulong result = 0;
-                for (ulong i = 0; i < ticksToCheck; i++) {
-                    var m = TrackingHistoryMasks[(int)((toTick - i) % totalSlots)][segmentIdx];
-                    if (m != null) result |= m[segmentBlockIdx + DeletedTrackingOffset];
-                }
-                return result;
-            }
-
-            #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong ChangedMaskHistory(ulong fromTick, ulong toTick, byte bufferSize, uint segmentIdx, int segmentBlockIdx) {
-                #if FFS_ECS_DEBUG
-                AssertComponentTrackChanged<T>(ComponentsTypeName);
-                AssertTrackingBufferNotOverflow(ComponentsTypeName, fromTick, toTick, bufferSize);
-                #endif
-                var ticksToCheck = toTick - fromTick;
-                if (ticksToCheck == 0) return 0UL;
-                if (ticksToCheck > bufferSize) ticksToCheck = bufferSize;
-                var totalSlots = (ulong)bufferSize + 1;
-                if (ticksToCheck == 1) {
-                    var m = TrackingHistoryMasks[(int)(toTick % totalSlots)][segmentIdx];
-                    return m != null ? m[segmentBlockIdx] : 0UL;
-                }
-                ulong result = 0;
-                for (ulong i = 0; i < ticksToCheck; i++) {
-                    var m = TrackingHistoryMasks[(int)((toTick - i) % totalSlots)][segmentIdx];
-                    if (m != null) result |= m[segmentBlockIdx];
-                }
-                return result;
-            }
-            #endif
-
-            /// <summary>
-            /// Resets only the Added tracking masks. Deleted tracking state is preserved. When tick-based tracking is active, clears all ring buffer slots.
-            /// Returns tracking segments to pool if Deleted state is also empty.
-            /// Must be called from the main thread (not during parallel query execution).
-            /// </summary>
-            [MethodImpl(AggressiveInlining)]
-            internal void ClearAddedTracking() {
-                #if FFS_ECS_DEBUG
-                AssertMultiThreadNotActive(ComponentsTypeName);
-                #endif
-                if (!TrackAdded) return;
-                var bufferSize = Data.Instance.TrackingBufferSize;
-                if (bufferSize > 0) {
-                    for (var slot = 0; slot < bufferSize + 1; slot++) {
-                        ClearAddedTrackingSlot(TrackingHistoryHeuristic[slot], TrackingHistoryMasks[slot]);
-                    }
-                }
-                else {
-                    ClearAddedTrackingSlot(TrackingHeuristicChunks, TrackingMaskSegments);
-                }
-            }
-
-            [MethodImpl(NoInlining)]
-            private void ClearAddedTrackingSlot(HeuristicComponentsTracking[] heuristicChunks, ulong[][] maskSegments) {
-                #if !NET6_0_OR_GREATER
-                var deBruijn = Utils.DeBruijn;
-                #endif
-                for (var chunkIdx = 0; chunkIdx < heuristicChunks.Length; chunkIdx++) {
-                    ref var heuristic = ref heuristicChunks[chunkIdx];
-                    var notEmpty = heuristic.AddedBlocks.Value;
-                    if (notEmpty == 0) continue;
-                    heuristic.AddedBlocks.Value = 0;
-                    var baseSegment = (uint)(chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT);
-                    while (notEmpty != 0) {
-                        #if NET6_0_OR_GREATER
-                        var blockIdx = System.Numerics.BitOperations.TrailingZeroCount(notEmpty);
-                        #else
-                        var blockIdx = deBruijn[(uint)(((notEmpty & (ulong)-(long)notEmpty) * 0x37E84A99DAE458FUL) >> 58)];
-                        #endif
-                        var segmentOffset = blockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT;
-                        var segmentIdx = (uint)(baseSegment + segmentOffset);
-                        ref var segRef = ref maskSegments[segmentIdx];
-                        if (segRef != null) {
-                            Array.Clear(segRef, AddedTrackingOffset, Const.BLOCKS_IN_SEGMENT);
-                            var segmentMask = 0xFUL << (segmentOffset << Const.BLOCKS_IN_SEGMENT_SHIFT);
-                            if ((heuristic.DeletedBlocks.Value & segmentMask) == 0
-                                #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                                && (heuristic.ChangedBlocks.Value & segmentMask) == 0
-                                #endif
-                            ) {
-                                ReturnTrackingSegment(segmentIdx, segRef);
-                                segRef = null;
-                            }
-                        }
-                        notEmpty &= ~(0xFUL << (segmentOffset << Const.BLOCKS_IN_SEGMENT_SHIFT));
-                    }
-                }
-            }
-
-            /// <summary>
-            /// Resets only the Deleted tracking masks. Added and Changed tracking state is preserved. When tick-based tracking is active, clears all ring buffer slots.
-            /// Returns tracking segments to pool if Added and Changed state is also empty.
-            /// Must be called from the main thread (not during parallel query execution).
-            /// </summary>
-            [MethodImpl(AggressiveInlining)]
-            internal void ClearDeletedTracking() {
-                #if FFS_ECS_DEBUG
-                AssertMultiThreadNotActive(ComponentsTypeName);
-                #endif
-                if (!TrackDeleted) return;
-                var bufferSize = Data.Instance.TrackingBufferSize;
-                if (bufferSize > 0) {
-                    for (var slot = 0; slot < bufferSize + 1; slot++) {
-                        ClearDeletedTrackingSlot(TrackingHistoryHeuristic[slot], TrackingHistoryMasks[slot]);
-                    }
-                }
-                else {
-                    ClearDeletedTrackingSlot(TrackingHeuristicChunks, TrackingMaskSegments);
-                }
-            }
-
-            [MethodImpl(NoInlining)]
-            private void ClearDeletedTrackingSlot(HeuristicComponentsTracking[] heuristicChunks, ulong[][] maskSegments) {
-                #if !NET6_0_OR_GREATER
-                var deBruijn = Utils.DeBruijn;
-                #endif
-                for (var chunkIdx = 0; chunkIdx < heuristicChunks.Length; chunkIdx++) {
-                    ref var heuristic = ref heuristicChunks[chunkIdx];
-                    var notEmpty = heuristic.DeletedBlocks.Value;
-                    if (notEmpty == 0) continue;
-                    heuristic.DeletedBlocks.Value = 0;
-                    var baseSegment = (uint)(chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT);
-                    while (notEmpty != 0) {
-                        #if NET6_0_OR_GREATER
-                        var blockIdx = System.Numerics.BitOperations.TrailingZeroCount(notEmpty);
-                        #else
-                        var blockIdx = deBruijn[(uint)(((notEmpty & (ulong)-(long)notEmpty) * 0x37E84A99DAE458FUL) >> 58)];
-                        #endif
-                        var segmentOffset = blockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT;
-                        var segmentIdx = (uint)(baseSegment + segmentOffset);
-                        ref var segRef = ref maskSegments[segmentIdx];
-                        if (segRef != null) {
-                            Array.Clear(segRef, DeletedTrackingOffset, Const.BLOCKS_IN_SEGMENT);
-                            var segmentMask = 0xFUL << (segmentOffset << Const.BLOCKS_IN_SEGMENT_SHIFT);
-                            if ((heuristic.AddedBlocks.Value & segmentMask) == 0
-                                #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                                && (heuristic.ChangedBlocks.Value & segmentMask) == 0
-                                #endif
-                            ) {
-                                ReturnTrackingSegment(segmentIdx, segRef);
-                                segRef = null;
-                            }
-                        }
-                        notEmpty &= ~(0xFUL << (segmentOffset << Const.BLOCKS_IN_SEGMENT_SHIFT));
-                    }
-                }
-            }
-
-            #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-            [MethodImpl(AggressiveInlining)]
-            internal void ClearChangedTracking() {
-                #if FFS_ECS_DEBUG
-                AssertMultiThreadNotActive(ComponentsTypeName);
-                #endif
-                if (!TrackChanged) return;
-                var bufferSize = Data.Instance.TrackingBufferSize;
-                if (bufferSize > 0) {
-                    for (var slot = 0; slot < bufferSize + 1; slot++) {
-                        ClearChangedTrackingSlot(TrackingHistoryHeuristic[slot], TrackingHistoryMasks[slot]);
-                    }
-                }
-                else {
-                    ClearChangedTrackingSlot(TrackingHeuristicChunks, TrackingMaskSegments);
-                }
-            }
-
-            [MethodImpl(NoInlining)]
-            private void ClearChangedTrackingSlot(HeuristicComponentsTracking[] heuristicChunks, ulong[][] maskSegments) {
-                #if !NET6_0_OR_GREATER
-                var deBruijn = Utils.DeBruijn;
-                #endif
-                for (var chunkIdx = 0; chunkIdx < heuristicChunks.Length; chunkIdx++) {
-                    ref var heuristic = ref heuristicChunks[chunkIdx];
-                    var notEmpty = heuristic.ChangedBlocks.Value;
-                    if (notEmpty == 0) continue;
-                    heuristic.ChangedBlocks.Value = 0;
-                    var baseSegment = (uint)(chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT);
-                    while (notEmpty != 0) {
-                        #if NET6_0_OR_GREATER
-                        var blockIdx = System.Numerics.BitOperations.TrailingZeroCount(notEmpty);
-                        #else
-                        var blockIdx = deBruijn[(uint)(((notEmpty & (ulong)-(long)notEmpty) * 0x37E84A99DAE458FUL) >> 58)];
-                        #endif
-                        var segmentOffset = blockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT;
-                        var segmentIdx = (uint)(baseSegment + segmentOffset);
-                        ref var segRef = ref maskSegments[segmentIdx];
-                        if (segRef != null) {
-                            Array.Clear(segRef, 0, Const.BLOCKS_IN_SEGMENT);
-                            var segmentMask = 0xFUL << (segmentOffset << Const.BLOCKS_IN_SEGMENT_SHIFT);
-                            if ((heuristic.AddedBlocks.Value & segmentMask) == 0
-                                && (heuristic.DeletedBlocks.Value & segmentMask) == 0) {
-                                ReturnTrackingSegment(segmentIdx, segRef);
-                                segRef = null;
-                            }
-                        }
-                        notEmpty &= ~(0xFUL << (segmentOffset << Const.BLOCKS_IN_SEGMENT_SHIFT));
-                    }
-                }
-            }
-            #endif
-
-            /// <summary>
-            /// Resets all tracking bitmasks for this component type. When tick-based tracking is active, clears all ring buffer slots.
-            /// After calling, <c>Added&lt;T&gt;</c>, <c>Deleted&lt;T&gt;</c>, and <c>Changed&lt;T&gt;</c> query filters will match no entities
-            /// until new Add/Delete/Change operations occur. Tracking segments are returned to the internal pool.
-            /// </summary>
-            [MethodImpl(AggressiveInlining)]
-            internal void ClearTrackingInternal() {
-                #if FFS_ECS_DEBUG
-                AssertMultiThreadNotActive(ComponentsTypeName);
-                #endif
-                if (!AnyTracking) return;
-                var bufferSize = Data.Instance.TrackingBufferSize;
-                if (bufferSize > 0) {
-                    for (var slot = 0; slot < bufferSize + 1; slot++) {
-                        ClearAllTrackingSlot(TrackingHistoryHeuristic[slot], TrackingHistoryMasks[slot]);
-                    }
-                }
-                else {
-                    ClearAllTrackingSlot(TrackingHeuristicChunks, TrackingMaskSegments);
-                }
-            }
-
-            [MethodImpl(NoInlining)]
-            private void ClearAllTrackingSlot(HeuristicComponentsTracking[] heuristicChunks, ulong[][] maskSegments) {
-                #if !NET6_0_OR_GREATER
-                var deBruijn = Utils.DeBruijn;
-                #endif
-                for (var chunkIdx = 0; chunkIdx < heuristicChunks.Length; chunkIdx++) {
-                    ref var heuristic = ref heuristicChunks[chunkIdx];
-                    var notEmpty = heuristic.AddedBlocks.Value | heuristic.DeletedBlocks.Value
-                        #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                        | heuristic.ChangedBlocks.Value
-                        #endif
-                        ;
-                    if (notEmpty == 0) continue;
-                    heuristic = default;
-                    var baseSegment = (uint)(chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT);
-                    while (notEmpty != 0) {
-                        #if NET6_0_OR_GREATER
-                        var blockIdx = System.Numerics.BitOperations.TrailingZeroCount(notEmpty);
-                        #else
-                        var blockIdx = deBruijn[(uint)(((notEmpty & (ulong)-(long)notEmpty) * 0x37E84A99DAE458FUL) >> 58)];
-                        #endif
-                        var segmentOffset = blockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT;
-                        var segmentIdx = (uint)(baseSegment + segmentOffset);
-                        ref var segRef = ref maskSegments[segmentIdx];
-                        if (segRef != null) {
-                            ReturnTrackingSegment(segmentIdx, segRef);
-                            segRef = null;
-                        }
-                        notEmpty &= ~(0xFUL << (segmentOffset << Const.BLOCKS_IN_SEGMENT_SHIFT));
-                    }
-                }
-            }
-            #endregion
 
             [MethodImpl(NoInlining)]
             private (ulong[], T[]) CreateNewSegment(uint segmentIdx) {
@@ -2723,58 +1857,6 @@ namespace FFS.Libraries.StaticEcs {
                 return masks != null ? masks[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT] : 0UL;
             }
 
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong AddedMask(uint segmentIdx, int segmentBlockIdx) {
-                #if FFS_ECS_DEBUG
-                AssertComponentTrackAdded<T>(ComponentsTypeName);
-                #endif
-                var masks = TrackingMaskSegments[segmentIdx];
-                return masks != null ? masks[segmentBlockIdx + AddedTrackingOffset] : 0UL;
-            }
-            
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong AddedChunkMask(uint chunkIdx) {
-                #if FFS_ECS_DEBUG
-                AssertComponentTrackAdded<T>(ComponentsTypeName);
-                #endif
-                return TrackingHeuristicChunks[chunkIdx].AddedBlocks.Value;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong DeletedMask(uint segmentIdx, int segmentBlockIdx) {
-                #if FFS_ECS_DEBUG
-                AssertComponentTrackDeleted<T>(ComponentsTypeName);
-                #endif
-                var masks = TrackingMaskSegments[segmentIdx];
-                return masks != null ? masks[segmentBlockIdx + DeletedTrackingOffset] : 0UL;
-            }
-            
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong DeletedChunkMask(uint chunkIdx) {
-                #if FFS_ECS_DEBUG
-                AssertComponentTrackDeleted<T>(ComponentsTypeName);
-                #endif
-                return TrackingHeuristicChunks[chunkIdx].DeletedBlocks.Value;
-            }
-
-            #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong ChangedMask(uint segmentIdx, int segmentBlockIdx) {
-                #if FFS_ECS_DEBUG
-                AssertComponentTrackChanged<T>(ComponentsTypeName);
-                #endif
-                var masks = TrackingMaskSegments[segmentIdx];
-                return masks != null ? masks[segmentBlockIdx] : 0UL;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong ChangedChunkMask(uint chunkIdx) {
-                #if FFS_ECS_DEBUG
-                AssertComponentTrackChanged<T>(ComponentsTypeName);
-                #endif
-                return TrackingHeuristicChunks[chunkIdx].ChangedBlocks.Value;
-            }
-            #endif
 
             [MethodImpl(AggressiveInlining)]
             internal readonly ulong AnyMask(uint segmentIdx, int segmentBlockIdx) {
@@ -2815,7 +1897,7 @@ namespace FFS.Libraries.StaticEcs {
 
             #region SERIALIZATION
             [MethodImpl(AggressiveInlining)]
-            internal void WriteChunk(ref BinaryPackWriter writer, uint chunkIdx, bool withTracking) {
+            internal void WriteChunk(ref BinaryPackWriter writer, uint chunkIdx) {
                 writer.WriteBool(IsTag);
                 writer.WriteBool(HasDisable);
 
@@ -2924,38 +2006,6 @@ namespace FFS.Libraries.StaticEcs {
                     }
                 }
 
-                writer.WriteByte(TrackingBlocksCount);
-                var hasTracking = withTracking && AnyTracking;
-                writer.WriteBool(hasTracking);
-                if (hasTracking) {
-                    var bufferSize = Data.Instance.TrackingBufferSize;
-                    var totalSlots = bufferSize + 1;
-                    var baseSegment = chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT;
-                    for (var slot = 0; slot < totalSlots; slot++) {
-                        HeuristicComponentsTracking[] heuristicArr;
-                        ulong[][] masksArr;
-                        if (bufferSize == 0) {
-                            heuristicArr = TrackingHeuristicChunks;
-                            masksArr = TrackingMaskSegments;
-                        } else {
-                            heuristicArr = TrackingHistoryHeuristic[slot];
-                            masksArr = TrackingHistoryMasks[slot];
-                        }
-                        ref var h = ref heuristicArr[chunkIdx];
-                        #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                        if (TrackChanged) writer.WriteUlong(h.ChangedBlocks.Value);
-                        #endif
-                        if (TrackAdded) writer.WriteUlong(h.AddedBlocks.Value);
-                        if (TrackDeleted) writer.WriteUlong(h.DeletedBlocks.Value);
-                        for (var s = 0; s < Const.SEGMENTS_IN_CHUNK; s++) {
-                            var seg = masksArr[baseSegment + s];
-                            writer.WriteBool(seg != null);
-                            if (seg != null) {
-                                writer.WriteArrayUnmanaged(seg, 0, TrackingBlocksCount);
-                            }
-                        }
-                    }
-                }
             }
 
             [MethodImpl(AggressiveInlining)]
@@ -3098,48 +2148,6 @@ namespace FFS.Libraries.StaticEcs {
                     }
                 }
 
-                var savedBlocksCount = reader.ReadByte();
-                if (savedBlocksCount != TrackingBlocksCount) {
-                    throw new StaticEcsException($"World<{typeof(TWorld)}>.Components<{typeof(T)}>", "ReadChunk",
-                        $"Tracking layout mismatch: saved TrackingBlocksCount={savedBlocksCount}, current={TrackingBlocksCount}. " +
-                        $"Either FFS_ECS_DISABLE_CHANGED_TRACKING differs between save and load, or the set of ITrackable* markers on the type has changed.");
-                }
-                var hasTracking = reader.ReadBool();
-                if (hasTracking) {
-                    var bufferSize = Data.Instance.TrackingBufferSize;
-                    var totalSlots = bufferSize + 1;
-                    var baseSegment = chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT;
-                    for (var slot = 0; slot < totalSlots; slot++) {
-                        HeuristicComponentsTracking[] heuristicArr;
-                        ulong[][] masksArr;
-                        if (bufferSize == 0) {
-                            heuristicArr = TrackingHeuristicChunks;
-                            masksArr = TrackingMaskSegments;
-                        } else {
-                            heuristicArr = TrackingHistoryHeuristic[slot];
-                            masksArr = TrackingHistoryMasks[slot];
-                        }
-                        ref var h = ref heuristicArr[chunkIdx];
-                        #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                        if (TrackChanged) h.ChangedBlocks.Value = reader.ReadUlong();
-                        #endif
-                        if (TrackAdded) h.AddedBlocks.Value = reader.ReadUlong();
-                        if (TrackDeleted) h.DeletedBlocks.Value = reader.ReadUlong();
-                        for (var s = 0; s < Const.SEGMENTS_IN_CHUNK; s++) {
-                            var present = reader.ReadBool();
-                            if (!present) continue;
-                            var segmentIdx = (uint)(baseSegment + s);
-                            ref var segRef = ref masksArr[segmentIdx];
-                            segRef ??= AllocateTrackingSegment(segmentIdx);
-                            reader.ReadArrayUnmanaged(ref segRef, 0);
-                        }
-                    }
-                    if (bufferSize > 0) {
-                        var writeSlot = (int)((Data.Instance.CurrentTick + 1) % (ulong)totalSlots);
-                        TrackingHeuristicChunks = TrackingHistoryHeuristic[writeSlot];
-                        TrackingMaskSegments = TrackingHistoryMasks[writeSlot];
-                    }
-                }
             }
 
             [MethodImpl(AggressiveInlining)]
@@ -3245,7 +2253,7 @@ namespace FFS.Libraries.StaticEcs {
             internal static void _TryToStringComponent(StringBuilder builder, uint eid) => Instance.TryToStringComponent(builder, new Entity(eid));
 
             [MethodImpl(AggressiveInlining)]
-            internal static void _WriteChunk(ref BinaryPackWriter writer, uint chunkIdx, bool withTracking) => Instance.WriteChunk(ref writer, chunkIdx, withTracking);
+            internal static void _WriteChunk(ref BinaryPackWriter writer, uint chunkIdx) => Instance.WriteChunk(ref writer, chunkIdx);
 
             [MethodImpl(AggressiveInlining)]
             internal static void _ReadChunk(ref BinaryPackReader reader, uint chunkIdx) => Instance.ReadChunk(ref reader, chunkIdx);
@@ -3284,22 +2292,6 @@ namespace FFS.Libraries.StaticEcs {
                 }
             }
 
-            [MethodImpl(AggressiveInlining)]
-            internal static void _AdvanceTracking() => Instance.AdvanceTrackingSlot();
-
-            [MethodImpl(AggressiveInlining)]
-            internal static void _ClearTracking() => Instance.ClearTrackingInternal();
-
-            [MethodImpl(AggressiveInlining)]
-            internal static void _ClearAddedTracking() => Instance.ClearAddedTracking();
-
-            [MethodImpl(AggressiveInlining)]
-            internal static void _ClearDeletedTracking() => Instance.ClearDeletedTracking();
-
-            #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-            [MethodImpl(AggressiveInlining)]
-            internal static void _ClearChangedTracking() => Instance.ClearChangedTracking();
-            #endif
 
             [MethodImpl(AggressiveInlining)]
             internal static int _CalculateCapacity() => Instance.CalculateCapacity();
@@ -3560,8 +2552,6 @@ namespace FFS.Libraries.StaticEcs {
         public delegate*<uint, void> _OnResize;
         public delegate*<uint, void> _OnInitialize;
         public delegate*<void> _OnDestroy;
-        public delegate*<uint, ulong[], bool, void> _OnTrackingSegmentCreated;
-        public delegate*<uint, void> _OnTrackingSegmentPooled;
 
         [MethodImpl(AggressiveInlining)]
         public void OnSegmentCreated(uint segmentIdx, ulong[] masks, T[] comps, bool fromPool) {
@@ -3587,25 +2577,5 @@ namespace FFS.Libraries.StaticEcs {
         public void OnDestroy() {
             if (_OnDestroy != null) _OnDestroy();
         }
-
-        [MethodImpl(AggressiveInlining)]
-        public void OnTrackingSegmentCreated(uint segmentIdx, ulong[] tracking, bool fromPool) {
-            if (_OnTrackingSegmentCreated != null) _OnTrackingSegmentCreated(segmentIdx, tracking, fromPool);
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        public void OnTrackingSegmentPooled(uint segmentIdx) {
-            if (_OnTrackingSegmentPooled != null) _OnTrackingSegmentPooled(segmentIdx);
-        }
-    }
-
-    #if ENABLE_IL2CPP
-    [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
-    [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
-    #endif
-    public struct HeuristicComponentsTracking {
-        internal AtomicMask AddedBlocks;
-        internal AtomicMask DeletedBlocks;
-        internal AtomicMask ChangedBlocks;
     }
 }

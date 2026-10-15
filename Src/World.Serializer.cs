@@ -1414,7 +1414,7 @@ namespace FFS.Libraries.StaticEcs {
                     if (withEntitiesData) {
                         Data.Instance.WriteChunk(ref writer, chunkIdx, false);
                     }
-                    Data.Instance.WriteDataChunk(ref writer, chunkIdx, false);
+                    Data.Instance.WriteDataChunk(ref writer, chunkIdx);
                 }
                 
                 var chunks = new ReadOnlySpan<uint>(tempChunks.Chunks, 0, (int) tempChunks.ChunksCount);
@@ -1511,7 +1511,7 @@ namespace FFS.Libraries.StaticEcs {
                 }
                 
                 writer.WriteUshort(Data.Instance.SerializableComponentsCount());
-                Data.Instance.WriteDataChunk(ref writer, chunkIdx, false);
+                Data.Instance.WriteDataChunk(ref writer, chunkIdx);
 
                 ReadOnlySpan<uint> chunks = stackalloc uint[1] { chunkIdx };
 

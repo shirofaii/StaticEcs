@@ -38,20 +38,5 @@ namespace FFS.Libraries.StaticEcs.Tests {
                 if (i % 10 == 0) Assert.Equal($"n{i}", e.Read<Name>().Value);
             }
         }
-
-        [Fact]
-        public void ASnapshotKeepsTrackingHistory() {
-            var e = W.NewEntity<Default>();
-            e.Set(new Tracked { V = 1 });
-            e.Set<TrackedTag>();
-            var gid = e.GID;
-            var snapshot = W.Serializer.CreateWorldSnapshot();
-            W.Destroy();
-            Create();
-            W.Serializer.LoadWorldSnapshot(snapshot);
-            Assert.True(gid.TryUnpack<TW>(out var back));
-            Assert.True(back.HasAdded<Tracked>());
-            Assert.True(back.HasAdded<TrackedTag>());
-        }
     }
 }

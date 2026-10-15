@@ -307,8 +307,6 @@ namespace FFS.Libraries.StaticEcs {
             private Guid[] _guidsComponents;
             private ushort _poolsCountComponents;
             private ushort _poolsCountSerializableComponents;
-            private ushort[] _trackingComponentIndices;
-            private ushort _trackingComponentIndicesCount;
             internal ushort BitMaskComponentsLen;
             
             // EVENTS
@@ -349,23 +347,11 @@ namespace FFS.Libraries.StaticEcs {
 
             // CONFIG
             internal readonly bool IndependentWorld;
-            internal readonly bool TrackCreated;
-            internal readonly byte TrackingBufferSize;
-
-            // CREATED TRACKING
-            internal ulong[] CreatedTrackingChunks;
-            internal ulong[][] CreatedTrackingSegments;
-            private ulong[][] _createdTrackingSegmentsPool;
-            private int _createdTrackingSegmentsPoolCount;
-            internal ulong[][] CreatedTrackingHistoryChunks;
-            internal ulong[][][] CreatedTrackingHistorySegments;
 
             // SYSTEMS
             internal List<SystemsHandle> RegisteredSystems;
 
             // STATE
-            internal ulong CurrentTick;
-            internal ulong CurrentLastTick;
             internal WorldStatus WorldStatus;
             internal volatile bool MultiThreadActive;
             #endregion
@@ -374,16 +360,6 @@ namespace FFS.Libraries.StaticEcs {
             public Data(WorldConfig worldConfig) {
                 worldConfig = worldConfig.MergeWith(WorldConfig.Default());
                 IndependentWorld = worldConfig.Independent.Value;
-                TrackCreated = worldConfig.TrackCreated.Value;
-                TrackingBufferSize = worldConfig.TrackingBufferSize.Value;
-                CurrentTick = 1;
-                CurrentLastTick = 0;
-                CreatedTrackingChunks = null;
-                CreatedTrackingSegments = null;
-                _createdTrackingSegmentsPool = null;
-                _createdTrackingSegmentsPoolCount = 0;
-                CreatedTrackingHistoryChunks = null;
-                CreatedTrackingHistorySegments = null;
 
                 // TEMPLATES
                 _versionEntitiesTemplate = new ushort[Const.ENTITIES_IN_SEGMENT];
@@ -437,8 +413,6 @@ namespace FFS.Libraries.StaticEcs {
                 // COMPONENTS
                 _poolsComponents = new ComponentsHandle[worldConfig.BaseComponentTypesCount.Value];
                 _guidsComponents = new Guid[worldConfig.BaseComponentTypesCount.Value];
-                _trackingComponentIndices = new ushort[worldConfig.BaseComponentTypesCount.Value];
-                _trackingComponentIndicesCount = default;
                 _componentPoolByGuid = new Dictionary<Guid, ComponentsHandle>();
                 _migratorByGuid = new Dictionary<Guid, EcsComponentDeleteMigrationReader<TWorld>>();
                 BitMaskComponents = null;
@@ -537,27 +511,6 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
 
                 // CREATED TRACKING
-                if (TrackCreated) {
-                    var totalSlots = TrackingBufferSize + 1;
-                    var createdPoolSize = TrackingBufferSize > 0 ? segmentsCapacity * totalSlots : segmentsCapacity;
-                    _createdTrackingSegmentsPool = new ulong[createdPoolSize][];
-                    _createdTrackingSegmentsPoolCount = 0;
-                    if (TrackingBufferSize > 0) {
-                        CreatedTrackingHistoryChunks = new ulong[totalSlots][];
-                        CreatedTrackingHistorySegments = new ulong[totalSlots][][];
-                        for (var i = 0; i < totalSlots; i++) {
-                            CreatedTrackingHistoryChunks[i] = new ulong[chunksCapacity];
-                            CreatedTrackingHistorySegments[i] = new ulong[segmentsCapacity][];
-                        }
-                        var currentSlot = (int)((CurrentTick + 1) % (ulong)totalSlots);
-                        CreatedTrackingChunks = CreatedTrackingHistoryChunks[currentSlot];
-                        CreatedTrackingSegments = CreatedTrackingHistorySegments[currentSlot];
-                    }
-                    else {
-                        CreatedTrackingChunks = new ulong[chunksCapacity];
-                        CreatedTrackingSegments = new ulong[segmentsCapacity][];
-                    }
-                }
 
                 for (uint i = 0; i < _poolsCountComponents; i++) {
                     _poolsComponents[i].Initialize(chunksCapacity, BitMaskComponents, BitMaskComponentsLen);
@@ -606,24 +559,6 @@ namespace FFS.Libraries.StaticEcs {
                 }
 
                 // CREATED TRACKING
-                if (TrackCreated) {
-                    var totalSlots = TrackingBufferSize + 1;
-                    var createdPoolSize = TrackingBufferSize > 0 ? segmentsCapacity * totalSlots : segmentsCapacity;
-                    Array.Resize(ref _createdTrackingSegmentsPool, (int)createdPoolSize);
-                    if (TrackingBufferSize > 0) {
-                        for (var i = 0; i < totalSlots; i++) {
-                            Array.Resize(ref CreatedTrackingHistoryChunks[i], (int)chunksCapacity);
-                            Array.Resize(ref CreatedTrackingHistorySegments[i], (int)segmentsCapacity);
-                        }
-                        var currentSlot = (int)((CurrentTick + 1) % (ulong)totalSlots);
-                        CreatedTrackingChunks = CreatedTrackingHistoryChunks[currentSlot];
-                        CreatedTrackingSegments = CreatedTrackingHistorySegments[currentSlot];
-                    }
-                    else {
-                        Array.Resize(ref CreatedTrackingChunks, (int)chunksCapacity);
-                        Array.Resize(ref CreatedTrackingSegments, (int)segmentsCapacity);
-                    }
-                }
 
                 // MULTI STORAGES
                 for (uint i = 0; i < _multiStorageResizersCount; i++) {
@@ -689,44 +624,10 @@ namespace FFS.Libraries.StaticEcs {
                     segment.ClusterId = EntitiesSegment.InvalidCluster;
                     segment.EntityType = EntitiesSegment.NoEntityType;
 
-                if (TrackCreated) {
-                        if (TrackingBufferSize > 0) {
-                            var totalSlots = TrackingBufferSize + 1;
-                            for (var slot = 0; slot < totalSlots; slot++) {
-                                ref var createdSeg = ref CreatedTrackingHistorySegments[slot][i];
-                                if (createdSeg != null) {
-                                    _createdTrackingSegmentsPool[_createdTrackingSegmentsPoolCount++] = createdSeg;
-                                    createdSeg = null;
-                                }
-                            }
-                        }
-                        else {
-                            ref var createdSeg = ref CreatedTrackingSegments[i];
-                            if (createdSeg != null) {
-                                _createdTrackingSegmentsPool[_createdTrackingSegmentsPoolCount++] = createdSeg;
-                                createdSeg = null;
-                            }
-                        }
-                    }
                 }
 
                 Array.Clear(HeuristicChunks, 0, HeuristicChunks.Length);
                 Array.Clear(HeuristicLoadedChunks, 0, HeuristicLoadedChunks.Length);
-
-                if (TrackCreated) {
-                    if (TrackingBufferSize > 0) {
-                        var totalSlots = TrackingBufferSize + 1;
-                        for (var slot = 0; slot < totalSlots; slot++) {
-                            Array.Clear(CreatedTrackingHistoryChunks[slot], 0, CreatedTrackingHistoryChunks[slot].Length);
-                        }
-                        var writeSlot = (int)((CurrentTick + 1) % (ulong)totalSlots);
-                        CreatedTrackingChunks = CreatedTrackingHistoryChunks[writeSlot];
-                        CreatedTrackingSegments = CreatedTrackingHistorySegments[writeSlot];
-                    }
-                    else {
-                        Array.Clear(CreatedTrackingChunks, 0, CreatedTrackingChunks.Length);
-                    }
-                }
 
                 for (var i = 0; i < 256; i++) {
                     if (EntityTypes[i].Registered && EntityTypes[i].HeuristicChunks != null) {
@@ -782,231 +683,6 @@ namespace FFS.Libraries.StaticEcs {
                     Array.Resize(ref _multiStorageChunkResetters, (int)(_multiStorageChunkResettersCount << 1));
                 }
                 _multiStorageChunkResetters[_multiStorageChunkResettersCount++] = resetter;
-            }
-            #endregion
-
-            #region TRACKING
-            [MethodImpl(AggressiveInlining)]
-            internal readonly void ClearAllComponentsTrackingInternal() {
-                for (var i = 0; i < _poolsCountComponents; i++) {
-                    _poolsComponents[i].ClearTracking();
-                }
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal readonly void ClearAddedComponentTrackingInternal() {
-                for (var i = 0; i < _poolsCountComponents; i++) {
-                    _poolsComponents[i].ClearAddedTracking();
-                }
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal readonly void ClearDeletedComponentTrackingInternal() {
-                for (var i = 0; i < _poolsCountComponents; i++) {
-                    _poolsComponents[i].ClearDeletedTracking();
-                }
-            }
-
-            #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-            [MethodImpl(AggressiveInlining)]
-            internal readonly void ClearChangedComponentTrackingInternal() {
-                for (var i = 0; i < _poolsCountComponents; i++) {
-                    _poolsComponents[i].ClearChangedTracking();
-                }
-            }
-            #endif
-
-
-            [MethodImpl(NoInlining)]
-            internal void SetCreatedBit(uint segmentIdx, byte segmentBlockIdx, ulong blockEntityMask, uint chunkIdx, byte chunkBlockIdx) {
-                ref var seg = ref CreatedTrackingSegments[segmentIdx];
-                seg ??= AllocateCreatedTrackingSegment();
-                seg[segmentBlockIdx] |= blockEntityMask;
-                CreatedTrackingChunks[chunkIdx] |= 1UL << chunkBlockIdx;
-            }
-
-            [MethodImpl(NoInlining)]
-            internal void SetCreatedBitBatch(ulong newEntitiesMask, uint segmentIdx, byte segmentBlockIdx, uint chunkIdx, byte chunkBlockIdx) {
-                ref var seg = ref CreatedTrackingSegments[segmentIdx];
-                seg ??= AllocateCreatedTrackingSegment();
-                seg[segmentBlockIdx] |= newEntitiesMask;
-                CreatedTrackingChunks[chunkIdx] |= 1UL << chunkBlockIdx;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong CreatedMask(uint segmentIdx, int segmentBlockIdx) {
-                var masks = CreatedTrackingSegments[segmentIdx];
-                return masks != null ? masks[segmentBlockIdx] : 0UL;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong CreatedHeuristicHistory(ulong fromTick, ulong toTick, uint chunkIdx) {
-                #if FFS_ECS_DEBUG
-                AssertTrackingBufferNotOverflow(WorldTypeName, fromTick, toTick, TrackingBufferSize);
-                #endif
-                var ticksToCheck = toTick - fromTick;
-                var totalSlots = (ulong)TrackingBufferSize + 1;
-                if (ticksToCheck == 0) return 0UL;
-                if (ticksToCheck > TrackingBufferSize) ticksToCheck = TrackingBufferSize;
-                if (ticksToCheck == 1) {
-                    return CreatedTrackingHistoryChunks[(int)(toTick % totalSlots)][chunkIdx];
-                }
-                ulong result = 0;
-                for (ulong i = 0; i < ticksToCheck; i++) {
-                    result |= CreatedTrackingHistoryChunks[(int)((toTick - i) % totalSlots)][chunkIdx];
-                }
-                return result;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            public readonly bool HasCreated(Entity entity) {
-                #if FFS_ECS_DEBUG
-                AssertTrackCreated();
-                AssertEntityIsNotDestroyedAndLoaded(WorldTypeName, entity);
-                #endif
-                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
-                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-                if (TrackingBufferSize > 0) {
-                    return (CreatedMaskHistory(CurrentLastTick, CurrentTick, segmentIdx, segmentBlockIdx) & blockEntityMask) != 0;
-                }
-                return (CreatedMask(segmentIdx, segmentBlockIdx) & blockEntityMask) != 0;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            public readonly bool HasCreated(Entity entity, ulong fromTick) {
-                #if FFS_ECS_DEBUG
-                AssertTrackCreated();
-                AssertEntityIsNotDestroyedAndLoaded(WorldTypeName, entity);
-                #endif
-                var entityId = entity.IdWithOffset - Const.ENTITY_ID_OFFSET;
-                var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (byte) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-                return (CreatedMaskHistory(fromTick, CurrentTick, segmentIdx, segmentBlockIdx) & blockEntityMask) != 0;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong CreatedMaskHistory(ulong fromTick, ulong toTick, uint segmentIdx, int segmentBlockIdx) {
-                #if FFS_ECS_DEBUG
-                AssertTrackingBufferNotOverflow(WorldTypeName, fromTick, toTick, TrackingBufferSize);
-                #endif
-                var ticksToCheck = toTick - fromTick;
-                var totalSlots = (ulong)TrackingBufferSize + 1;
-                if (ticksToCheck == 0) return 0UL;
-                if (ticksToCheck > TrackingBufferSize) ticksToCheck = TrackingBufferSize;
-                if (ticksToCheck == 1) {
-                    var m = CreatedTrackingHistorySegments[(int)(toTick % totalSlots)][segmentIdx];
-                    return m != null ? m[segmentBlockIdx] : 0UL;
-                }
-                ulong result = 0;
-                for (ulong i = 0; i < ticksToCheck; i++) {
-                    var m = CreatedTrackingHistorySegments[(int)((toTick - i) % totalSlots)][segmentIdx];
-                    if (m != null) result |= m[segmentBlockIdx];
-                }
-                return result;
-            }
-
-            [MethodImpl(NoInlining)]
-            internal void AdvanceTickInternal() {
-                CurrentTick++;
-                AdvanceCreatedTrackingSlot();
-                for (var i = 0; i < _trackingComponentIndicesCount; i++) {
-                    _poolsComponents[_trackingComponentIndices[i]].AdvanceTracking();
-                }
-            }
-
-            [MethodImpl(NoInlining)]
-            internal void AdvanceCreatedTrackingSlot() {
-                if (!TrackCreated || TrackingBufferSize == 0) return;
-                var newSlot = (int)((CurrentTick + 1) % (ulong)(TrackingBufferSize + 1));
-                var chunks = CreatedTrackingHistoryChunks[newSlot];
-                var segments = CreatedTrackingHistorySegments[newSlot];
-                for (var chunkIdx = 0; chunkIdx < chunks.Length; chunkIdx++) {
-                    var notEmpty = chunks[chunkIdx];
-                    if (notEmpty == 0) continue;
-                    chunks[chunkIdx] = 0;
-                    var baseSegment = (uint)(chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT);
-                    while (notEmpty != 0) {
-                        #if NET6_0_OR_GREATER
-                        var blockIdx = System.Numerics.BitOperations.TrailingZeroCount(notEmpty);
-                        #else
-                        var blockIdx = Utils.DeBruijn[(uint)(((notEmpty & (ulong)-(long)notEmpty) * 0x37E84A99DAE458FUL) >> 58)];
-                        #endif
-                        var segmentOffset = blockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT;
-                        var segmentIdx = (uint)(baseSegment + segmentOffset);
-                        ref var segRef = ref segments[segmentIdx];
-                        if (segRef != null) {
-                            ReturnCreatedTrackingSegment(segRef);
-                            segRef = null;
-                        }
-                        notEmpty &= ~(0xFUL << (segmentOffset << Const.BLOCKS_IN_SEGMENT_SHIFT));
-                    }
-                }
-                CreatedTrackingChunks = chunks;
-                CreatedTrackingSegments = segments;
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            internal void ClearCreatedTrackingInternal() {
-                if (!TrackCreated) return;
-                #if FFS_ECS_DEBUG
-                AssertMultiThreadNotActive(WorldTypeName);
-                #endif
-                if (TrackingBufferSize > 0) {
-                    var totalSlots = TrackingBufferSize + 1;
-                    for (var slot = 0; slot < totalSlots; slot++) {
-                        ClearCreatedTrackingSlot(CreatedTrackingHistoryChunks[slot], CreatedTrackingHistorySegments[slot]);
-                    }
-                }
-                else {
-                    ClearCreatedTrackingSlot(CreatedTrackingChunks, CreatedTrackingSegments);
-                }
-            }
-
-            [MethodImpl(NoInlining)]
-            private void ClearCreatedTrackingSlot(ulong[] chunks, ulong[][] segments) {
-                #if !NET6_0_OR_GREATER
-                var deBruijn = Utils.DeBruijn;
-                #endif
-                for (var chunkIdx = 0; chunkIdx < chunks.Length; chunkIdx++) {
-                    var notEmpty = chunks[chunkIdx];
-                    if (notEmpty == 0) continue;
-                    chunks[chunkIdx] = 0;
-                    var baseSegment = (uint)(chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT);
-                    while (notEmpty != 0) {
-                        #if NET6_0_OR_GREATER
-                        var blockIdx = System.Numerics.BitOperations.TrailingZeroCount(notEmpty);
-                        #else
-                        var blockIdx = deBruijn[(uint)(((notEmpty & (ulong)-(long)notEmpty) * 0x37E84A99DAE458FUL) >> 58)];
-                        #endif
-                        var segmentOffset = blockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT;
-                        var segmentIdx = (uint)(baseSegment + segmentOffset);
-                        ref var segRef = ref segments[segmentIdx];
-                        if (segRef != null) {
-                            ReturnCreatedTrackingSegment(segRef);
-                            segRef = null;
-                        }
-                        notEmpty &= ~(0xFUL << (segmentOffset << Const.BLOCKS_IN_SEGMENT_SHIFT));
-                    }
-                }
-            }
-
-            [MethodImpl(NoInlining)]
-            private ulong[] AllocateCreatedTrackingSegment() {
-                if (_createdTrackingSegmentsPoolCount > 0) {
-                    var seg = _createdTrackingSegmentsPool[--_createdTrackingSegmentsPoolCount];
-                    _createdTrackingSegmentsPool[_createdTrackingSegmentsPoolCount] = null;
-                    Array.Clear(seg, 0, Const.BLOCKS_IN_SEGMENT);
-                    return seg;
-                }
-                return new ulong[Const.BLOCKS_IN_SEGMENT];
-            }
-
-            [MethodImpl(AggressiveInlining)]
-            private void ReturnCreatedTrackingSegment(ulong[] seg) {
-                _createdTrackingSegmentsPool[_createdTrackingSegmentsPoolCount++] = seg;
             }
             #endregion
 
@@ -1492,10 +1168,6 @@ namespace FFS.Libraries.StaticEcs {
                 entitiesMask |= 1UL << blockEntityIdx;
                 segment.Masks[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT * 2] |= 1UL << blockEntityIdx; // Loaded entities mask
 
-                if (TrackCreated) {
-                    SetCreatedBit(segmentIdx, (byte)segmentBlockIdx, 1UL << blockEntityIdx, chunkIdx, (byte)(segmentBlocksOffset + segmentBlockIdx));
-                }
-
                 if (entitiesMask == ulong.MaxValue) {
                     var chunkBlockMask = 1UL << (segmentBlocksOffset + segmentBlockIdx);
                     heuristic.FullBlocks.Value |= chunkBlockMask;
@@ -1625,10 +1297,6 @@ namespace FFS.Libraries.StaticEcs {
                 entitiesMask |= 1UL << blockEntityIdx;
                 segment.Masks[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT * 2] |= 1UL << blockEntityIdx; // Loaded entities mask
 
-                if (TrackCreated) {
-                    SetCreatedBit(segmentIdx, (byte)segmentBlockIdx, 1UL << blockEntityIdx, chunkIdx, (byte)chunkBlockIdx);
-                }
-
                 if (entitiesMask == ulong.MaxValue) {
                     var chunkBlockMask = 1UL << chunkBlockIdx;
                     heuristic.FullBlocks.Value |= chunkBlockMask;
@@ -1729,10 +1397,6 @@ namespace FFS.Libraries.StaticEcs {
                 segment.Masks[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT * 2] |= 1UL << blockEntityIdx; // Loaded entities mask
                 segment.Versions[segmentEntityIdx] = gid.Version;
 
-                if (TrackCreated) {
-                    SetCreatedBit(segmentIdx, (byte)segmentBlockIdx, 1UL << blockEntityIdx, chunkIdx, (byte)chunkBlockIdx);
-                }
-
                 if (entitiesMask == ulong.MaxValue) {
                     var chunkBlockMask = 1UL << chunkBlockIdx;
                     HeuristicChunks[chunkIdx].FullBlocks.Value |= chunkBlockMask;
@@ -1803,10 +1467,6 @@ namespace FFS.Libraries.StaticEcs {
 
                 entitiesMask |= newEntitiesMask;
                 segment.Masks[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT * 2] |= newEntitiesMask; // Loaded entities mask
-
-                if (TrackCreated) {
-                    SetCreatedBitBatch(newEntitiesMask, segmentIdx, segmentBlockIdx, chunkIdx, (byte)(segmentBlocksOffset + segmentBlockIdx));
-                }
 
                 if (entitiesMask == ulong.MaxValue) {
                     var chunkBlockMask = 1UL << (segmentBlocksOffset + segmentBlockIdx);
@@ -2907,43 +2567,9 @@ namespace FFS.Libraries.StaticEcs {
             internal void Write(ref BinaryPackWriter writer, ChunkWritingStrategy strategy, ReadOnlySpan<ushort> clustersToWrite, ref TempChunksData tempChunks, bool fullWorld) {
                 clustersToWrite = GetActiveClustersIfEmpty(clustersToWrite);
 
-                writer.WriteUlong(CurrentTick);
-                writer.WriteUlong(CurrentLastTick);
-                writer.WriteByte(TrackingBufferSize);
-
                 writer.WriteInt(HeuristicChunks.Length);
                 writer.WriteInt(Clusters.Length);
                 writer.WriteInt(clustersToWrite.Length);
-
-                writer.WriteBool(TrackCreated);
-                if (TrackCreated) {
-                    var bufferSize = TrackingBufferSize;
-                    var totalSlots = bufferSize + 1;
-                    for (var slot = 0; slot < totalSlots; slot++) {
-                        ulong[] chunksArr;
-                        ulong[][] segmentsArr;
-                        if (bufferSize == 0) {
-                            chunksArr = CreatedTrackingChunks;
-                            segmentsArr = CreatedTrackingSegments;
-                        } else {
-                            chunksArr = CreatedTrackingHistoryChunks[slot];
-                            segmentsArr = CreatedTrackingHistorySegments[slot];
-                        }
-                        writer.WriteArrayUnmanaged(chunksArr, 0, chunksArr.Length);
-
-                        uint nonNullCount = 0;
-                        for (var s = 0; s < segmentsArr.Length; s++) {
-                            if (segmentsArr[s] != null) nonNullCount++;
-                        }
-                        writer.WriteUint(nonNullCount);
-                        for (uint s = 0; s < segmentsArr.Length; s++) {
-                            if (segmentsArr[s] != null) {
-                                writer.WriteUint(s);
-                                writer.WriteArrayUnmanaged(segmentsArr[s], 0, Const.BLOCKS_IN_SEGMENT);
-                            }
-                        }
-                    }
-                }
 
                 for (var i = 0; i < clustersToWrite.Length; i++) {
                     var clusterId = clustersToWrite[i];
@@ -2974,16 +2600,12 @@ namespace FFS.Libraries.StaticEcs {
                 for (var i = 0; i < tempChunks.ChunksCount; i++) {
                     var chunkIdx = tempChunks.Chunks[i];
                     writer.WriteUint(chunkIdx);
-                    WriteDataChunk(ref writer, chunkIdx, true);
+                    WriteDataChunk(ref writer, chunkIdx);
                 }
             }
 
             [MethodImpl(AggressiveInlining)]
             internal void Read(ref BinaryPackReader reader, bool fullWorld, bool hardReset = false) {
-                var savedTick = reader.ReadUlong();
-                var savedLastTick = reader.ReadUlong();
-                var savedBufferSize = reader.ReadByte();
-
                 var chunksCapacity = reader.ReadInt();
                 var clustersCapacity = reader.ReadInt();
                 var clustersCount = reader.ReadInt();
@@ -2997,61 +2619,12 @@ namespace FFS.Libraries.StaticEcs {
                     }
                 }
 
-                if (savedBufferSize != TrackingBufferSize) {
-                    throw new StaticEcsException($"World<{typeof(TWorld)}>", "Data.Read", $"TrackingBufferSize mismatch: saved={savedBufferSize}, current={TrackingBufferSize}");
-                }
-                CurrentTick = savedTick;
-                CurrentLastTick = savedLastTick;
-
-                for (var i = 0; i < RegisteredSystems.Count; i++) {
-                    RegisteredSystems[i].ResetLastTicks(CurrentTick);
-                }
-
                 if (chunksCapacity > HeuristicChunks.Length) {
                     ResizeWorld((uint) chunksCapacity);
                 }
                 
                 if (clustersCapacity > Clusters.Length) {
                     ResizeClusters(clustersCapacity);
-                }
-
-                var savedTrackCreated = reader.ReadBool();
-                if (savedTrackCreated != TrackCreated) {
-                    throw new StaticEcsException($"World<{typeof(TWorld)}>", "Data.Read", $"TrackCreated mismatch: saved={savedTrackCreated}, current={TrackCreated}");
-                }
-                if (TrackCreated) {
-                    var bufferSize = TrackingBufferSize;
-                    var totalSlots = bufferSize + 1;
-                    for (var slot = 0; slot < totalSlots; slot++) {
-                        ulong[] chunksArr;
-                        ulong[][] segmentsArr;
-                        if (bufferSize == 0) {
-                            chunksArr = CreatedTrackingChunks;
-                            segmentsArr = CreatedTrackingSegments;
-                        } else {
-                            chunksArr = CreatedTrackingHistoryChunks[slot];
-                            segmentsArr = CreatedTrackingHistorySegments[slot];
-                        }
-                        reader.ReadArrayUnmanaged(ref chunksArr, 0);
-                        if (bufferSize == 0) {
-                            CreatedTrackingChunks = chunksArr;
-                        } else {
-                            CreatedTrackingHistoryChunks[slot] = chunksArr;
-                        }
-
-                        var nonNullCount = reader.ReadUint();
-                        for (var i = 0; i < nonNullCount; i++) {
-                            var segIdx = reader.ReadUint();
-                            ref var segRef = ref segmentsArr[segIdx];
-                            segRef ??= AllocateCreatedTrackingSegment();
-                            reader.ReadArrayUnmanaged(ref segRef, 0);
-                        }
-                    }
-                    if (bufferSize > 0) {
-                        var writeSlot = (int)((CurrentTick + 1) % (ulong)(bufferSize + 1));
-                        CreatedTrackingChunks = CreatedTrackingHistoryChunks[writeSlot];
-                        CreatedTrackingSegments = CreatedTrackingHistorySegments[writeSlot];
-                    }
                 }
 
                 for (var i = 0; i < clustersCount; i++) {
@@ -3203,7 +2776,7 @@ namespace FFS.Libraries.StaticEcs {
             }
             
             [MethodImpl(AggressiveInlining)]
-            internal void WriteDataChunk(ref BinaryPackWriter writer, uint chunkIdx, bool withTracking) {
+            internal void WriteDataChunk(ref BinaryPackWriter writer, uint chunkIdx) {
                var hasEntities = HasEntitiesInChunk(chunkIdx);
                writer.WriteBool(hasEntities);
 
@@ -3217,7 +2790,7 @@ namespace FFS.Libraries.StaticEcs {
 
                    if (hasEntities) {
                        var sizePosition = writer.MakePoint(sizeof(uint));
-                       pool.WriteChunk(ref writer, chunkIdx, withTracking);
+                       pool.WriteChunk(ref writer, chunkIdx);
                        writer.WriteUintAt(sizePosition, writer.Position - (sizePosition + sizeof(uint)));
                    }
                }
@@ -3532,21 +3105,16 @@ namespace FFS.Libraries.StaticEcs {
 
             [MethodImpl(AggressiveInlining)]
             private void StoreComponentStorage<T>(in Components<T> storage, Guid guid, bool nonSerializable, string typeName) where T : struct, IComponentOrTag {
-                var tracking = storage.TrackAdded || storage.TrackDeleted
-                    #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                    || storage.TrackChanged
-                    #endif
-                ;
                 #if FFS_ECS_DEBUG
                 Components<T>.instance = storage;
                 #else
                 Components<T>.Instance = storage;
                 #endif
                 Components<T>.Handle = ComponentsHandle.Create<TWorld, T>();
-                RegisterComponentPool(Components<T>.Handle, guid, nonSerializable, tracking, typeName);
+                RegisterComponentPool(Components<T>.Handle, guid, nonSerializable, typeName);
             }
 
-            private void RegisterComponentPool(ComponentsHandle handle, Guid guid, bool nonSerializable, bool tracking, string typeName) {
+            private void RegisterComponentPool(ComponentsHandle handle, Guid guid, bool nonSerializable, string typeName) {
                 if (_componentPoolByGuid.ContainsKey(guid)) {
                     throw new StaticEcsException($"Type {typeName} with guid {guid} already registered");
                 }
@@ -3560,13 +3128,6 @@ namespace FFS.Libraries.StaticEcs {
                 _guidsComponents[_poolsCountComponents++] = guid;
                 if (!nonSerializable) {
                     _poolsCountSerializableComponents++;
-                }
-
-                if (tracking) {
-                    if (_trackingComponentIndicesCount == _trackingComponentIndices.Length) {
-                        Array.Resize(ref _trackingComponentIndices, _trackingComponentIndicesCount << 1);
-                    }
-                    _trackingComponentIndices[_trackingComponentIndicesCount++] = (ushort)(_poolsCountComponents - 1);
                 }
 
                 _componentPoolByGuid[guid] = handle;

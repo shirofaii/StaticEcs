@@ -542,7 +542,7 @@ namespace FFS.Libraries.StaticEcs {
         private readonly unsafe delegate*<uint, void> _hardResetChunk;
         private readonly unsafe delegate*<StringBuilder, uint, void> _tryToStringComponent;
         // serialization
-        private readonly unsafe delegate*<ref BinaryPackWriter, uint, bool, void> _writeChunk;
+        private readonly unsafe delegate*<ref BinaryPackWriter, uint, void> _writeChunk;
         private readonly unsafe delegate*<ref BinaryPackReader, uint, void> _readChunk;
         private readonly unsafe delegate*<ref BinaryPackWriter, uint, bool, bool> _writeEntity;
         private readonly unsafe delegate*<ref BinaryPackReader, uint, void> _readEntity;
@@ -571,13 +571,6 @@ namespace FFS.Libraries.StaticEcs {
         private readonly unsafe delegate*<uint, uint, bool> _move;
         private readonly unsafe delegate*<uint, void> _set;
         private readonly unsafe delegate*<IComponentOrTag> _defaultValue;
-        private readonly unsafe delegate*<void> _clearTracking;
-        private readonly unsafe delegate*<void> _clearAddedTracking;
-        private readonly unsafe delegate*<void> _clearDeletedTracking;
-        #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-        private readonly unsafe delegate*<void> _clearChangedTracking;
-        #endif
-        private readonly unsafe delegate*<void> _advanceTracking;
 
         /// <summary>
         /// The <see cref="Type"/> of the component struct this handle operates on.
@@ -666,14 +659,7 @@ namespace FFS.Libraries.StaticEcs {
                 &World<TWorld>.Components<TComponent>._Copy,
                 &World<TWorld>.Components<TComponent>._Move,
                 &World<TWorld>.Components<TComponent>._Set,
-                &World<TWorld>.Components<TComponent>._DefaultValue,
-                &World<TWorld>.Components<TComponent>._ClearTracking,
-                &World<TWorld>.Components<TComponent>._ClearAddedTracking,
-                &World<TWorld>.Components<TComponent>._ClearDeletedTracking,
-                &World<TWorld>.Components<TComponent>._AdvanceTracking
-                #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                , &World<TWorld>.Components<TComponent>._ClearChangedTracking
-                #endif
+                &World<TWorld>.Components<TComponent>._DefaultValue
             );
         }
 
@@ -690,7 +676,7 @@ namespace FFS.Libraries.StaticEcs {
             delegate*<void> hardReset,
             delegate*<uint, void> hardResetChunk,
             delegate*<StringBuilder, uint, void> tryToStringComponent,
-            delegate*<ref BinaryPackWriter, uint, bool, void> writeChunk,
+            delegate*<ref BinaryPackWriter, uint, void> writeChunk,
             delegate*<ref BinaryPackReader, uint, void> readChunk,
             delegate*<ref BinaryPackWriter, uint, bool, bool> writeEntity,
             delegate*<ref BinaryPackReader, uint, void> readEntity,
@@ -716,14 +702,7 @@ namespace FFS.Libraries.StaticEcs {
             delegate*<uint, uint, bool> copy,
             delegate*<uint, uint, bool> move,
             delegate*<uint, void> set,
-            delegate*<IComponentOrTag> defaultValue,
-            delegate*<void> clearTracking,
-            delegate*<void> clearAddedTracking,
-            delegate*<void> clearDeletedTracking,
-            delegate*<void> advanceTracking
-            #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-            , delegate*<void> clearChangedTracking
-            #endif
+            delegate*<IComponentOrTag> defaultValue
             ) {
             ComponentType = componentType;
             WorldType = worldType;
@@ -764,13 +743,6 @@ namespace FFS.Libraries.StaticEcs {
             _move = move;
             _set = set;
             _defaultValue = defaultValue;
-            _clearTracking = clearTracking;
-            _clearAddedTracking = clearAddedTracking;
-            _clearDeletedTracking = clearDeletedTracking;
-            _advanceTracking = advanceTracking;
-            #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-            _clearChangedTracking = clearChangedTracking;
-            #endif
         }
 
         #region BASE
@@ -799,28 +771,12 @@ namespace FFS.Libraries.StaticEcs {
             unsafe { _hardResetChunk(chunkIdx); }
         }
 
-        [MethodImpl(AggressiveInlining)]
-        public unsafe void ClearTracking() { _clearTracking(); }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe void ClearAddedTracking() { _clearAddedTracking(); }
-
-        [MethodImpl(AggressiveInlining)]
-        public unsafe void ClearDeletedTracking() { _clearDeletedTracking(); }
-
-        #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-        [MethodImpl(AggressiveInlining)]
-        public unsafe void ClearChangedTracking() { _clearChangedTracking(); }
-        #endif
-
-        [MethodImpl(AggressiveInlining)]
-        internal unsafe void AdvanceTracking() { _advanceTracking(); }
         #endregion
 
         #region SERIALIZATION
         [MethodImpl(AggressiveInlining)]
-        internal void WriteChunk(ref BinaryPackWriter writer, uint chunkIdx, bool withTracking) {
-            unsafe { _writeChunk(ref writer, chunkIdx, withTracking); }
+        internal void WriteChunk(ref BinaryPackWriter writer, uint chunkIdx) {
+            unsafe { _writeChunk(ref writer, chunkIdx); }
         }
 
         [MethodImpl(AggressiveInlining)]

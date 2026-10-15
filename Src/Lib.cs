@@ -418,37 +418,12 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
 
-        internal static void AssertComponentTrackAdded<T>(string type, [CallerMemberName] string method = "") where T : struct, IComponentOrTag {
-            if (!Components<T>.Instance.TrackAdded) {
-                throw new StaticEcsException(type, method, $"Component {typeof(T).GenericName()} does not implement ITrackableAdded.");
-            }
-        }
-
-        internal static void AssertComponentTrackDeleted<T>(string type, [CallerMemberName] string method = "") where T : struct, IComponentOrTag {
-            if (!Components<T>.Instance.TrackDeleted) {
-                throw new StaticEcsException(type, method, $"Component {typeof(T).GenericName()} does not implement ITrackableDeleted.");
-            }
-        }
-
         internal static void AssertComponentDisableable<T>(string type, [CallerMemberName] string method = "") where T : struct, IComponentOrTag {
             if (!Components<T>.Instance.HasDisable) {
                 throw new StaticEcsException(type, method, $"Component {typeof(T).GenericName()} does not implement IDisableable.");
             }
         }
 
-        #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-        internal static void AssertComponentTrackChanged<T>(string type, [CallerMemberName] string method = "") where T : struct, IComponentOrTag {
-            if (!Components<T>.Instance.TrackChanged) {
-                throw new StaticEcsException(type, method, $"Component {typeof(T).GenericName()} does not implement ITrackableChanged.");
-            }
-        }
-        #endif
-
-        internal static void AssertTrackCreated([CallerMemberName] string method = "") {
-            if (!Data.Instance.TrackCreated) {
-                throw new StaticEcsException(WorldTypeName, method, "WorldConfig.TrackCreated is not enabled.");
-            }
-        }
 
         internal static void AssertNotRegisteredEvent<T>(string type, [CallerMemberName] string method = "") where T : struct, IEvent {
             if (Events<T>.Instance.Initialized) {
@@ -510,13 +485,6 @@ namespace FFS.Libraries.StaticEcs {
         internal static void AssertMultiThreadNotActive(string type, [CallerMemberName] string method = "") {
             if (Data.Instance.MultiThreadActive) {
                 throw new StaticEcsException(type, method, "Forbidden in a parallel query.");
-            }
-        }
-
-        internal static void AssertTrackingBufferNotOverflow(string type, ulong fromTick, ulong toTick, byte bufferSize, [CallerMemberName] string method = "") {
-            var ticksToCheck = toTick - fromTick;
-            if (ticksToCheck > bufferSize) {
-                throw new StaticEcsException(type, method, $"Tracking buffer overflow: system missed {ticksToCheck - bufferSize} ticks (buffer={bufferSize}, from={fromTick}, to={toTick}). Increase WorldConfig.TrackingBufferSize or call Tick() less frequently.");
             }
         }
 
