@@ -22,63 +22,73 @@ namespace FFS.Libraries.StaticEcs {
         [MethodImpl(AggressiveInlining)]
         public static WorldQuery<Nothing> Query() => new(default);
 
-        /// <summary>
-        /// Creates a query with a single filter.
-        /// <para>Usage: <c>W.Query&lt;All&lt;Position, Velocity&gt;&gt;()</c></para>
-        /// </summary>
-        /// <typeparam name="TFilter0">
-        /// A filter type implementing <see cref="IQueryFilter"/>. Common filters:
-        /// <see cref="All{T0}"/>, <see cref="None{T0}"/>, <see cref="Any{T0,T1}"/>.
-        /// The same <c>All</c>/<c>None</c>/<c>Any</c> filters accept both components and tags.
-        /// </typeparam>
         [MethodImpl(AggressiveInlining)]
-        public static WorldQuery<TFilter0> Query<TFilter0>(TFilter0 filter0 = default)
-            where TFilter0 : struct, IQueryFilter => new(filter0);
+        public static WorldQuery<TFilter> Query<TFilter>(TFilter filter = default)
+            where TFilter : struct, IQueryFilter => new(filter);
 
-        /// <inheritdoc cref="Query{TFilter0}"/>
         [MethodImpl(AggressiveInlining)]
-        public static WorldQuery<And<TFilter0, TFilter1>> Query<TFilter0, TFilter1>(TFilter0 filter0 = default, TFilter1 filter1 = default)
-            where TFilter0 : struct, IQueryFilter
-            where TFilter1 : struct, IQueryFilter =>
-            new (new And<TFilter0, TFilter1>(filter0, filter1));
+        public static WorldQuery<All<T0>> With<T0>()
+            where T0 : struct, IComponentOrTag => new(default);
 
-        /// <inheritdoc cref="Query{TFilter0}"/>
         [MethodImpl(AggressiveInlining)]
-        public static WorldQuery<And<TFilter0, TFilter1, TFilter2>> Query<TFilter0, TFilter1, TFilter2>(TFilter0 filter0 = default, TFilter1 filter1 = default, TFilter2 filter2 = default)
-            where TFilter0 : struct, IQueryFilter
-            where TFilter1 : struct, IQueryFilter
-            where TFilter2 : struct, IQueryFilter => new (new And<TFilter0, TFilter1, TFilter2>(filter0, filter1, filter2));
+        public static WorldQuery<All<T0, T1>> With<T0, T1>()
+            where T0 : struct, IComponentOrTag
+            where T1 : struct, IComponentOrTag => new(default);
 
-        /// <inheritdoc cref="Query{TFilter0}"/>
         [MethodImpl(AggressiveInlining)]
-        public static WorldQuery<And<TFilter0, TFilter1, TFilter2, TFilter3>> Query<TFilter0, TFilter1, TFilter2, TFilter3>(TFilter0 filter0 = default, TFilter1 filter1 = default, TFilter2 filter2 = default, TFilter3 filter3 = default)
-            where TFilter0 : struct, IQueryFilter
-            where TFilter1 : struct, IQueryFilter
-            where TFilter2 : struct, IQueryFilter
-            where TFilter3 : struct, IQueryFilter => new (new And<TFilter0, TFilter1, TFilter2, TFilter3>(filter0, filter1, filter2, filter3));
+        public static WorldQuery<All<T0, T1, T2>> With<T0, T1, T2>()
+            where T0 : struct, IComponentOrTag
+            where T1 : struct, IComponentOrTag
+            where T2 : struct, IComponentOrTag => new(default);
 
-        /// <inheritdoc cref="Query{TFilter0}"/>
         [MethodImpl(AggressiveInlining)]
-        public static WorldQuery<And<TFilter0, TFilter1, TFilter2, TFilter3, TFilter4>> Query<TFilter0, TFilter1, TFilter2, TFilter3, TFilter4>(
-            TFilter0 filter0 = default, TFilter1 filter1 = default, TFilter2 filter2 = default, TFilter3 filter3 = default, TFilter4 filter4 = default
-        )
-            where TFilter0 : struct, IQueryFilter
-            where TFilter1 : struct, IQueryFilter
-            where TFilter2 : struct, IQueryFilter
-            where TFilter3 : struct, IQueryFilter
-            where TFilter4 : struct, IQueryFilter => new (new And<TFilter0, TFilter1, TFilter2, TFilter3, TFilter4>(filter0, filter1, filter2, filter3, filter4));
+        public static WorldQuery<All<T0, T1, T2, T3>> With<T0, T1, T2, T3>()
+            where T0 : struct, IComponentOrTag
+            where T1 : struct, IComponentOrTag
+            where T2 : struct, IComponentOrTag
+            where T3 : struct, IComponentOrTag => new(default);
 
-        /// <inheritdoc cref="Query{TFilter0}"/>
         [MethodImpl(AggressiveInlining)]
-        public static WorldQuery<And<TFilter0, TFilter1, TFilter2, TFilter3, TFilter4, TFilter5>> Query<TFilter0, TFilter1, TFilter2, TFilter3, TFilter4, TFilter5>(
-            TFilter0 filter0 = default, TFilter1 filter1 = default, TFilter2 filter2 = default, TFilter3 filter3 = default, TFilter4 filter4 = default, TFilter5 filter5 = default
-        )
-            where TFilter0 : struct, IQueryFilter
-            where TFilter1 : struct, IQueryFilter
-            where TFilter2 : struct, IQueryFilter
-            where TFilter3 : struct, IQueryFilter
-            where TFilter4 : struct, IQueryFilter
-            where TFilter5 : struct, IQueryFilter => new (new And<TFilter0, TFilter1, TFilter2, TFilter3, TFilter4, TFilter5>(filter0, filter1, filter2, filter3, filter4, filter5));
+        public static WorldQuery<All<T0, T1, T2, T3, T4>> With<T0, T1, T2, T3, T4>()
+            where T0 : struct, IComponentOrTag
+            where T1 : struct, IComponentOrTag
+            where T2 : struct, IComponentOrTag
+            where T3 : struct, IComponentOrTag
+            where T4 : struct, IComponentOrTag => new(default);
+
+        [MethodImpl(AggressiveInlining)]
+        public static WorldQuery<All<T0, T1, T2, T3, T4, T5>> With<T0, T1, T2, T3, T4, T5>()
+            where T0 : struct, IComponentOrTag
+            where T1 : struct, IComponentOrTag
+            where T2 : struct, IComponentOrTag
+            where T3 : struct, IComponentOrTag
+            where T4 : struct, IComponentOrTag
+            where T5 : struct, IComponentOrTag => new(default);
+
+        [MethodImpl(AggressiveInlining)]
+        public static WorldQuery<All<T0, T1, T2, T3, T4, T5, T6>> With<T0, T1, T2, T3, T4, T5, T6>()
+            where T0 : struct, IComponentOrTag
+            where T1 : struct, IComponentOrTag
+            where T2 : struct, IComponentOrTag
+            where T3 : struct, IComponentOrTag
+            where T4 : struct, IComponentOrTag
+            where T5 : struct, IComponentOrTag
+            where T6 : struct, IComponentOrTag => new(default);
+
+        [MethodImpl(AggressiveInlining)]
+        public static WorldQuery<All<T0, T1, T2, T3, T4, T5, T6, T7>> With<T0, T1, T2, T3, T4, T5, T6, T7>()
+            where T0 : struct, IComponentOrTag
+            where T1 : struct, IComponentOrTag
+            where T2 : struct, IComponentOrTag
+            where T3 : struct, IComponentOrTag
+            where T4 : struct, IComponentOrTag
+            where T5 : struct, IComponentOrTag
+            where T6 : struct, IComponentOrTag
+            where T7 : struct, IComponentOrTag => new(default);
+
+        [MethodImpl(AggressiveInlining)]
+        public static WorldQuery<EntityIs<TEntityType>> Is<TEntityType>()
+            where TEntityType : struct, IEntityType => new(default);
 
         #if ENABLE_IL2CPP
         [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
@@ -123,6 +133,69 @@ namespace FFS.Libraries.StaticEcs {
             /// <param name="entities">Which entity lifecycle states to include (default: only enabled).</param>
             /// <param name="clusters">Optional cluster IDs to restrict iteration scope. Empty = all clusters.</param>
             /// <returns>A <see cref="QueryStrictIterator{TWorld, TFilter}"/> for foreach enumeration.</returns>
+            [MethodImpl(AggressiveInlining)]
+            public QueryStrictIterator<TWorld, TFilter> GetEnumerator() => new(default(ReadOnlySpan<ushort>), Filter, EntityStatusType.Enabled);
+
+            [MethodImpl(AggressiveInlining)]
+            public WorldQuery<And<TFilter, None<T0>>> Without<T0>()
+                where T0 : struct, IComponentOrTag => new(new And<TFilter, None<T0>>(Filter, default));
+
+            [MethodImpl(AggressiveInlining)]
+            public WorldQuery<And<TFilter, None<T0, T1>>> Without<T0, T1>()
+                where T0 : struct, IComponentOrTag
+                where T1 : struct, IComponentOrTag => new(new And<TFilter, None<T0, T1>>(Filter, default));
+
+            [MethodImpl(AggressiveInlining)]
+            public WorldQuery<And<TFilter, None<T0, T1, T2>>> Without<T0, T1, T2>()
+                where T0 : struct, IComponentOrTag
+                where T1 : struct, IComponentOrTag
+                where T2 : struct, IComponentOrTag => new(new And<TFilter, None<T0, T1, T2>>(Filter, default));
+
+            [MethodImpl(AggressiveInlining)]
+            public WorldQuery<And<TFilter, None<T0, T1, T2, T3>>> Without<T0, T1, T2, T3>()
+                where T0 : struct, IComponentOrTag
+                where T1 : struct, IComponentOrTag
+                where T2 : struct, IComponentOrTag
+                where T3 : struct, IComponentOrTag => new(new And<TFilter, None<T0, T1, T2, T3>>(Filter, default));
+
+            [MethodImpl(AggressiveInlining)]
+            public WorldQuery<And<TFilter, None<T0, T1, T2, T3, T4>>> Without<T0, T1, T2, T3, T4>()
+                where T0 : struct, IComponentOrTag
+                where T1 : struct, IComponentOrTag
+                where T2 : struct, IComponentOrTag
+                where T3 : struct, IComponentOrTag
+                where T4 : struct, IComponentOrTag => new(new And<TFilter, None<T0, T1, T2, T3, T4>>(Filter, default));
+
+            [MethodImpl(AggressiveInlining)]
+            public WorldQuery<And<TFilter, None<T0, T1, T2, T3, T4, T5>>> Without<T0, T1, T2, T3, T4, T5>()
+                where T0 : struct, IComponentOrTag
+                where T1 : struct, IComponentOrTag
+                where T2 : struct, IComponentOrTag
+                where T3 : struct, IComponentOrTag
+                where T4 : struct, IComponentOrTag
+                where T5 : struct, IComponentOrTag => new(new And<TFilter, None<T0, T1, T2, T3, T4, T5>>(Filter, default));
+
+            [MethodImpl(AggressiveInlining)]
+            public WorldQuery<And<TFilter, None<T0, T1, T2, T3, T4, T5, T6>>> Without<T0, T1, T2, T3, T4, T5, T6>()
+                where T0 : struct, IComponentOrTag
+                where T1 : struct, IComponentOrTag
+                where T2 : struct, IComponentOrTag
+                where T3 : struct, IComponentOrTag
+                where T4 : struct, IComponentOrTag
+                where T5 : struct, IComponentOrTag
+                where T6 : struct, IComponentOrTag => new(new And<TFilter, None<T0, T1, T2, T3, T4, T5, T6>>(Filter, default));
+
+            [MethodImpl(AggressiveInlining)]
+            public WorldQuery<And<TFilter, None<T0, T1, T2, T3, T4, T5, T6, T7>>> Without<T0, T1, T2, T3, T4, T5, T6, T7>()
+                where T0 : struct, IComponentOrTag
+                where T1 : struct, IComponentOrTag
+                where T2 : struct, IComponentOrTag
+                where T3 : struct, IComponentOrTag
+                where T4 : struct, IComponentOrTag
+                where T5 : struct, IComponentOrTag
+                where T6 : struct, IComponentOrTag
+                where T7 : struct, IComponentOrTag => new(new And<TFilter, None<T0, T1, T2, T3, T4, T5, T6, T7>>(Filter, default));
+
             [MethodImpl(AggressiveInlining)]
             public QueryStrictIterator<TWorld, TFilter> Entities(EntityStatusType entities = EntityStatusType.Enabled,
                                                                  ReadOnlySpan<ushort> clusters = default) {

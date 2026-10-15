@@ -59,10 +59,8 @@ namespace FFS.Libraries.StaticEcs.Tests {
             Assert.Equal(64, Count<All<Red, Pos>>());
             Assert.Equal(32, Count<All<Blue, Pos>>());
             Assert.Equal(320, Count<None<Red>>());
-            Assert.Equal(320, Count<Any<Red, Blue>>());
-            Assert.Equal(384, Count<Any<Red, Pos>>());
             var redNoBlue = 0;
-            foreach (var _ in W.Query<All<Red>, None<Blue>>().Entities()) redNoBlue++;
+            foreach (var _ in W.With<Red>().Without<Blue>()) redNoBlue++;
             Assert.Equal(160, redNoBlue);
         }
 

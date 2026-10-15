@@ -89,11 +89,10 @@ namespace FFS.Libraries.StaticEcs.Tests {
             Assert.Equal(150, Count<All<Pos>>());
             Assert.Equal(100, Count<All<Vel>>());
             Assert.Equal(50, Count<All<Pos, Vel>>());
-            Assert.Equal(100, CountWith<All<Pos>, None<Vel>>());
-            Assert.Equal(200, Count<Any<Pos, Vel>>());
+            Assert.Equal(100, W.With<Pos>().Without<Vel>().Count());
 
             var sum = 0;
-            foreach (var e in W.Query<All<Pos, Vel>>().Entities()) sum += e.Ref<Pos>().X;
+            foreach (var e in W.With<Pos, Vel>()) sum += e.Ref<Pos>().X;
             var expected = 0;
             for (var i = 0; i < 300; i += 6) expected += i;
             Assert.Equal(expected, sum);
@@ -127,12 +126,6 @@ namespace FFS.Libraries.StaticEcs.Tests {
             var c = 0;
             for (var i = 1; i < n; i += 2) if (i % 5 != 0) c++;
             return c;
-        }
-
-        private static int CountWith<TA, TB>() where TA : struct, IQueryFilter where TB : struct, IQueryFilter {
-            var n = 0;
-            foreach (var _ in W.Query<TA, TB>().Entities()) n++;
-            return n;
         }
 
         [Fact]

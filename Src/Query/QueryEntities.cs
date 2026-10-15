@@ -34,7 +34,7 @@ namespace FFS.Libraries.StaticEcs {
             /// <param name="clusters">Optional cluster filter. If provided, only entities in these clusters are counted.</param>
             /// <returns>Total number of matching entities.</returns>
             [MethodImpl(AggressiveInlining)]
-            public int EntitiesCount(EntityStatusType entities = EntityStatusType.Enabled,
+            public int Count(EntityStatusType entities = EntityStatusType.Enabled,
                                      ReadOnlySpan<ushort> clusters = default) {
                 var count = 0;
                 if (Prepare(Filter, clusters, entities, true, out var queryData, out var firstGlobalBlockIdx)) {
@@ -58,7 +58,7 @@ namespace FFS.Libraries.StaticEcs {
             /// <param name="chunks">Chunks filter.</param>
             /// <returns>Total number of matching entities.</returns>
             [MethodImpl(AggressiveInlining)]
-            public int EntitiesCount(ReadOnlySpan<uint> chunks, EntityStatusType entities = EntityStatusType.Enabled) {
+            public int Count(ReadOnlySpan<uint> chunks, EntityStatusType entities = EntityStatusType.Enabled) {
                 var count = 0;
                 if (Prepare(Filter, chunks, entities, true, out var queryData, out var firstGlobalBlockIdx)) {
                     while (firstGlobalBlockIdx >= 0) {
@@ -168,7 +168,6 @@ namespace FFS.Libraries.StaticEcs {
                     Dispose(Filter, entities, strict, queryData);
                 }
             }
-
 
             /// <summary>
             /// Removes components from all entities matching this query's filter in a single batch.

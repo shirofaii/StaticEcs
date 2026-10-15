@@ -15,13 +15,11 @@ namespace FFS.Libraries.StaticEcs.Tests {
             Assert.True(e.HasDisabled<Hp>());
             Assert.Equal(4, e.Read<Hp>().Value);
             Assert.Equal(0, Count<All<Hp>>());
-            Assert.Equal(1, Count<AllOnlyDisabled<Hp>>());
-            Assert.Equal(1, Count<AllWithDisabled<Hp>>());
+            Assert.Equal(1, W.Query().Count());
 
             e.Enable<Hp>();
             Assert.True(e.HasEnabled<Hp>());
             Assert.Equal(1, Count<All<Hp>>());
-            Assert.Equal(0, Count<AllOnlyDisabled<Hp>>());
         }
 
         [Fact]

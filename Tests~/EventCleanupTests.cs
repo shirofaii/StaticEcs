@@ -10,7 +10,7 @@ namespace FFS.Libraries.StaticEcs.Tests {
                 if (i % 3 == 0) e.Set(new Hooked { V = i });
             }
             Hooked.Calls.Clear();
-            W.Query<All<Hooked>>().BatchDelete<Hooked>();
+            W.With<Hooked>().BatchDelete<Hooked>();
             Assert.Equal(0, Count<All<Hooked>>());
             Assert.Equal(1000, Count<All<Pos>>());
             Assert.Equal(334, Hooked.Calls.Count);
@@ -24,7 +24,7 @@ namespace FFS.Libraries.StaticEcs.Tests {
                 e.Set<Red>();
                 if (i % 2 == 0) e.Set<Blue>();
             }
-            W.Query<All<Blue>>().BatchDelete<Red>();
+            W.With<Blue>().BatchDelete<Red>();
             Assert.Equal(500, Count<All<Red>>());
             Assert.Equal(0, Count<All<Red, Blue>>());
             Assert.Equal(500, Count<All<Blue>>());

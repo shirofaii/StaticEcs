@@ -24,7 +24,9 @@ namespace FFS.Libraries.StaticEcs.Tests {
             Assert.Equal(gids.Length, Count<All<Pos>>());
             Assert.Equal(gids.Length / 2, Count<All<Red>>());
             Assert.Equal(1000 - 334, Count<All<Hp>>());
-            Assert.Equal((gids.Length + 8) / 9, Count<AllOnlyDisabled<Hp>>());
+            var disabledHp = 0;
+            foreach (var e in W.With<Pos>()) if (e.HasDisabled<Hp>()) disabledHp++;
+            Assert.Equal((gids.Length + 8) / 9, disabledHp);
             for (var i = 0; i < gids.Length; i += 37) {
                 Assert.True(gids[i].TryUnpack<TW>(out var e));
                 Assert.Equal(i, e.Ref<Pos>().X);
