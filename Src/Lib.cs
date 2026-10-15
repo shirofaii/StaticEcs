@@ -592,9 +592,9 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
 
-        internal static void AssertGuidNotEmpty<T>(string type, Guid guid, [CallerMemberName] string method = "") {
+        internal static void AssertGuidNotEmpty(string type, Guid guid, string typeName, [CallerMemberName] string method = "") {
             if (guid.Equals(Guid.Empty)) {
-                throw new StaticEcsException(type, method, $"`{typeof(T).GenericName()}` GUID can't be empty. Set valid value or leave it uninitialized.");
+                throw new StaticEcsException(type, method, $"`{typeName}` GUID can't be empty. Set valid value or leave it uninitialized.");
             }
         }
     }

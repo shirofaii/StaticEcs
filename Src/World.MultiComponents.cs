@@ -899,8 +899,8 @@ namespace FFS.Libraries.StaticEcs {
             }
             
             void IComponentInternal.OnInitialize<TW>() {
-                var hasWrite = MultiComponentType<TValue>.HasWrite();
-                var hasRead = MultiComponentType<TValue>.HasRead();
+                var hasWrite = TypeHooks.MultiHasWrite(typeof(TValue));
+                var hasRead = TypeHooks.MultiHasRead(typeof(TValue));
 
                 ref var storage = ref World<TW>.ResourcesData<TW>.Instance.GetOrCreate<MultiValueStorage<TValue>>(out var isNew);
                 if (isNew) {
@@ -1641,44 +1641,4 @@ namespace FFS.Libraries.StaticEcs {
         #endif
     }
 
-    internal static class MultiComponentType<
-        #if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)]
-        #endif
-        T> where T : struct, IMultiComponent {
-        private static readonly Type[] WriteParams = { typeof(BinaryPackWriter).MakeByRefType() };
-        private static readonly Type[] ReadParams = { typeof(BinaryPackReader).MakeByRefType() };
-
-        internal static bool HasWrite() {
-            return HasMethod(typeof(T), nameof(IMultiComponent.Write), WriteParams);
-        }
-
-        internal static bool HasRead() {
-            return HasMethod(typeof(T), nameof(IMultiComponent.Read), ReadParams);
-        }
-
-        private static bool HasMethod(
-            #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods)]
-            #endif
-            Type structType, string methodName, Type[] parameterTypes) {
-            var methods = structType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
-            foreach (var methodInfo in methods) {
-                if (methodInfo.Name == methodName && !methodInfo.IsGenericMethodDefinition) {
-                    var parameters = methodInfo.GetParameters();
-                    if (parameters.Length == parameterTypes.Length) {
-                        var match = true;
-                        for (var i = 0; i < parameters.Length; i++) {
-                            if (parameterTypes[i].Name != parameters[i].ParameterType.Name) {
-                                match = false;
-                                break;
-                            }
-                        }
-                        if (match) return true;
-                    }
-                }
-            }
-            return false;
-        }
-    }
 }

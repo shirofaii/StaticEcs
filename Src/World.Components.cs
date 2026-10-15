@@ -270,18 +270,6 @@ namespace FFS.Libraries.StaticEcs {
             );
         }
 
-        internal static readonly ComponentTypeConfig<T> DefaultComponent = new(
-            guid: typeof(T).GuidFromAQN(),
-            version: 0,
-            noDataLifecycle: false,
-            readWriteStrategy: AutoRegistration.TryCreateUnmanagedPackArrayStrategy<T>() ?? new StructPackArrayStrategy<T>(),
-            defaultValue: null
-        );
-
-        internal static readonly ComponentTypeConfig<T> DefaultTag = new(
-            guid: typeof(T).GuidFromAQN(),
-            version: 0
-        );
     }
 
     /// <summary>
@@ -400,18 +388,18 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
                     return;
                 }
-                ComponentTypeConfig<T> config = default;
+                var nonSerializable = typeof(INonSerializable).IsAssignableFrom(typeof(T));
                 if (isTag) {
-                    if (default(T) is ITagConfig<T> cfg) {
-                        config = cfg.Config().AsComponentConfig;
+                    if (default(T) is ITagConfig<T> tagConfig) {
+                        Data.Instance.RegisterComponentOrTagTypeInternal(tagConfig.Config().AsComponentConfig, true, nonSerializable, typeof(T).Name);
+                        return;
                     }
                 }
-                else if (default(T) is IComponentConfig<T> cfg) {
-                    config = cfg.Config();
+                else if (default(T) is IComponentConfig<T> componentConfig) {
+                    Data.Instance.RegisterComponentOrTagTypeInternal(componentConfig.Config(), false, nonSerializable, typeof(T).Name);
+                    return;
                 }
-
-                
-                Data.Instance.RegisterComponentOrTagTypeInternal(config, isTag, typeof(INonSerializable).IsAssignableFrom(typeof(T)), typeof(T).Name);
+                Data.Instance.RegisterDefaultComponentOrTagTypeInternal<T>(isTag, nonSerializable, typeof(T).Name);
             }
 
             internal HeuristicChunk[] HeuristicChunks;
@@ -489,8 +477,8 @@ namespace FFS.Libraries.StaticEcs {
             internal readonly bool Unmanaged;
             internal readonly int UnmanagedSize;
 
-            private readonly IPackArrayStrategy<T> _readWriteArrayStrategy;
-            private readonly IPackArrayStrategyResettable _resettableStrategy;
+            private IPackArrayStrategy<T> _readWriteArrayStrategy;
+            private IPackArrayStrategyResettable _resettableStrategy;
 
             internal ulong[][] _trackingSegmentsPool;
             internal int _trackingSegmentsPoolCount;
@@ -1987,7 +1975,7 @@ namespace FFS.Libraries.StaticEcs {
             #if NET5_0_OR_GREATER
             [UnconditionalSuppressMessage("AOT", "IL2091", Justification = "Component metadata is preserved by the registration path.")]
             #endif
-            internal Components(ushort componentId, ComponentTypeConfig<T> config, bool isTag, bool nonSerializable, string typeName) {
+            internal Components(ushort componentId, Guid guid, byte version, bool noDataLifecycle, IPackArrayStrategy<T> readWriteStrategy, bool hasDefaultValue, T defaultValue, bool isTag, bool nonSerializable, string typeName) {
                 TypeName = typeName;
                 IsTag = isTag;
                 NonSerializable = nonSerializable;
@@ -1996,10 +1984,10 @@ namespace FFS.Libraries.StaticEcs {
                 _idMask = 1UL << (DynamicId & Const.U64_MASK);
                 _idMaskInv = ~_idMask;
 
-                Guid = config.Guid!.Value;
-                Version = config.Version!.Value;
-                _readWriteArrayStrategy = config.ReadWriteStrategy;
-                _resettableStrategy = config.ReadWriteStrategy as IPackArrayStrategyResettable;
+                Guid = guid;
+                Version = version;
+                _readWriteArrayStrategy = default(T) is IComponentStrategyOverride ? null : readWriteStrategy;
+                _resettableStrategy = _readWriteArrayStrategy as IPackArrayStrategyResettable;
 
                 _segmentsMaskCache = Const.DataMasks;
                 _segmentsPoolCount = 0;
@@ -2015,22 +2003,18 @@ namespace FFS.Libraries.StaticEcs {
                         HasOnDelete = hookOverride.HasOnDelete();
                         HasCopyTo = hookOverride.HasCopyTo();
                     } else {
-                        HasOnAdd = ComponentType<T>.HasOnAdd();
-                        HasOnDelete = ComponentType<T>.HasOnDelete();
-                        HasCopyTo = ComponentType<T>.HasCopyTo();
+                        HasOnAdd = TypeHooks.ComponentHasOnAdd(typeof(T));
+                        HasOnDelete = TypeHooks.ComponentHasOnDelete(typeof(T));
+                        HasCopyTo = TypeHooks.ComponentHasCopyTo(typeof(T));
                     }
-                    HasWrite = ComponentType<T>.HasWrite();
-                    HasRead = ComponentType<T>.HasRead();
-                    if (default(T) is IComponentStrategyOverride packOverride) {
-                        _readWriteArrayStrategy = packOverride.ArrayPackStrategy<T>();
-                        _resettableStrategy = _readWriteArrayStrategy as IPackArrayStrategyResettable;
-                    }
+                    HasWrite = TypeHooks.ComponentHasWrite(typeof(T));
+                    HasRead = TypeHooks.ComponentHasRead(typeof(T));
                 }
                 Unmanaged = isTag || !RuntimeHelpers.IsReferenceOrContainsReferences<T>();
                 UnmanagedSize = !isTag && Unmanaged ? BinaryPack.SizeOf<T>() : 0;
-                DataLifecycle = !isTag && !config.NoDataLifecycle.Value;
-                DefaultValue = config.DefaultValue ?? default;
-                HasDefaultValue = config.DefaultValue.HasValue;
+                DataLifecycle = !isTag && !noDataLifecycle;
+                DefaultValue = defaultValue;
+                HasDefaultValue = hasDefaultValue;
 
                 var probe = default(T);
                 TrackAdded = probe is ITrackableAdded;
@@ -2110,6 +2094,16 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
             }
             
+            [MethodImpl(NoInlining)]
+            private void ResolveStrategy() {
+                if (_readWriteArrayStrategy != null) return;
+                if (default(T) is IComponentStrategyOverride packOverride) {
+                    _readWriteArrayStrategy = packOverride.ArrayPackStrategy<T>();
+                }
+                _readWriteArrayStrategy ??= AutoRegistration.TryCreateUnmanagedPackArrayStrategy<T>() ?? new StructPackArrayStrategy<T>();
+                _resettableStrategy = _readWriteArrayStrategy as IPackArrayStrategyResettable;
+            }
+
             [MethodImpl(AggressiveInlining)]
             internal void Initialize(uint chunksCapacity, ulong[][] chunkHeuristicMask, ushort chunkHeuristicMaskLen) {
                 _chunkHeuristicWorldMask = chunkHeuristicMask;
@@ -3048,6 +3042,7 @@ namespace FFS.Libraries.StaticEcs {
                         }
                     }
                     else {
+                        ResolveStrategy();
                         var unmanagedStrategy = _readWriteArrayStrategy.IsUnmanaged();
 
                         writer.WriteByte(Version);
@@ -3198,6 +3193,7 @@ namespace FFS.Libraries.StaticEcs {
                     else {
                         var oldVersion = reader.ReadByte();
                         var unmanagedStrategy = reader.ReadBool();
+                        ResolveStrategy();
 
                         _resettableStrategy?.Reset();
 
@@ -3752,85 +3748,6 @@ namespace FFS.Libraries.StaticEcs {
     }
     #endregion
     
-    #region REFLECTION UTILS
-    #if ENABLE_IL2CPP
-    [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
-    [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
-    [Il2CppEagerStaticClassConstruction]
-    #endif
-    internal static class ComponentType<
-        #if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)]
-        #endif
-        T> where T : struct, IComponentOrTag {
-        private static readonly Type[] OnAddParams = {
-            typeof(World<>.Entity)
-        };
-        private static readonly Type[] OnDeleteParams = {
-            typeof(World<>.Entity),
-            typeof(HookReason)
-        };
-        private static readonly Type[] CopyToParams = {
-            typeof(World<>.Entity),
-            typeof(World<>.Entity),
-            typeof(bool)
-        };
-        private static readonly Type[] WriteParams = {
-            typeof(BinaryPackWriter).MakeByRefType(),
-            typeof(World<>.Entity)
-        };
-        private static readonly Type[] ReadParams = {
-            typeof(BinaryPackReader).MakeByRefType(),
-            typeof(World<>.Entity),
-            typeof(byte),
-            typeof(bool)
-        };
-
-        internal static bool HasOnAdd() {
-            return HasMethod(typeof(T), nameof(IComponentOrTag.OnAdd), OnAddParams);
-        }
-        
-        internal static bool HasOnDelete() {
-            return HasMethod(typeof(T), nameof(IComponentOrTag.OnDelete), OnDeleteParams);
-        }
-        
-        internal static bool HasCopyTo() {
-            return HasMethod(typeof(T), nameof(IComponentOrTag.CopyTo), CopyToParams);
-        }
-        
-        internal static bool HasWrite() {
-            return HasMethod(typeof(T), nameof(IComponentOrTag.Write), WriteParams);
-        }
-        
-        internal static bool HasRead() {
-            return HasMethod(typeof(T), nameof(IComponentOrTag.Read), ReadParams);
-        }
-        
-        private static bool HasMethod(
-            #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods)]
-            #endif
-            Type structType, string methodName, Type[] parameterTypes) {
-            var methods = structType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
-            foreach (var methodInfo in methods) {
-                if (methodInfo.Name == methodName && methodInfo.IsGenericMethodDefinition) {
-                    var parameters = methodInfo.GetParameters();
-                    if (parameters.Length == parameterTypes.Length) {
-                        var match = true;
-                        for (var i = 0; i < parameters.Length; i++) {
-                            if (parameterTypes[i].Name != parameters[i].ParameterType.Name) {
-                                match = false;
-                                break;
-                            }
-                        }
-                        if (match) return true;
-                    }
-                }
-            }
-            return false;
-        }
-    }
-    #endregion
 
     #if ENABLE_IL2CPP
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]

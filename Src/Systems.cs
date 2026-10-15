@@ -441,8 +441,8 @@ namespace FFS.Libraries.StaticEcs {
                     ? declaredGuid.Value
                     : boxedSystem.GetType().GuidFromAQN();
 
-                var hasWrite = SystemType<TSystem>.HasWrite();
-                var hasRead = SystemType<TSystem>.HasRead();
+                var hasWrite = TypeHooks.SystemHasWrite(typeof(TSystem));
+                var hasRead = TypeHooks.SystemHasRead(typeof(TSystem));
                 #if FFS_ECS_DEBUG
                 if (hasWrite != hasRead) {
                     throw new StaticEcsException(
@@ -462,10 +462,10 @@ namespace FFS.Libraries.StaticEcs {
                     Order = order,
                     System = boxedSystem,
                     Index = AllSystemsCount,
-                    HasDestroy = SystemType<TSystem>.HasDestroy(),
-                    HasInit = SystemType<TSystem>.HasInit(),
-                    HasUpdate = SystemType<TSystem>.HasUpdate(),
-                    HasUpdateIsActive = SystemType<TSystem>.HasUpdateIsActive(),
+                    HasDestroy = TypeHooks.SystemHasDestroy(typeof(TSystem)),
+                    HasInit = TypeHooks.SystemHasInit(typeof(TSystem)),
+                    HasUpdate = TypeHooks.SystemHasUpdate(typeof(TSystem)),
+                    HasUpdateIsActive = TypeHooks.SystemHasUpdateIsActive(typeof(TSystem)),
                     HasSnapshotState = hasWrite && hasRead,
                     Guid = guid,
                     Version = boxedSystem.Version()
@@ -723,59 +723,6 @@ namespace FFS.Libraries.StaticEcs {
         }
     }
 
-    #if ENABLE_IL2CPP
-    [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
-    [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
-    [Il2CppEagerStaticClassConstruction]
-    #endif
-    internal static class SystemType<
-        #if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)]
-        #endif
-        T> where T : ISystem {
-        private static readonly Type[] WriteParams = { typeof(BinaryPackWriter).MakeByRefType() };
-        private static readonly Type[] ReadParams = { typeof(BinaryPackReader).MakeByRefType(), typeof(byte) };
-
-        internal static readonly Guid TypeGuid = typeof(T).GuidFromAQN();
-
-        internal static bool HasUpdate() {
-            return HasMethod(typeof(T), nameof(ISystem.Update), Array.Empty<Type>());
-        }
-
-        internal static bool HasInit() {
-            return HasMethod(typeof(T), nameof(ISystem.Init), Array.Empty<Type>());
-        }
-
-        internal static bool HasDestroy() {
-            return HasMethod(typeof(T), nameof(ISystem.Destroy), Array.Empty<Type>());
-        }
-
-        internal static bool HasUpdateIsActive() {
-            return HasMethod(typeof(T), nameof(ISystem.UpdateIsActive), Array.Empty<Type>());
-        }
-
-        internal static bool HasWrite() {
-            return HasMethod(typeof(T), nameof(ISystem.Write), WriteParams);
-        }
-
-        internal static bool HasRead() {
-            return HasMethod(typeof(T), nameof(ISystem.Read), ReadParams);
-        }
-
-        private static bool HasMethod(
-            #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods)]
-            #endif
-            Type structType, string methodName, Type[] parameterTypes) {
-            return structType.GetMethod(
-                methodName,
-                BindingFlags.Instance | BindingFlags.Public,
-                binder: null,
-                types: parameterTypes,
-                modifiers: null
-            ) != null;
-        }
-    }
 
     /// <summary>
     /// Type-erased handle for accessing the resources of a specific

@@ -3511,54 +3511,69 @@ namespace FFS.Libraries.StaticEcs {
             #endif
             [MethodImpl(AggressiveInlining)]
             internal void RegisterComponentOrTagTypeInternal<T>(ComponentTypeConfig<T> typeConfig, bool isTag, bool nonSerializable, string typeName) where T : struct, IComponentOrTag {
-                typeConfig = isTag
-                    ? typeConfig.MergeWith(ComponentTypeConfig<T>.DefaultTag)
-                    : typeConfig.MergeWith(ComponentTypeConfig<T>.DefaultComponent);
-
+                var guid = typeConfig.Guid ?? typeof(T).GuidFromAQN();
                 #if FFS_ECS_DEBUG
-                AssertNotRegisteredComponent<T>(WorldTypeName);
-                AssertGuidNotEmpty<T>(WorldTypeName, typeConfig.Guid.Value);
+                AssertGuidNotEmpty(WorldTypeName, guid, typeName);
                 #endif
+
+                var storage = new Components<T>(_poolsCountComponents, guid, typeConfig.Version ?? 0, typeConfig.NoDataLifecycle ?? false, isTag ? null : typeConfig.ReadWriteStrategy, typeConfig.DefaultValue.HasValue, typeConfig.DefaultValue ?? default, isTag, nonSerializable, typeName);
+                StoreComponentStorage(in storage, guid, nonSerializable, typeName);
+            }
+
+            #if NET5_0_OR_GREATER
+            [UnconditionalSuppressMessage("AOT", "IL2091", Justification = "Component/tag metadata is preserved by the registration path and DynamicDependency on RegisterAll.")]
+            #endif
+            [MethodImpl(AggressiveInlining)]
+            internal void RegisterDefaultComponentOrTagTypeInternal<T>(bool isTag, bool nonSerializable, string typeName) where T : struct, IComponentOrTag {
+                var guid = typeof(T).GuidFromAQN();
+                #if FFS_ECS_DEBUG
+                AssertGuidNotEmpty(WorldTypeName, guid, typeName);
+                #endif
+
+                var storage = new Components<T>(_poolsCountComponents, guid, 0, false, null, false, default, isTag, nonSerializable, typeName);
+                StoreComponentStorage(in storage, guid, nonSerializable, typeName);
+            }
+
+            [MethodImpl(AggressiveInlining)]
+            private void StoreComponentStorage<T>(in Components<T> storage, Guid guid, bool nonSerializable, string typeName) where T : struct, IComponentOrTag {
+                var tracking = storage.TrackAdded || storage.TrackDeleted
+                    #if !FFS_ECS_DISABLE_CHANGED_TRACKING
+                    || storage.TrackChanged
+                    #endif
+                ;
+                #if FFS_ECS_DEBUG
+                Components<T>.instance = storage;
+                #else
+                Components<T>.Instance = storage;
+                #endif
+                Components<T>.Handle = ComponentsHandle.Create<TWorld, T>();
+                RegisterComponentPool(Components<T>.Handle, guid, nonSerializable, tracking, typeName);
+            }
+
+            private void RegisterComponentPool(ComponentsHandle handle, Guid guid, bool nonSerializable, bool tracking, string typeName) {
+                if (_componentPoolByGuid.ContainsKey(guid)) {
+                    throw new StaticEcsException($"Type {typeName} with guid {guid} already registered");
+                }
 
                 if (_poolsCountComponents == _poolsComponents.Length) {
                     Array.Resize(ref _poolsComponents, _poolsCountComponents << 1);
                     Array.Resize(ref _guidsComponents, _poolsCountComponents << 1);
                 }
 
-                #if FFS_ECS_DEBUG
-                Components<T>.instance = new Components<T>(_poolsCountComponents, typeConfig, isTag, nonSerializable, typeName);
-                #else
-                Components<T>.Instance = new Components<T>(_poolsCountComponents, typeConfig, isTag, nonSerializable, typeName);
-                #endif
-                Components<T>.Handle = ComponentsHandle.Create<TWorld, T>();
-                _poolsComponents[_poolsCountComponents] = Components<T>.Handle;
-                _guidsComponents[_poolsCountComponents++] = typeConfig.Guid!.Value;
+                _poolsComponents[_poolsCountComponents] = handle;
+                _guidsComponents[_poolsCountComponents++] = guid;
                 if (!nonSerializable) {
                     _poolsCountSerializableComponents++;
                 }
 
-                #if FFS_ECS_DEBUG
-                ref var registeredComponents = ref Components<T>.instance;
-                #else
-                ref var registeredComponents = ref Components<T>.Instance;
-                #endif
-                if (registeredComponents.TrackAdded || registeredComponents.TrackDeleted
-                    #if !FFS_ECS_DISABLE_CHANGED_TRACKING
-                    || registeredComponents.TrackChanged
-                    #endif
-                    ) {
+                if (tracking) {
                     if (_trackingComponentIndicesCount == _trackingComponentIndices.Length) {
                         Array.Resize(ref _trackingComponentIndices, _trackingComponentIndicesCount << 1);
                     }
                     _trackingComponentIndices[_trackingComponentIndicesCount++] = (ushort)(_poolsCountComponents - 1);
                 }
 
-                var guid = typeConfig.Guid.Value;
-                if (_componentPoolByGuid.ContainsKey(guid)) {
-                    throw new StaticEcsException($"Type {typeof(T)} with guid {guid} already registered");
-                }
-
-                _componentPoolByGuid[guid] = Components<T>.Handle;
+                _componentPoolByGuid[guid] = handle;
             }
 
             [MethodImpl(AggressiveInlining)]
@@ -3710,7 +3725,7 @@ namespace FFS.Libraries.StaticEcs {
                 var typeConfig = config.MergeWith(EventTypeConfig<T>.Default);
 
                 #if FFS_ECS_DEBUG
-                AssertGuidNotEmpty<T>(WorldTypeName, typeConfig.Guid.Value);
+                AssertGuidNotEmpty(WorldTypeName, typeConfig.Guid.Value, typeof(T).GenericName());
                 #endif
 
                 Events<T>.Instance = new Events<T>(_poolsCountEvents, typeConfig, nonSerializable);

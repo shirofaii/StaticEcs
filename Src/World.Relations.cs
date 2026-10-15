@@ -169,9 +169,9 @@ namespace FFS.Libraries.StaticEcs {
                 _value = reader.ReadEntityGID();
             }
 
-            bool IComponentHookOverride.HasOnAdd() => LinkType<TLinkType>.HasOnAdd();
-            bool IComponentHookOverride.HasOnDelete() => LinkType<TLinkType>.HasOnDelete();
-            bool IComponentHookOverride.HasCopyTo() => LinkType<TLinkType>.HasCopyTo();
+            bool IComponentHookOverride.HasOnAdd() => TypeHooks.LinkHasOnAdd(typeof(TLinkType));
+            bool IComponentHookOverride.HasOnDelete() => TypeHooks.LinkHasOnDelete(typeof(TLinkType));
+            bool IComponentHookOverride.HasCopyTo() => TypeHooks.LinkHasCopyTo(typeof(TLinkType));
 
             EntityGID ILinkComponent.Value => _value;
             void ILinkComponent.SetValue(EntityGID gid) => _value = gid;
@@ -1132,7 +1132,7 @@ namespace FFS.Libraries.StaticEcs {
             void IComponentInternal.OnInitialize<TW>() {
                 ref var storage = ref World<TW>.ResourcesData<TW>.Instance.GetOrCreate<MultiValueStorage<Link<TLinkType>>>(out var isNew);
                 if (isNew) {
-                    storage.Init(Data.Instance.EntitiesSegments.Length, LinkType<TLinkType>.HasOnAdd(), LinkType<TLinkType>.HasOnDelete(), LinkType<TLinkType>.HasCopyTo(), false, false);
+                    storage.Init(Data.Instance.EntitiesSegments.Length, TypeHooks.LinkHasOnAdd(typeof(TLinkType)), TypeHooks.LinkHasOnDelete(typeof(TLinkType)), TypeHooks.LinkHasCopyTo(typeof(TLinkType)), false, false);
                     storage.ElementStrategy = new UnmanagedPackArrayStrategy<Link<TLinkType>>();
                     World<TW>.Data.Instance.RegisterMultiStorageResizer(_ResizeStorage);
                 }
@@ -1650,60 +1650,4 @@ namespace FFS.Libraries.StaticEcs {
         #endif
     }
 
-    internal static class LinkType<
-        #if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)]
-        #endif
-        T> where T : unmanaged, ILinkType {
-        private static readonly Type[] OnAddParams = {
-            typeof(World<>.Entity),
-            typeof(EntityGID)
-        };
-        private static readonly Type[] OnDeleteParams = {
-            typeof(World<>.Entity),
-            typeof(EntityGID),
-            typeof(HookReason)
-        };
-        private static readonly Type[] CopyToParams = {
-            typeof(World<>.Entity),
-            typeof(World<>.Entity),
-            typeof(EntityGID)
-        };
-
-        internal static bool HasOnAdd() {
-            return HasMethod(typeof(T), nameof(ILinkType.OnAdd), OnAddParams);
-        }
-        
-        internal static bool HasOnDelete() {
-            return HasMethod(typeof(T), nameof(ILinkType.OnDelete), OnDeleteParams);
-        }
-        
-        internal static bool HasCopyTo() {
-            return HasMethod(typeof(T), nameof(ILinkType.CopyTo), CopyToParams);
-        }
-        
-        private static bool HasMethod(
-            #if NET5_0_OR_GREATER
-            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods)]
-            #endif
-            Type structType, string methodName, Type[] parameterTypes) {
-            var methods = structType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly);
-            foreach (var methodInfo in methods) {
-                if (methodInfo.Name == methodName && methodInfo.IsGenericMethodDefinition) {
-                    var parameters = methodInfo.GetParameters();
-                    if (parameters.Length == parameterTypes.Length) {
-                        var match = true;
-                        for (var i = 0; i < parameters.Length; i++) {
-                            if (parameterTypes[i].Name != parameters[i].ParameterType.Name) {
-                                match = false;
-                                break;
-                            }
-                        }
-                        if (match) return true;
-                    }
-                }
-            }
-            return false;
-        }
-    }
 }
