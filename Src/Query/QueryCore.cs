@@ -16,7 +16,7 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
-    public abstract partial class World<TWorld> {
+    public abstract partial class World {
         #region PREPARE AND DISPOSE
         [SuppressMessage("ReSharper", "PossibleNullReferenceException")]
         [MethodImpl(NoInlining)]
@@ -328,7 +328,7 @@ namespace FFS.Libraries.StaticEcs {
                             if (entitiesMask != 0) {
                                 #if FFS_ECS_DEBUG
                                 if (found) {
-                                    throw new StaticEcsException($"World<{typeof(TWorld)}> query One() found more than one entity");
+                                    throw new StaticEcsException($"World query One() found more than one entity");
                                 }
                                 #endif
 
@@ -342,7 +342,7 @@ namespace FFS.Libraries.StaticEcs {
                                 #if FFS_ECS_DEBUG
                                 if (assertSingle) {
                                     if ((entitiesMask & (entitiesMask - 1)) != 0) {
-                                        throw new StaticEcsException($"World<{typeof(TWorld)}> query One() found more than one entity");
+                                        throw new StaticEcsException($"World query One() found more than one entity");
                                     }
                                     found = true;
                                     continue;

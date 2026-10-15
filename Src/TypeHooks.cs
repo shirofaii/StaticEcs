@@ -49,15 +49,15 @@ namespace FFS.Libraries.StaticEcs {
                 ComponentHasWrite(type), ComponentHasRead(type), probe is IDisableable, probe is IComponentInternal);
         }
 
-        private static readonly Type[] ComponentOnAddParams = { typeof(World<>.Entity) };
-        private static readonly Type[] ComponentOnDeleteParams = { typeof(World<>.Entity), typeof(HookReason) };
-        private static readonly Type[] ComponentCopyToParams = { typeof(World<>.Entity), typeof(World<>.Entity), typeof(bool) };
-        private static readonly Type[] ComponentWriteParams = { typeof(BinaryPackWriter).MakeByRefType(), typeof(World<>.Entity) };
-        private static readonly Type[] ComponentReadParams = { typeof(BinaryPackReader).MakeByRefType(), typeof(World<>.Entity), typeof(byte), typeof(bool) };
+        private static readonly Type[] ComponentOnAddParams = { typeof(World.Entity) };
+        private static readonly Type[] ComponentOnDeleteParams = { typeof(World.Entity), typeof(HookReason) };
+        private static readonly Type[] ComponentCopyToParams = { typeof(World.Entity), typeof(World.Entity), typeof(bool) };
+        private static readonly Type[] ComponentWriteParams = { typeof(BinaryPackWriter).MakeByRefType(), typeof(World.Entity) };
+        private static readonly Type[] ComponentReadParams = { typeof(BinaryPackReader).MakeByRefType(), typeof(World.Entity), typeof(byte), typeof(bool) };
 
-        private static readonly Type[] LinkOnAddParams = { typeof(World<>.Entity), typeof(EntityGID) };
-        private static readonly Type[] LinkOnDeleteParams = { typeof(World<>.Entity), typeof(EntityGID), typeof(HookReason) };
-        private static readonly Type[] LinkCopyToParams = { typeof(World<>.Entity), typeof(World<>.Entity), typeof(EntityGID) };
+        private static readonly Type[] LinkOnAddParams = { typeof(World.Entity), typeof(EntityGID) };
+        private static readonly Type[] LinkOnDeleteParams = { typeof(World.Entity), typeof(EntityGID), typeof(HookReason) };
+        private static readonly Type[] LinkCopyToParams = { typeof(World.Entity), typeof(World.Entity), typeof(EntityGID) };
 
         private static readonly Type[] MultiWriteParams = { typeof(BinaryPackWriter).MakeByRefType() };
         private static readonly Type[] MultiReadParams = { typeof(BinaryPackReader).MakeByRefType() };
@@ -65,15 +65,15 @@ namespace FFS.Libraries.StaticEcs {
         private static readonly Type[] SystemWriteParams = { typeof(BinaryPackWriter).MakeByRefType() };
         private static readonly Type[] SystemReadParams = { typeof(BinaryPackReader).MakeByRefType(), typeof(byte) };
 
-        internal static bool ComponentHasOnAdd(Type type) => HasMethod(type, nameof(IComponentOrTag.OnAdd), ComponentOnAddParams, true);
-        internal static bool ComponentHasOnDelete(Type type) => HasMethod(type, nameof(IComponentOrTag.OnDelete), ComponentOnDeleteParams, true);
-        internal static bool ComponentHasCopyTo(Type type) => HasMethod(type, nameof(IComponentOrTag.CopyTo), ComponentCopyToParams, true);
-        internal static bool ComponentHasWrite(Type type) => HasMethod(type, nameof(IComponentOrTag.Write), ComponentWriteParams, true);
-        internal static bool ComponentHasRead(Type type) => HasMethod(type, nameof(IComponentOrTag.Read), ComponentReadParams, true);
+        internal static bool ComponentHasOnAdd(Type type) => HasMethod(type, nameof(IComponentOrTag.OnAdd), ComponentOnAddParams, false);
+        internal static bool ComponentHasOnDelete(Type type) => HasMethod(type, nameof(IComponentOrTag.OnDelete), ComponentOnDeleteParams, false);
+        internal static bool ComponentHasCopyTo(Type type) => HasMethod(type, nameof(IComponentOrTag.CopyTo), ComponentCopyToParams, false);
+        internal static bool ComponentHasWrite(Type type) => HasMethod(type, nameof(IComponentOrTag.Write), ComponentWriteParams, false);
+        internal static bool ComponentHasRead(Type type) => HasMethod(type, nameof(IComponentOrTag.Read), ComponentReadParams, false);
 
-        internal static bool LinkHasOnAdd(Type type) => HasMethod(type, nameof(ILinkType.OnAdd), LinkOnAddParams, true);
-        internal static bool LinkHasOnDelete(Type type) => HasMethod(type, nameof(ILinkType.OnDelete), LinkOnDeleteParams, true);
-        internal static bool LinkHasCopyTo(Type type) => HasMethod(type, nameof(ILinkType.CopyTo), LinkCopyToParams, true);
+        internal static bool LinkHasOnAdd(Type type) => HasMethod(type, nameof(ILinkType.OnAdd), LinkOnAddParams, false);
+        internal static bool LinkHasOnDelete(Type type) => HasMethod(type, nameof(ILinkType.OnDelete), LinkOnDeleteParams, false);
+        internal static bool LinkHasCopyTo(Type type) => HasMethod(type, nameof(ILinkType.CopyTo), LinkCopyToParams, false);
 
         internal static bool MultiHasWrite(Type type) => HasMethod(type, nameof(IMultiComponent.Write), MultiWriteParams, false);
         internal static bool MultiHasRead(Type type) => HasMethod(type, nameof(IMultiComponent.Read), MultiReadParams, false);

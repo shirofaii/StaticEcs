@@ -4,12 +4,12 @@ namespace FFS.Libraries.StaticEcs.Tests {
     public struct EveryNth : IQueryFilter {
         public ulong Pattern;
 
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType => ulong.MaxValue;
+        public ulong FilterChunk(uint chunkIdx) => ulong.MaxValue;
 
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType => Pattern;
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) => Pattern;
 
         #if DEBUG
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType { }
+        public void Block(int val) { }
         #endif
     }
 

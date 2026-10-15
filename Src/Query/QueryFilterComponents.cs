@@ -47,19 +47,19 @@ namespace FFS.Libraries.StaticEcs {
         where T0 : struct, IComponentOrTag {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return World.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
+            return World.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType {
-            World<TWorld>.Components<T0>.Instance.BlockDeleteDisable(val);
+        public void Block(int val) {
+            World.Components<T0>.Instance.BlockDeleteDisable(val);
         }
         #endif
 
@@ -78,22 +78,22 @@ namespace FFS.Libraries.StaticEcs {
         where T1 : struct, IComponentOrTag {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return World.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
+            return World.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType {
-            World<TWorld>.Components<T0>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T1>.Instance.BlockDeleteDisable(val);
+        public void Block(int val) {
+            World.Components<T0>.Instance.BlockDeleteDisable(val);
+            World.Components<T1>.Instance.BlockDeleteDisable(val);
         }
         #endif
 
@@ -113,25 +113,25 @@ namespace FFS.Libraries.StaticEcs {
         where T2 : struct, IComponentOrTag {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return World.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
+            return World.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType {
-            World<TWorld>.Components<T0>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T1>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T2>.Instance.BlockDeleteDisable(val);
+        public void Block(int val) {
+            World.Components<T0>.Instance.BlockDeleteDisable(val);
+            World.Components<T1>.Instance.BlockDeleteDisable(val);
+            World.Components<T2>.Instance.BlockDeleteDisable(val);
         }
         #endif
 
@@ -152,28 +152,28 @@ namespace FFS.Libraries.StaticEcs {
         where T3 : struct, IComponentOrTag {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return World.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
+            return World.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType {
-            World<TWorld>.Components<T0>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T1>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T2>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T3>.Instance.BlockDeleteDisable(val);
+        public void Block(int val) {
+            World.Components<T0>.Instance.BlockDeleteDisable(val);
+            World.Components<T1>.Instance.BlockDeleteDisable(val);
+            World.Components<T2>.Instance.BlockDeleteDisable(val);
+            World.Components<T3>.Instance.BlockDeleteDisable(val);
         }
         #endif
 
@@ -195,31 +195,31 @@ namespace FFS.Libraries.StaticEcs {
         where T4 : struct, IComponentOrTag {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return World.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T4>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
+            return World.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T4>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType {
-            World<TWorld>.Components<T0>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T1>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T2>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T3>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T4>.Instance.BlockDeleteDisable(val);
+        public void Block(int val) {
+            World.Components<T0>.Instance.BlockDeleteDisable(val);
+            World.Components<T1>.Instance.BlockDeleteDisable(val);
+            World.Components<T2>.Instance.BlockDeleteDisable(val);
+            World.Components<T3>.Instance.BlockDeleteDisable(val);
+            World.Components<T4>.Instance.BlockDeleteDisable(val);
         }
         #endif
 
@@ -242,34 +242,34 @@ namespace FFS.Libraries.StaticEcs {
         where T5 : struct, IComponentOrTag {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return World.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T4>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T5>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
+            return World.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T4>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T5>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType {
-            World<TWorld>.Components<T0>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T1>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T2>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T3>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T4>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T5>.Instance.BlockDeleteDisable(val);
+        public void Block(int val) {
+            World.Components<T0>.Instance.BlockDeleteDisable(val);
+            World.Components<T1>.Instance.BlockDeleteDisable(val);
+            World.Components<T2>.Instance.BlockDeleteDisable(val);
+            World.Components<T3>.Instance.BlockDeleteDisable(val);
+            World.Components<T4>.Instance.BlockDeleteDisable(val);
+            World.Components<T5>.Instance.BlockDeleteDisable(val);
         }
         #endif
 
@@ -293,37 +293,37 @@ namespace FFS.Libraries.StaticEcs {
         where T6 : struct, IComponentOrTag {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T6>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return World.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T6>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T4>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T5>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T6>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
+            return World.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T4>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T5>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T6>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType {
-            World<TWorld>.Components<T0>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T1>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T2>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T3>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T4>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T5>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T6>.Instance.BlockDeleteDisable(val);
+        public void Block(int val) {
+            World.Components<T0>.Instance.BlockDeleteDisable(val);
+            World.Components<T1>.Instance.BlockDeleteDisable(val);
+            World.Components<T2>.Instance.BlockDeleteDisable(val);
+            World.Components<T3>.Instance.BlockDeleteDisable(val);
+            World.Components<T4>.Instance.BlockDeleteDisable(val);
+            World.Components<T5>.Instance.BlockDeleteDisable(val);
+            World.Components<T6>.Instance.BlockDeleteDisable(val);
         }
         #endif
 
@@ -348,40 +348,40 @@ namespace FFS.Libraries.StaticEcs {
         where T7 : struct, IComponentOrTag {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T6>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
-                         & World<TWorld>.Components<T7>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return World.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T6>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value
+                         & World.Components<T7>.Instance.Masks.HeuristicChunks[chunkIdx].NotEmptyBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T4>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T5>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T6>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & World<TWorld>.Components<T7>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
+            return World.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T4>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T5>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T6>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & World.Components<T7>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType {
-            World<TWorld>.Components<T0>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T1>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T2>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T3>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T4>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T5>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T6>.Instance.BlockDeleteDisable(val);
-            World<TWorld>.Components<T7>.Instance.BlockDeleteDisable(val);
+        public void Block(int val) {
+            World.Components<T0>.Instance.BlockDeleteDisable(val);
+            World.Components<T1>.Instance.BlockDeleteDisable(val);
+            World.Components<T2>.Instance.BlockDeleteDisable(val);
+            World.Components<T3>.Instance.BlockDeleteDisable(val);
+            World.Components<T4>.Instance.BlockDeleteDisable(val);
+            World.Components<T5>.Instance.BlockDeleteDisable(val);
+            World.Components<T6>.Instance.BlockDeleteDisable(val);
+            World.Components<T7>.Instance.BlockDeleteDisable(val);
         }
         #endif
 
@@ -415,19 +415,19 @@ namespace FFS.Libraries.StaticEcs {
         where T0 : struct, IComponentOrTag {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return ~World.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
+            return ~World.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType {
-            World<TWorld>.Components<T0>.Instance.BlockAddEnable(val);
+        public void Block(int val) {
+            World.Components<T0>.Instance.BlockAddEnable(val);
         }
         #endif
 
@@ -446,22 +446,22 @@ namespace FFS.Libraries.StaticEcs {
         where T1 : struct, IComponentOrTag {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return ~World.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
+            return ~World.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType {
-            World<TWorld>.Components<T0>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T1>.Instance.BlockAddEnable(val);
+        public void Block(int val) {
+            World.Components<T0>.Instance.BlockAddEnable(val);
+            World.Components<T1>.Instance.BlockAddEnable(val);
         }
         #endif
 
@@ -481,25 +481,25 @@ namespace FFS.Libraries.StaticEcs {
         where T2 : struct, IComponentOrTag {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return ~World.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
+            return ~World.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType {
-            World<TWorld>.Components<T0>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T1>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T2>.Instance.BlockAddEnable(val);
+        public void Block(int val) {
+            World.Components<T0>.Instance.BlockAddEnable(val);
+            World.Components<T1>.Instance.BlockAddEnable(val);
+            World.Components<T2>.Instance.BlockAddEnable(val);
         }
         #endif
 
@@ -520,28 +520,28 @@ namespace FFS.Libraries.StaticEcs {
         where T3 : struct, IComponentOrTag {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return ~World.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
+            return ~World.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType {
-            World<TWorld>.Components<T0>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T1>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T2>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T3>.Instance.BlockAddEnable(val);
+        public void Block(int val) {
+            World.Components<T0>.Instance.BlockAddEnable(val);
+            World.Components<T1>.Instance.BlockAddEnable(val);
+            World.Components<T2>.Instance.BlockAddEnable(val);
+            World.Components<T3>.Instance.BlockAddEnable(val);
         }
         #endif
 
@@ -563,31 +563,31 @@ namespace FFS.Libraries.StaticEcs {
         where T4 : struct, IComponentOrTag {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return ~World.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T4>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
+            return ~World.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T4>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType {
-            World<TWorld>.Components<T0>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T1>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T2>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T3>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T4>.Instance.BlockAddEnable(val);
+        public void Block(int val) {
+            World.Components<T0>.Instance.BlockAddEnable(val);
+            World.Components<T1>.Instance.BlockAddEnable(val);
+            World.Components<T2>.Instance.BlockAddEnable(val);
+            World.Components<T3>.Instance.BlockAddEnable(val);
+            World.Components<T4>.Instance.BlockAddEnable(val);
         }
         #endif
 
@@ -610,34 +610,34 @@ namespace FFS.Libraries.StaticEcs {
         where T5 : struct, IComponentOrTag {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return ~World.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T4>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T5>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
+            return ~World.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T4>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T5>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType {
-            World<TWorld>.Components<T0>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T1>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T2>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T3>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T4>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T5>.Instance.BlockAddEnable(val);
+        public void Block(int val) {
+            World.Components<T0>.Instance.BlockAddEnable(val);
+            World.Components<T1>.Instance.BlockAddEnable(val);
+            World.Components<T2>.Instance.BlockAddEnable(val);
+            World.Components<T3>.Instance.BlockAddEnable(val);
+            World.Components<T4>.Instance.BlockAddEnable(val);
+            World.Components<T5>.Instance.BlockAddEnable(val);
         }
         #endif
 
@@ -661,37 +661,37 @@ namespace FFS.Libraries.StaticEcs {
         where T6 : struct, IComponentOrTag {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T6>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return ~World.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T6>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T4>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T5>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T6>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
+            return ~World.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T4>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T5>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T6>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType {
-            World<TWorld>.Components<T0>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T1>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T2>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T3>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T4>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T5>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T6>.Instance.BlockAddEnable(val);
+        public void Block(int val) {
+            World.Components<T0>.Instance.BlockAddEnable(val);
+            World.Components<T1>.Instance.BlockAddEnable(val);
+            World.Components<T2>.Instance.BlockAddEnable(val);
+            World.Components<T3>.Instance.BlockAddEnable(val);
+            World.Components<T4>.Instance.BlockAddEnable(val);
+            World.Components<T5>.Instance.BlockAddEnable(val);
+            World.Components<T6>.Instance.BlockAddEnable(val);
         }
         #endif
 
@@ -716,40 +716,40 @@ namespace FFS.Libraries.StaticEcs {
         where T7 : struct, IComponentOrTag {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T6>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
-                         & ~World<TWorld>.Components<T7>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return ~World.Components<T0>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T1>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T2>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T3>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T4>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T5>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T6>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value
+                         & ~World.Components<T7>.Instance.Masks.HeuristicChunks[chunkIdx].FullBlocks.Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
-            return ~World<TWorld>.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T4>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T5>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T6>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
-                            & ~World<TWorld>.Components<T7>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
+            return ~World.Components<T0>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T1>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T2>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T3>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T4>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T5>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T6>.Instance.EnabledMask(segmentIdx, segmentBlockIdx)
+                            & ~World.Components<T7>.Instance.EnabledMask(segmentIdx, segmentBlockIdx);
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType {
-            World<TWorld>.Components<T0>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T1>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T2>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T3>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T4>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T5>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T6>.Instance.BlockAddEnable(val);
-            World<TWorld>.Components<T7>.Instance.BlockAddEnable(val);
+        public void Block(int val) {
+            World.Components<T0>.Instance.BlockAddEnable(val);
+            World.Components<T1>.Instance.BlockAddEnable(val);
+            World.Components<T2>.Instance.BlockAddEnable(val);
+            World.Components<T3>.Instance.BlockAddEnable(val);
+            World.Components<T4>.Instance.BlockAddEnable(val);
+            World.Components<T5>.Instance.BlockAddEnable(val);
+            World.Components<T6>.Instance.BlockAddEnable(val);
+            World.Components<T7>.Instance.BlockAddEnable(val);
         }
         #endif
 

@@ -19,7 +19,7 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
-    public abstract partial class World<TWorld> {
+    public abstract partial class World {
         #if ENABLE_IL2CPP
         [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
         [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
@@ -226,7 +226,7 @@ namespace FFS.Libraries.StaticEcs {
 
             [MethodImpl(AggressiveInlining)]
             internal void WriteEntitySnapshotData(ref BinaryPackWriter writer,
-                                                  CustomSnapshotEntityDataWriter<TWorld> snapshotDataEntityWriter,
+                                                  CustomSnapshotEntityDataWriter snapshotDataEntityWriter,
                                                   SnapshotWriteParams snapshotParams,
                                                   ReadOnlySpan<uint> chunks,
                                                   EntityStatusType entities) {
@@ -272,7 +272,7 @@ namespace FFS.Libraries.StaticEcs {
 
             [MethodImpl(AggressiveInlining)]
             internal void ReadEntitySnapshotData(ref BinaryPackReader reader,
-                                                 CustomSnapshotEntityDataReader<TWorld> snapshotDataEntityReader,
+                                                 CustomSnapshotEntityDataReader snapshotDataEntityReader,
                                                  ushort version,
                                                  SnapshotReadParams snapshotParams,
                                                  ReadOnlySpan<uint> chunks,

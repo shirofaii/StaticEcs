@@ -179,7 +179,7 @@ namespace FFS.Libraries.StaticEcs {
 
         /// <summary>
         /// Offset added to raw entity slot indices so that a default-initialized (zeroed)
-        /// <see cref="World{TWorld}.Entity"/> is never a valid handle. Value: 1.
+        /// <see cref="World.Entity"/> is never a valid handle. Value: 1.
         /// </summary>
         public const int ENTITY_ID_OFFSET = 1;
 
@@ -292,10 +292,10 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
-    public abstract partial class World<TWorld> {
+    public abstract partial class World {
 
-        internal static readonly string WorldTypeName = $"World<{typeof(TWorld)}>"; 
-        internal static readonly string EntityTypeName = $"World<{typeof(TWorld)}>.Entity"; 
+        internal const string WorldTypeName = "World";
+        internal const string EntityTypeName = "World.Entity"; 
 
         [MethodImpl(AggressiveInlining)]
         internal static void Assert(string type, bool state, string message, [CallerMemberName] string method = "") {
@@ -318,30 +318,6 @@ namespace FFS.Libraries.StaticEcs {
         private static void AssertWorldIsInitializedFailed(string type, string method) {
             if (Data.Instance.WorldStatus != WorldStatus.Initialized) {
                 throw new StaticEcsException(type, method, "World not initialized.");
-            }
-        }
-        
-        [MethodImpl(AggressiveInlining)]
-        internal static void AssertWorldIsIndependent(string type, [CallerMemberName] string method = "") {
-            if (!IsIndependent) AssertWorldIsIndependentFailed(type, method);
-        }
-
-        [MethodImpl(NoInlining)]
-        private static void AssertWorldIsIndependentFailed(string type, string method) {
-            if (!IsIndependent) {
-                throw new StaticEcsException(type, method, "World not Independent.");
-            }
-        }
-        
-        [MethodImpl(AggressiveInlining)]
-        internal static void AssertWorldIsDependent(string type, [CallerMemberName] string method = "") {
-            if (IsIndependent) AssertWorldIsDependentFailed(type, method);
-        }
-
-        [MethodImpl(NoInlining)]
-        private static void AssertWorldIsDependentFailed(string type, string method) {
-            if (IsIndependent) {
-                throw new StaticEcsException(type, method, "World not Dependent.");
             }
         }
         
@@ -547,36 +523,36 @@ namespace FFS.Libraries.StaticEcs {
         
         [MethodImpl(AggressiveInlining)]
         internal static void AssertGidIsActive(string type, EntityGID gid, [CallerMemberName] string method = "") {
-            if (gid.Status<TWorld>() != GIDStatus.Active) AssertGidIsActiveFailed(type, gid, method);
+            if (gid.Status() != GIDStatus.Active) AssertGidIsActiveFailed(type, gid, method);
         }
 
         [MethodImpl(NoInlining)]
         private static void AssertGidIsActiveFailed(string type, EntityGID gid, string method) {
-            if (gid.Status<TWorld>() != GIDStatus.Active) {
+            if (gid.Status() != GIDStatus.Active) {
                 throw new StaticEcsException(type, method, $"EntityGID ID: {gid.Id}, Version {gid.Version}, ClusterId {gid.ClusterId}. Not actual or not loaded.");
             }
         }
         
         [MethodImpl(AggressiveInlining)]
         internal static void AssertGidIsNotActive(string type, EntityGID gid, [CallerMemberName] string method = "") {
-            if (gid.Status<TWorld>() == GIDStatus.Active) AssertGidIsNotActiveFailed(type, gid, method);
+            if (gid.Status() == GIDStatus.Active) AssertGidIsNotActiveFailed(type, gid, method);
         }
 
         [MethodImpl(NoInlining)]
         private static void AssertGidIsNotActiveFailed(string type, EntityGID gid, string method) {
-            if (gid.Status<TWorld>() == GIDStatus.Active) {
+            if (gid.Status() == GIDStatus.Active) {
                 throw new StaticEcsException(type, method, $"EntityGID ID: {gid.Id}, Version {gid.Version}, ClusterId {gid.ClusterId}. Already registered.");
             }
         }
         
         [MethodImpl(AggressiveInlining)]
         internal static void AssertGidIsNotLoaded(string type, EntityGID gid, [CallerMemberName] string method = "") {
-            if (gid.Status<TWorld>() != GIDStatus.NotLoaded) AssertGidIsNotLoadedFailed(type, gid, method);
+            if (gid.Status() != GIDStatus.NotLoaded) AssertGidIsNotLoadedFailed(type, gid, method);
         }
 
         [MethodImpl(NoInlining)]
         private static void AssertGidIsNotLoadedFailed(string type, EntityGID gid, string method) {
-            if (gid.Status<TWorld>() != GIDStatus.NotLoaded) {
+            if (gid.Status() != GIDStatus.NotLoaded) {
                 throw new StaticEcsException(type, method, $"EntityGID ID: {gid.Id}, Version {gid.Version}, ClusterId {gid.ClusterId}. Not actual or already loaded.");
             }
         }
@@ -850,7 +826,7 @@ namespace FFS.Libraries.StaticEcs {
     /// <summary>
     /// Reflection-based auto-discovery and registration of all ECS types in specified assemblies.
     /// Scans for value types (structs) implementing ECS marker interfaces and registers them
-    /// with the target <c>World&lt;TWorld&gt;</c> using default configuration.
+    /// with the target <c>World</c> using default configuration.
     /// <para>
     /// <b>Detected interfaces and registration behavior:</b>
     /// <list type="bullet">
@@ -870,7 +846,7 @@ namespace FFS.Libraries.StaticEcs {
     /// <item>Abstract types and open generic definitions are skipped.</item>
     /// <item>All types are registered with default configuration (no custom GUID, no custom serialization).</item>
     /// <item>A single type implementing multiple interfaces will be registered for each applicable one.</item>
-    /// <item>The fluent wrapper <c>World&lt;TWorld&gt;.Types().RegisterAll()</c> (without arguments) defaults to <c>typeof(TWorld).Assembly</c>. This method itself does not default — pass assemblies explicitly.</item>
+    /// <item>The fluent wrapper <c>World.Types().RegisterAll()</c> (without arguments) defaults to <c>typeof(World).Assembly</c>. This method itself does not default — pass assemblies explicitly.</item>
     /// </list>
     /// </para>
     /// <para>
@@ -879,25 +855,24 @@ namespace FFS.Libraries.StaticEcs {
     /// </summary>
     public static class AutoRegistration {
         /// <summary>
-        /// Scans the specified assemblies for all ECS types and registers them with <c>World&lt;TWorld&gt;</c>.
+        /// Scans the specified assemblies for all ECS types and registers them with <c>World</c>.
         /// See <see cref="AutoRegistration"/> class documentation for the full list of detected interfaces
         /// and registration behavior.
         /// </summary>
-        /// <typeparam name="TWorld">The world type to register types into.</typeparam>
         /// <param name="assemblies">
         /// Assemblies to scan. Must contain at least one assembly — this is the low-level entry point and does not
-        /// fall back to any default. For the ergonomic default (scan <c>typeof(TWorld).Assembly</c>), use the fluent
-        /// wrapper <c>World&lt;TWorld&gt;.Types().RegisterAll()</c> instead.
+        /// fall back to any default. For the ergonomic default (scan <c>typeof(World).Assembly</c>), use the fluent
+        /// wrapper <c>World.Types().RegisterAll()</c> instead.
         /// The StaticEcs framework assembly is always excluded.
         /// </param>
         #if NET5_0_OR_GREATER
-        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicMethods, typeof(World<>))]
-        [DynamicDependency(DynamicallyAccessedMemberTypes.NonPublicMethods, typeof(World<>))]
-        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicNestedTypes, typeof(World<>))]
-        [DynamicDependency(DynamicallyAccessedMemberTypes.NonPublicNestedTypes, typeof(World<>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicMethods, typeof(World))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.NonPublicMethods, typeof(World))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicNestedTypes, typeof(World))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.NonPublicNestedTypes, typeof(World))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, typeof(ComponentTypeConfig<>))]
         [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicMethods, typeof(TagTypeConfig<>))]
-        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicFields | DynamicallyAccessedMemberTypes.NonPublicFields, typeof(World<>.EntityTypeInfo<>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicFields | DynamicallyAccessedMemberTypes.NonPublicFields, typeof(World.EntityTypeInfo<>))]
         [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Types are preserved by static usage in consuming code.")]
         [UnconditionalSuppressMessage("Trimming", "IL2055", Justification = "Config types are preserved by DynamicDependency above.")]
         [UnconditionalSuppressMessage("Trimming", "IL2060", Justification = "Registration methods are preserved by DynamicDependency above.")]
@@ -909,10 +884,9 @@ namespace FFS.Libraries.StaticEcs {
         [UnconditionalSuppressMessage("Trimming", "IL2037", Justification = "Config types are preserved by DynamicDependency above.")]
         #endif
         [MethodImpl(NoInlining)]
-        public static void RegisterAll<TWorld>(params Assembly[] assemblies) where TWorld : struct, IWorldType {
+        public static void RegisterAll(params Assembly[] assemblies) {
             var ecsAssembly = typeof(IComponent).Assembly;
-            var worldType = typeof(World<TWorld>);
-            var tWorld = worldType.GetGenericArguments()[0];
+            var worldType = typeof(World);
 
             var componentsOpenType = worldType.GetNestedType("Components`1", BindingFlags.Public)
                                      ?? throw new StaticEcsException($"AutoRegistration: type Components`1 not found on {worldType.Name}");
@@ -932,27 +906,27 @@ namespace FFS.Libraries.StaticEcs {
                     if (!type.IsValueType || type.IsAbstract || type.IsGenericTypeDefinition) continue;
 
                     if (typeof(IComponent).IsAssignableFrom(type) && !typeof(IComponentInternal).IsAssignableFrom(type)) {
-                        GetAutoRegisterGenericMethod(type, componentsOpenType, tWorld).Invoke(null, new[] { (object)false });
+                        GetAutoRegisterGenericMethod(type, componentsOpenType).Invoke(null, new[] { (object)false });
                     }
 
                     if (typeof(ITag).IsAssignableFrom(type)) {
-                        GetAutoRegisterGenericMethod(type, componentsOpenType, tWorld).Invoke(null, new[] { (object)true });
+                        GetAutoRegisterGenericMethod(type, componentsOpenType).Invoke(null, new[] { (object)true });
                     }
 
                     if (typeof(IMultiComponent).IsAssignableFrom(type)) {
-                        GetAutoRegisterGenericMethod(type, multiOpenType, tWorld).Invoke(null, null);
+                        GetAutoRegisterGenericMethod(type, multiOpenType).Invoke(null, null);
                     }
 
                     if (typeof(ILinksType).IsAssignableFrom(type)) {
-                        GetAutoRegisterGenericMethod(type, linksOpenType, tWorld).Invoke(null, null);
+                        GetAutoRegisterGenericMethod(type, linksOpenType).Invoke(null, null);
                     }
                     else if (typeof(ILinkType).IsAssignableFrom(type)) {
-                        GetAutoRegisterGenericMethod(type, linkOpenType, tWorld).Invoke(null, null);
+                        GetAutoRegisterGenericMethod(type, linkOpenType).Invoke(null, null);
                     }
 
                     if (typeof(IEntityType).IsAssignableFrom(type) && type != typeof(Default)) {
                         try {
-                            GetAutoRegisterGenericMethod(type, entityTypeOpenType, tWorld).Invoke(null, null);
+                            GetAutoRegisterGenericMethod(type, entityTypeOpenType).Invoke(null, null);
                         }
                         catch (Exception) {
                             throw new StaticEcsException($"Failed to automatically register EntityType `{type.Name}`; please register it manually using `W.Types().EntityType<{type.Name}>()`");
@@ -974,8 +948,8 @@ namespace FFS.Libraries.StaticEcs {
             #if NET5_0_OR_GREATER
             [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods | DynamicallyAccessedMemberTypes.NonPublicMethods)]
             #endif
-            Type openType, Type tWorld) {
-            var genericType = openType.MakeGenericType(tWorld, type);
+            Type openType) {
+            var genericType = openType.MakeGenericType(type);
             return genericType.GetMethod("AutoRegister", BindingFlags.NonPublic | BindingFlags.Static)
                    ?? throw new StaticEcsException($"AutoRegistration: method AutoRegister not found on {genericType.Name}");
         }
@@ -1001,20 +975,19 @@ namespace FFS.Libraries.StaticEcs {
         }
 
         #if NET5_0_OR_GREATER
-        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, typeof(MultiUnmanagedPackArrayStrategy<,>))]
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor, typeof(MultiUnmanagedPackArrayStrategy<>))]
         [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Generic instantiation is pre-compiled because types are statically referenced in consuming code.")]
         [UnconditionalSuppressMessage("Trimming", "IL2055", Justification = "Types preserved by DynamicDependency above.")]
         #endif
-        internal static IPackArrayStrategy<World<TWorld>.Multi<TValue>> TryCreateUnmanagedMultiPackArrayStrategy<TWorld, TValue>() 
-            where TValue : struct, IMultiComponent 
-            where TWorld : struct, IWorldType {
+        internal static IPackArrayStrategy<World.Multi<TValue>> TryCreateUnmanagedMultiPackArrayStrategy<TValue>() 
+            where TValue : struct, IMultiComponent {
             if (RuntimeHelpers.IsReferenceOrContainsReferences<TValue>()) {
                 return null;
             }
             
             try {
-                var unmanagedPackStrategyType = typeof(MultiUnmanagedPackArrayStrategy<,>).MakeGenericType(typeof(TWorld), typeof(TValue));
-                return (IPackArrayStrategy<World<TWorld>.Multi<TValue>>)Activator.CreateInstance(unmanagedPackStrategyType);
+                var unmanagedPackStrategyType = typeof(MultiUnmanagedPackArrayStrategy<>).MakeGenericType(typeof(TValue));
+                return (IPackArrayStrategy<World.Multi<TValue>>)Activator.CreateInstance(unmanagedPackStrategyType);
             }
             catch (Exception) {
                 return null;

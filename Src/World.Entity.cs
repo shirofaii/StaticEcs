@@ -19,10 +19,10 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
-    public abstract partial class World<TWorld> {
+    public abstract partial class World {
 
         /// <summary>
-        /// Lightweight runtime handle representing a single entity in <c>World&lt;TWorld&gt;</c>.
+        /// Lightweight runtime handle representing a single entity in <c>World</c>.
         /// <para>
         /// An Entity is a thin wrapper around a <c>uint</c> slot index (with an offset applied so
         /// that the default/zeroed struct is never a valid entity). It provides the primary API for
@@ -33,10 +33,10 @@ namespace FFS.Libraries.StaticEcs {
         /// If the entity is destroyed and its slot is reused, a stale Entity handle will silently
         /// refer to the new occupant. For persistent/serializable references that survive
         /// destroy/recreate cycles, use <see cref="GID"/> (<see cref="EntityGID"/>) instead and
-        /// validate with <see cref="EntityGID.TryUnpack{TWorld}(out Entity)"/> before use.
+        /// validate with <see cref="EntityGID.TryUnpack(out Entity)"/> before use.
         /// </para>
         /// <para>
-        /// Entities are created via <see cref="World{TWorld}.NewEntity(ushort)"/> and destroyed via
+        /// Entities are created via <see cref="World.NewEntity(ushort)"/> and destroyed via
         /// <see cref="Destroy"/>. All component/tag operations on a destroyed entity will throw
         /// in debug builds.
         /// </para>
@@ -521,7 +521,7 @@ namespace FFS.Libraries.StaticEcs {
             #region IS_MATCH
             /// <summary>
             /// Checks whether this entity matches the specified query filter <typeparamref name="Q"/>
-            /// using the same <see cref="IQueryFilter.FilterEntities{TWorld}"/> logic as queries.
+            /// using the same <see cref="IQueryFilter.FilterEntities"/> logic as queries.
             /// </summary>
             /// <typeparam name="Q">Query filter type.</typeparam>
             /// <param name="filter">Filter value (default-initialized for stateless filters).</param>
@@ -532,7 +532,7 @@ namespace FFS.Libraries.StaticEcs {
                 var segmentIdx = id >> Const.ENTITIES_IN_SEGMENT_SHIFT;
                 var segmentBlockIdx = (byte) ((id >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
                 var blockEntityMask = 1UL << (int) (id & Const.ENTITIES_IN_BLOCK_MASK);
-                return (filter.FilterEntities<TWorld>(segmentIdx, segmentBlockIdx) & blockEntityMask) != 0UL;
+                return (filter.FilterEntities(segmentIdx, segmentBlockIdx) & blockEntityMask) != 0UL;
             }
             #endregion
 
@@ -1426,7 +1426,7 @@ namespace FFS.Libraries.StaticEcs {
     /// a logical entity category (e.g. Bullet, Enemy, Effect). Entities of the same type are
     /// co-located in the same memory segments for optimal cache locality.
     /// <para>
-    /// Optionally override <see cref="OnCreate{TWorld}"/> and <see cref="OnDestroy{TWorld}"/>
+    /// Optionally override <see cref="OnCreate"/> and <see cref="OnDestroy"/>
     /// to define lifecycle hooks. The struct can carry fields to parameterize creation.
     /// </para>
     /// <para>
@@ -1447,7 +1447,7 @@ namespace FFS.Libraries.StaticEcs {
         /// call on a value type — the JIT devirtualizes and inlines it at zero cost.
         /// </para>
         /// </summary>
-        void OnCreate<TWorld>(World<TWorld>.Entity entity) where TWorld : struct, IWorldType {}
+        void OnCreate(World.Entity entity) {}
 
         /// <summary>
         /// Called before entity destruction (before component OnDelete hooks).
@@ -1456,7 +1456,7 @@ namespace FFS.Libraries.StaticEcs {
         /// All entity components and tags are still accessible at this point.
         /// </para>
         /// </summary>
-        void OnDestroy<TWorld>(World<TWorld>.Entity entity, HookReason reason) where TWorld : struct, IWorldType {}
+        void OnDestroy(World.Entity entity, HookReason reason) {}
     }
 
     /// <summary>

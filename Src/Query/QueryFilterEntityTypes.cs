@@ -25,23 +25,23 @@ namespace FFS.Libraries.StaticEcs {
         where T0 : struct, IEntityType {
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType {
-            return World<TWorld>.Data.Instance.EntityTypes[World<TWorld>.EntityTypeInfo<T0>.Instance.Id].HeuristicChunks[chunkIdx].Value;
+        public ulong FilterChunk(uint chunkIdx) {
+            return World.Data.Instance.EntityTypes[World.EntityTypeInfo<T0>.Instance.Id].HeuristicChunks[chunkIdx].Value;
         }
 
         [MethodImpl(AggressiveInlining)]
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType {
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx) {
             return ulong.MaxValue;
         }
 
         #if FFS_ECS_DEBUG
         [MethodImpl(AggressiveInlining)]
-        public void Assert<TWorld>() where TWorld : struct, IWorldType {
-            World<TWorld>.AssertEntityTypeIsRegistered(typeof(T0).Name, World<TWorld>.EntityTypeInfo<T0>.Instance.Id);
+        public void Assert() {
+            World.AssertEntityTypeIsRegistered(typeof(T0).Name, World.EntityTypeInfo<T0>.Instance.Id);
         }
 
         [MethodImpl(AggressiveInlining)]
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType { }
+        public void Block(int val) { }
         #endif
 
     }

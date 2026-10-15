@@ -14,7 +14,7 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
-    public abstract partial class World<TWorld> {
+    public abstract partial class World {
 
         /// <summary>
         /// Creates a query with no filter (<see cref="Nothing"/>), matching all alive entities.
@@ -96,7 +96,7 @@ namespace FFS.Libraries.StaticEcs {
         #endif
         /// <summary>
         /// Stack-allocated query handle providing zero-allocation entity iteration and batch operations.
-        /// Created via <c>World&lt;TWorld&gt;.Query&lt;TFilter&gt;()</c>.
+        /// Created via <c>World.Query&lt;TFilter&gt;()</c>.
         /// <para>
         /// Iteration modes:
         /// <list type="bullet">
@@ -132,9 +132,9 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             /// <param name="entities">Which entity lifecycle states to include (default: only enabled).</param>
             /// <param name="clusters">Optional cluster IDs to restrict iteration scope. Empty = all clusters.</param>
-            /// <returns>A <see cref="QueryStrictIterator{TWorld}"/> for foreach enumeration.</returns>
+            /// <returns>A <see cref="QueryStrictIterator"/> for foreach enumeration.</returns>
             [MethodImpl(AggressiveInlining)]
-            public QueryStrictIterator<TWorld> GetEnumerator() => new(default(ReadOnlySpan<ushort>), QueryDefOf(Filter), EntityStatusType.Enabled);
+            public QueryStrictIterator GetEnumerator() => new(default(ReadOnlySpan<ushort>), QueryDefOf(Filter), EntityStatusType.Enabled);
 
             [MethodImpl(AggressiveInlining)]
             public WorldQuery<And<TFilter, None<T0>>> Without<T0>()
@@ -197,9 +197,9 @@ namespace FFS.Libraries.StaticEcs {
                 where T7 : struct, IComponentOrTag => new(new And<TFilter, None<T0, T1, T2, T3, T4, T5, T6, T7>>(Filter, default));
 
             [MethodImpl(AggressiveInlining)]
-            public QueryStrictIterator<TWorld> Entities(EntityStatusType entities = EntityStatusType.Enabled,
+            public QueryStrictIterator Entities(EntityStatusType entities = EntityStatusType.Enabled,
                                                                  ReadOnlySpan<ushort> clusters = default) {
-                return new QueryStrictIterator<TWorld>(clusters, QueryDefOf(Filter), entities);
+                return new QueryStrictIterator(clusters, QueryDefOf(Filter), entities);
             }
             
             /// <summary>
@@ -216,21 +216,21 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             /// <param name="entities">Which entity lifecycle states to include (default: only enabled).</param>
             /// <param name="clusters">Optional cluster IDs to restrict iteration scope. Empty = all clusters.</param>
-            /// <returns>A <see cref="QueryFlexibleIterator{TWorld}"/> for foreach enumeration.</returns>
+            /// <returns>A <see cref="QueryFlexibleIterator"/> for foreach enumeration.</returns>
             [MethodImpl(AggressiveInlining)]
-            public QueryFlexibleIterator<TWorld> EntitiesFlexible(EntityStatusType entities = EntityStatusType.Enabled,
+            public QueryFlexibleIterator EntitiesFlexible(EntityStatusType entities = EntityStatusType.Enabled,
                                                                            ReadOnlySpan<ushort> clusters = default) {
-                return new QueryFlexibleIterator<TWorld>(clusters, QueryDefOf(Filter), entities);
+                return new QueryFlexibleIterator(clusters, QueryDefOf(Filter), entities);
             }
             
             [MethodImpl(AggressiveInlining)]
-            internal QueryStrictIterator<TWorld> Entities(ReadOnlySpan<uint> chunks, EntityStatusType entities = EntityStatusType.Enabled) {
-                return new QueryStrictIterator<TWorld>(chunks, QueryDefOf(Filter), entities);
+            internal QueryStrictIterator Entities(ReadOnlySpan<uint> chunks, EntityStatusType entities = EntityStatusType.Enabled) {
+                return new QueryStrictIterator(chunks, QueryDefOf(Filter), entities);
             }
 
             [MethodImpl(AggressiveInlining)]
-            internal QueryFlexibleIterator<TWorld> EntitiesFlexible(ReadOnlySpan<uint> chunks, EntityStatusType entities = EntityStatusType.Enabled) {
-                return new QueryFlexibleIterator<TWorld>(chunks, QueryDefOf(Filter), entities);
+            internal QueryFlexibleIterator EntitiesFlexible(ReadOnlySpan<uint> chunks, EntityStatusType entities = EntityStatusType.Enabled) {
+                return new QueryFlexibleIterator(chunks, QueryDefOf(Filter), entities);
             }
 
             /// <summary>
@@ -341,14 +341,14 @@ namespace FFS.Libraries.StaticEcs {
         /// to quickly skip entire blocks (64 entities) that cannot match.
         /// The caller ANDs the result with the current chunk mask.
         /// </summary>
-        public ulong FilterChunk<TWorld>(uint chunkIdx) where TWorld : struct, IWorldType;
+        public ulong FilterChunk(uint chunkIdx);
 
         /// <summary>
         /// Fine-grained entity-level filtering. Returns actual presence bitmask
         /// to determine exactly which entities in this block match.
         /// The caller ANDs the result with the current entities mask.
         /// </summary>
-        public ulong FilterEntities<TWorld>(uint segmentIdx, byte segmentBlockIdx) where TWorld : struct, IWorldType;
+        public ulong FilterEntities(uint segmentIdx, byte segmentBlockIdx);
 
         #if FFS_ECS_DEBUG
         /// <summary>
@@ -357,7 +357,7 @@ namespace FFS.Libraries.StaticEcs {
         /// scoped to entities present in the current iteration snapshot; entities outside the
         /// snapshot (created mid-iteration or non-matching) are not blocked.
         /// </summary>
-        public void Block<TWorld>(int val) where TWorld : struct, IWorldType;
+        public void Block(int val);
         #endif
 
     }

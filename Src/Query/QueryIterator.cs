@@ -15,10 +15,10 @@ namespace FFS.Libraries.StaticEcs {
 
     /// <summary>
     /// Flexible (re-checking) entity iterator returned by
-    /// <see cref="World{TWorld}.WorldQuery{TFilter}.EntitiesFlexible"/>.
+    /// <see cref="World.WorldQuery{TFilter}.EntitiesFlexible"/>.
     /// <para>
-    /// Unlike <see cref="QueryStrictIterator{TWorld}"/>, this iterator re-reads the cached
-    /// block bitmask on every step, allowing <see cref="World{TWorld}.Entity.Destroy"/> and entity
+    /// Unlike <see cref="QueryStrictIterator"/>, this iterator re-reads the cached
+    /// block bitmask on every step, allowing <see cref="World.Entity.Destroy"/> and entity
     /// status changes (Disable/Enable) to be performed on <b>other snapshot</b> entities during the
     /// loop — such entities are excluded from the remaining iteration. This is slightly slower than
     /// the strict variant but tolerant of entity-level mutations on the iterated set.
@@ -35,17 +35,15 @@ namespace FFS.Libraries.StaticEcs {
     /// <c>await</c> boundaries. Use it in a <c>foreach</c> loop.
     /// </para>
     /// </summary>
-    /// <typeparam name="TWorld">World type identifying the static ECS world to iterate.</typeparam>
     #if ENABLE_IL2CPP
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
-    public ref struct QueryFlexibleIterator<TWorld>
-        where TWorld : struct, IWorldType {
+    public ref struct QueryFlexibleIterator {
 
         private readonly QueryData _queryData;
         private ulong _availableMask;
-        private World<TWorld>.Entity _current;
+        private World.Entity _current;
         private int _firstGlobalBlockIdx;
         private readonly QueryDef _def;
         private readonly EntityStatusType _entities;
@@ -60,7 +58,7 @@ namespace FFS.Libraries.StaticEcs {
             _entities = entities;
             _current = default;
             _def = def;
-            World<TWorld>.Prepare(def, clusters, entities, false, out _queryData, out _firstGlobalBlockIdx);
+            World.Prepare(def, clusters, entities, false, out _queryData, out _firstGlobalBlockIdx);
             _availableMask = _firstGlobalBlockIdx >= 0 ? ulong.MaxValue : 0;
         }
 
@@ -70,12 +68,12 @@ namespace FFS.Libraries.StaticEcs {
             _entities = entities;
             _current = default;
             _def = def;
-            World<TWorld>.Prepare(def, chunks, entities, false, out _queryData, out _firstGlobalBlockIdx);
+            World.Prepare(def, chunks, entities, false, out _queryData, out _firstGlobalBlockIdx);
             _availableMask = _firstGlobalBlockIdx >= 0 ? ulong.MaxValue : 0;
         }
 
         /// <summary>The entity at the current iterator position.</summary>
-        public readonly World<TWorld>.Entity Current {
+        public readonly World.Entity Current {
             [MethodImpl(AggressiveInlining)] get => _current;
         }
 
@@ -93,7 +91,7 @@ namespace FFS.Libraries.StaticEcs {
                     #endif
                     _current.IdWithOffset = (uint)(_firstGlobalBlockIdx << Const.ENTITIES_IN_BLOCK_SHIFT) + Const.ENTITY_ID_OFFSET + bitIdx;
                     #if FFS_ECS_DEBUG
-                    World<TWorld>.Data.Instance.SetCurrentQueryEntity(_current.IdWithOffset);
+                    World.Data.Instance.SetCurrentQueryEntity(_current.IdWithOffset);
                     #endif
                     return true;
                 }
@@ -119,7 +117,7 @@ namespace FFS.Libraries.StaticEcs {
                     #endif
                     _current.IdWithOffset = (uint)(_firstGlobalBlockIdx << Const.ENTITIES_IN_BLOCK_SHIFT) + Const.ENTITY_ID_OFFSET + bitIdx;
                     #if FFS_ECS_DEBUG
-                    World<TWorld>.Data.Instance.SetCurrentQueryEntity(_current.IdWithOffset);
+                    World.Data.Instance.SetCurrentQueryEntity(_current.IdWithOffset);
                     #endif
                     return true;
                 }
@@ -127,24 +125,24 @@ namespace FFS.Libraries.StaticEcs {
         }
 
         [MethodImpl(AggressiveInlining)]
-        public readonly QueryFlexibleIterator<TWorld> GetEnumerator() => this;
+        public readonly QueryFlexibleIterator GetEnumerator() => this;
 
         [MethodImpl(AggressiveInlining)]
         public void Dispose() {
             if (_queryData.Blocks != null) {
-                World<TWorld>.Dispose(_def, _entities, false, _queryData);
+                World.Dispose(_def, _entities, false, _queryData);
             }
         }
     }
 
     /// <summary>
     /// Strict (fast-path) entity iterator returned by
-    /// <see cref="World{TWorld}.WorldQuery{TFilter}.Entities"/>.
+    /// <see cref="World.WorldQuery{TFilter}.Entities"/>.
     /// <para>
     /// The strict iterator assumes that the filtered component and tag types are <b>not</b>
     /// modified on other entities that belong to the iteration snapshot. This allows it to skip
     /// per-block bitmask re-evaluation, making it faster than
-    /// <see cref="QueryFlexibleIterator{TWorld}"/>. Additionally, it uses a sequential
+    /// <see cref="QueryFlexibleIterator"/>. Additionally, it uses a sequential
     /// bit-scan optimization: when the next entity is adjacent in the bitmask, it advances with a
     /// single shift + increment instead of a full trailing-zero-count scan.
     /// </para>
@@ -158,18 +156,16 @@ namespace FFS.Libraries.StaticEcs {
     /// <c>await</c> boundaries. Use it in a <c>foreach</c> loop.
     /// </para>
     /// </summary>
-    /// <typeparam name="TWorld">World type identifying the static ECS world to iterate.</typeparam>
     #if ENABLE_IL2CPP
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
-    public ref struct QueryStrictIterator<TWorld>
-        where TWorld : struct, IWorldType {
+    public ref struct QueryStrictIterator {
 
         private readonly QueryData _queryData;
         private ulong _entitiesMask;
         private ulong _isolatedBit;
-        private World<TWorld>.Entity _current;
+        private World.Entity _current;
         private int _firstGlobalBlockIdx;
         private readonly QueryDef _def;
         private readonly EntityStatusType _entities;
@@ -184,7 +180,7 @@ namespace FFS.Libraries.StaticEcs {
             _entities = entities;
             _current = default;
             _def = def;
-            World<TWorld>.Prepare(def, clusters, entities, true, out _queryData, out _firstGlobalBlockIdx);
+            World.Prepare(def, clusters, entities, true, out _queryData, out _firstGlobalBlockIdx);
 
             _isolatedBit = 0;
             _entitiesMask = _firstGlobalBlockIdx >= 0 ? _queryData.Blocks[_firstGlobalBlockIdx].EntitiesMask : 0;
@@ -196,14 +192,14 @@ namespace FFS.Libraries.StaticEcs {
             _entities = entities;
             _current = default;
             _def = def;
-            World<TWorld>.Prepare(def, chunks, entities, true, out _queryData, out _firstGlobalBlockIdx);
+            World.Prepare(def, chunks, entities, true, out _queryData, out _firstGlobalBlockIdx);
 
             _isolatedBit = 0;
             _entitiesMask = _firstGlobalBlockIdx >= 0 ? _queryData.Blocks[_firstGlobalBlockIdx].EntitiesMask : 0;
         }
 
         /// <summary>The entity at the current iterator position.</summary>
-        public readonly World<TWorld>.Entity Current {
+        public readonly World.Entity Current {
             [MethodImpl(AggressiveInlining)] get => _current;
         }
 
@@ -214,7 +210,7 @@ namespace FFS.Libraries.StaticEcs {
                 _isolatedBit = nextBit;
                 ++_current.IdWithOffset;
                 #if FFS_ECS_DEBUG
-                World<TWorld>.Data.Instance.SetCurrentQueryEntity(_current.IdWithOffset);
+                World.Data.Instance.SetCurrentQueryEntity(_current.IdWithOffset);
                 #endif
                 return true;
             }
@@ -238,7 +234,7 @@ namespace FFS.Libraries.StaticEcs {
                     _isolatedBit = isolatedBit;
                     _current.IdWithOffset = (uint)(_firstGlobalBlockIdx << Const.ENTITIES_IN_BLOCK_SHIFT) + Const.ENTITY_ID_OFFSET + bitIndex;
                     #if FFS_ECS_DEBUG
-                    World<TWorld>.Data.Instance.SetCurrentQueryEntity(_current.IdWithOffset);
+                    World.Data.Instance.SetCurrentQueryEntity(_current.IdWithOffset);
                     #endif
                     return true;
                 }
@@ -251,12 +247,12 @@ namespace FFS.Libraries.StaticEcs {
         }
 
         [MethodImpl(AggressiveInlining)]
-        public readonly QueryStrictIterator<TWorld> GetEnumerator() => this;
+        public readonly QueryStrictIterator GetEnumerator() => this;
 
         [MethodImpl(AggressiveInlining)]
         public void Dispose() {
             if (_queryData.Blocks != null) {
-                World<TWorld>.Dispose(_def, _entities, true, _queryData);
+                World.Dispose(_def, _entities, true, _queryData);
             }
         }
     }

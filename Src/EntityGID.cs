@@ -15,7 +15,7 @@ namespace FFS.Libraries.StaticEcs {
 
     /// <summary>
     /// Status of an <see cref="EntityGID"/> or <see cref="EntityGIDCompact"/> within a world.
-    /// Returned by <see cref="EntityGID.Status{TWorld}"/> and <see cref="EntityGIDCompact.Status{TWorld}"/>.
+    /// Returned by <see cref="EntityGID.Status"/> and <see cref="EntityGIDCompact.Status"/>.
     /// </summary>
     public enum GIDStatus : byte {
         /// <summary>The entity exists, its version matches, and it is loaded — the entity is alive and accessible.</summary>
@@ -31,7 +31,7 @@ namespace FFS.Libraries.StaticEcs {
     /// Full-size global identifier for an entity (8 bytes, explicit union layout over ulong).
     /// <para>
     /// EntityGID serves as a persistent, serializable reference to an entity that remains meaningful
-    /// across world reloads, save/load cycles, and network synchronization. Unlike <see cref="World{TWorld}.Entity"/>,
+    /// across world reloads, save/load cycles, and network synchronization. Unlike <see cref="World.Entity"/>,
     /// which is a lightweight runtime handle valid only while the entity is alive, EntityGID embeds a
     /// <see cref="Version"/> counter that detects stale references — if the entity was destroyed and its
     /// slot reused, the version will no longer match, making it safe to detect dangling references.
@@ -65,7 +65,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <summary>
         /// Internal entity index without the <c>ENTITY_ID_OFFSET</c> applied.
         /// This is the zero-based slot index used internally by the world's storage.
-        /// To obtain the value expected by <see cref="World{TWorld}.Entity"/>, use <see cref="EntityID"/>.
+        /// To obtain the value expected by <see cref="World.Entity"/>, use <see cref="EntityID"/>.
         /// Occupies bytes [0..3] of <see cref="Raw"/>.
         /// </summary>
         [FieldOffset(0)] public readonly uint Id;
@@ -139,7 +139,7 @@ namespace FFS.Libraries.StaticEcs {
 
         /// <summary>
         /// Entity identifier with <c>ENTITY_ID_OFFSET</c> applied — the value that can be used
-        /// to construct a <see cref="World{TWorld}.Entity"/>. The offset exists because entity ID 0
+        /// to construct a <see cref="World.Entity"/>. The offset exists because entity ID 0
         /// is reserved as a null/invalid sentinel.
         /// </summary>
         public uint EntityID {
@@ -154,41 +154,38 @@ namespace FFS.Libraries.StaticEcs {
         /// <see cref="GIDStatus.NotLoaded"/> — the entity exists and version matches, but it is currently unloaded.
         /// </para>
         /// </summary>
-        /// <typeparam name="TWorld">The world type to check against.</typeparam>
         /// <returns>The <see cref="GIDStatus"/> of this GID.</returns>
         [MethodImpl(AggressiveInlining)]
-        public GIDStatus Status<TWorld>() where TWorld : struct, IWorldType {
-            return World<TWorld>.Data.Instance.GIDStatus(this);
+        public GIDStatus Status() {
+            return World.Data.Instance.GIDStatus(this);
         }
 
         /// <summary>
-        /// Attempts to resolve this GID into a live <see cref="World{TWorld}.Entity"/> handle.
+        /// Attempts to resolve this GID into a live <see cref="World.Entity"/> handle.
         /// Returns <c>true</c> and a valid entity if the GID is loaded and actual;
         /// returns <c>false</c> if either condition fails (entity not loaded or version mismatch).
         /// <para>
         /// This is the primary safe way to convert a persisted/serialized GID back into a
-        /// runtime entity handle. Always prefer this over <see cref="Unpack{TWorld}"/> unless
+        /// runtime entity handle. Always prefer this over <see cref="Unpack"/> unless
         /// you have already validated the GID.
         /// </para>
         /// </summary>
-        /// <typeparam name="TWorld">The world type to resolve against.</typeparam>
         /// <param name="entity">
         /// The resolved entity handle. Only valid when the method returns <c>true</c>.
         /// On <c>false</c>, the value is partially initialized and must not be used.
         /// </param>
         /// <returns><c>true</c> if the GID was successfully unpacked into a valid entity.</returns>
         [MethodImpl(AggressiveInlining)]
-        public bool TryUnpack<TWorld>(out World<TWorld>.Entity entity) where TWorld : struct, IWorldType {
+        public bool TryUnpack(out World.Entity entity) {
             entity.IdWithOffset = Id + Const.ENTITY_ID_OFFSET;
-            return World<TWorld>.Data.Instance.GIDStatus(this) == GIDStatus.Active;
+            return World.Data.Instance.GIDStatus(this) == GIDStatus.Active;
         }
 
         /// <summary>
         /// Attempts to resolve this GID into a live entity handle, with failure diagnostics.
-        /// Behaves like <see cref="TryUnpack{TWorld}(out World{TWorld}.Entity)"/> but additionally
+        /// Behaves like <see cref="TryUnpack(out World.Entity)"/> but additionally
         /// reports the <see cref="GIDStatus"/> indicating why the resolution failed.
         /// </summary>
-        /// <typeparam name="TWorld">The world type to resolve against.</typeparam>
         /// <param name="entity">
         /// The resolved entity handle. Only valid when the method returns <c>true</c>.
         /// </param>
@@ -200,9 +197,9 @@ namespace FFS.Libraries.StaticEcs {
         /// </param>
         /// <returns><c>true</c> if the GID was successfully unpacked into a valid entity.</returns>
         [MethodImpl(AggressiveInlining)]
-        public bool TryUnpack<TWorld>(out World<TWorld>.Entity entity, out GIDStatus status) where TWorld : struct, IWorldType {
+        public bool TryUnpack(out World.Entity entity, out GIDStatus status) {
             entity.IdWithOffset = Id + Const.ENTITY_ID_OFFSET;
-            status = World<TWorld>.Data.Instance.GIDStatus(this);
+            status = World.Data.Instance.GIDStatus(this);
             return status == GIDStatus.Active;
         }
 
@@ -211,20 +208,19 @@ namespace FFS.Libraries.StaticEcs {
         /// (in Release builds). In Debug builds, throws <see cref="StaticEcsException"/> if the
         /// GID is not loaded or not actual.
         /// <para>
-        /// Use only when you have already verified the GID via <see cref="Status{TWorld}()"/>
-        /// or in hot paths where the validity is guaranteed by design. Prefer <see cref="TryUnpack{TWorld}(out World{TWorld}.Entity)"/>
+        /// Use only when you have already verified the GID via <see cref="Status()"/>
+        /// or in hot paths where the validity is guaranteed by design. Prefer <see cref="TryUnpack(out World.Entity)"/>
         /// for general-purpose code.
         /// </para>
         /// </summary>
-        /// <typeparam name="TWorld">The world type to resolve against.</typeparam>
         /// <returns>A live entity handle corresponding to this GID.</returns>
         [MethodImpl(AggressiveInlining)]
-        public World<TWorld>.Entity Unpack<TWorld>() where TWorld : struct, IWorldType {
+        public World.Entity Unpack() {
             #if FFS_ECS_DEBUG
-            World<TWorld>.AssertGidIsActive("EntityGID", this);
+            World.AssertGidIsActive("EntityGID", this);
             #endif
 
-            return new World<TWorld>.Entity(Id);
+            return new World.Entity(Id);
         }
 
         /// <summary>
@@ -365,7 +361,7 @@ namespace FFS.Libraries.StaticEcs {
 
         /// <summary>
         /// Entity identifier with <c>ENTITY_ID_OFFSET</c> applied — the value that can be used
-        /// to construct a <see cref="World{TWorld}.Entity"/>.
+        /// to construct a <see cref="World.Entity"/>.
         /// </summary>
         public uint EntityID {
             [MethodImpl(AggressiveInlining)] get => Id + Const.ENTITY_ID_OFFSET;
@@ -397,54 +393,50 @@ namespace FFS.Libraries.StaticEcs {
 
         /// <summary>
         /// Returns the current status of this compact GID in the specified world.
-        /// See <see cref="EntityGID.Status{TWorld}"/> for full semantics.
+        /// See <see cref="EntityGID.Status"/> for full semantics.
         /// </summary>
-        /// <typeparam name="TWorld">The world type to check against.</typeparam>
         /// <returns>The <see cref="GIDStatus"/> of this GID.</returns>
         [MethodImpl(AggressiveInlining)]
-        public GIDStatus Status<TWorld>() where TWorld : struct, IWorldType {
-            return World<TWorld>.Data.Instance.GIDStatus(this);
+        public GIDStatus Status() {
+            return World.Data.Instance.GIDStatus(this);
         }
 
         /// <summary>
         /// Attempts to resolve this compact GID into a live entity handle.
-        /// See <see cref="EntityGID.TryUnpack{TWorld}(out World{TWorld}.Entity)"/> for full semantics.
+        /// See <see cref="EntityGID.TryUnpack(out World.Entity)"/> for full semantics.
         /// </summary>
-        /// <typeparam name="TWorld">The world type to resolve against.</typeparam>
         /// <param name="entity">The resolved entity. Valid only when the method returns <c>true</c>.</param>
         /// <returns><c>true</c> if the GID was successfully unpacked.</returns>
         [MethodImpl(AggressiveInlining)]
-        public bool TryUnpack<TWorld>(out World<TWorld>.Entity entity) where TWorld : struct, IWorldType {
+        public bool TryUnpack(out World.Entity entity) {
             entity.IdWithOffset = Id + Const.ENTITY_ID_OFFSET;
-            return World<TWorld>.Data.Instance.GIDStatus(this) == GIDStatus.Active;
+            return World.Data.Instance.GIDStatus(this) == GIDStatus.Active;
         }
         
         /// <summary>
         /// Attempts to resolve this compact GID into a live entity handle, with failure diagnostics.
-        /// See <see cref="EntityGID.TryUnpack{TWorld}(out World{TWorld}.Entity, out GIDStatus)"/> for full semantics.
+        /// See <see cref="EntityGID.TryUnpack(out World.Entity, out GIDStatus)"/> for full semantics.
         /// </summary>
-        /// <typeparam name="TWorld">The world type to resolve against.</typeparam>
         /// <param name="entity">The resolved entity. Valid only when the method returns <c>true</c>.</param>
         /// <param name="status">The <see cref="GIDStatus"/> of this GID.</param>
         /// <returns><c>true</c> if the GID was successfully unpacked.</returns>
         [MethodImpl(AggressiveInlining)]
-        public bool TryUnpack<TWorld>(out World<TWorld>.Entity entity, out GIDStatus status) where TWorld : struct, IWorldType {
+        public bool TryUnpack(out World.Entity entity, out GIDStatus status) {
             entity.IdWithOffset = Id + Const.ENTITY_ID_OFFSET;
-            status = World<TWorld>.Data.Instance.GIDStatus(this);
+            status = World.Data.Instance.GIDStatus(this);
             return status == GIDStatus.Active;
         }
 
         /// <summary>
         /// Unconditionally converts this compact GID into an entity handle.
         /// In Debug builds, throws if the GID is not loaded or not actual.
-        /// See <see cref="EntityGID.Unpack{TWorld}"/> for full semantics and usage guidance.
+        /// See <see cref="EntityGID.Unpack"/> for full semantics and usage guidance.
         /// </summary>
-        /// <typeparam name="TWorld">The world type to resolve against.</typeparam>
         /// <returns>A live entity handle.</returns>
         [MethodImpl(AggressiveInlining)]
-        public World<TWorld>.Entity Unpack<TWorld>() where TWorld : struct, IWorldType {
+        public World.Entity Unpack() {
             #if FFS_ECS_DEBUG
-            World<TWorld>.AssertGidIsActive("EntityGID", this);
+            World.AssertGidIsActive("EntityGID", this);
             #endif
 
             return new(Id);

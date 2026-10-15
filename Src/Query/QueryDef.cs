@@ -98,7 +98,7 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
-    public abstract partial class World<TWorld> {
+    public abstract partial class World {
         internal static class QueryDefCache<TFilter> where TFilter : struct, IQueryFilter {
             internal static QueryDef Def;
         }
@@ -141,7 +141,7 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             if (def.Custom != null) {
-                mask &= def.Custom.FilterChunk<TWorld>(chunkIdx);
+                mask &= def.Custom.FilterChunk(chunkIdx);
             }
 
             return mask;
@@ -189,7 +189,7 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             if (def.Custom != null) {
-                mask &= def.Custom.FilterEntities<TWorld>(segmentIdx, segmentBlockIdx);
+                mask &= def.Custom.FilterEntities(segmentIdx, segmentBlockIdx);
             }
 
             return mask;
@@ -199,7 +199,7 @@ namespace FFS.Libraries.StaticEcs {
         internal static void BlockQuery(QueryDef def, int val) {
             foreach (var masks in def.With) masks.BlockDeleteDisable(val);
             foreach (var masks in def.Without) masks.BlockAddEnable(val);
-            def.Custom?.Block<TWorld>(val);
+            def.Custom?.Block(val);
         }
         #endif
     }

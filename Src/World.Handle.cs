@@ -18,8 +18,8 @@ using Unity.IL2CPP.CompilerServices;
 namespace FFS.Libraries.StaticEcs {
 
     /// <summary>
-    /// Type-erased handle for accessing a <see cref="World{TWorld}"/> without knowing the concrete
-    /// <c>TWorld</c> type at compile time. Bridges the static-generic ECS world to runtime-dynamic
+    /// Type-erased handle for accessing a <see cref="World"/> without knowing the concrete
+    /// <c>World</c> type at compile time. Bridges the static-generic ECS world to runtime-dynamic
     /// access via function pointers.
     /// <para>
     /// <b>Primary use cases:</b> editor/inspector tools, debug visualizers, serialization frameworks,
@@ -28,7 +28,7 @@ namespace FFS.Libraries.StaticEcs {
     /// overhead beyond the indirection itself.
     /// </para>
     /// <para>
-    /// Obtain a WorldHandle via <c>World&lt;TWorld&gt;.Handle</c> or internal creation methods.
+    /// Obtain a WorldHandle via <c>World.Handle</c> or internal creation methods.
     /// The handle remains valid as long as the world exists. Entity IDs used in this handle are
     /// raw <c>uint</c> values.
     /// </para>
@@ -38,146 +38,28 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
     public readonly struct WorldHandle {
-        private readonly unsafe delegate*<EntityGID, GIDStatus> _gidStatus;
-        private readonly unsafe delegate*<byte, ushort, EntityGID> _newEntity;
-        private readonly unsafe delegate*<uint> _calculateEntitiesCount;
-        private readonly unsafe delegate*<uint> _calculateEntitiesCapacity;
-        private readonly unsafe delegate*<EntityGID, bool> _destroyEntity;
-        private readonly unsafe delegate*<void> _destroyAllEntities;
-        private readonly unsafe delegate*<ushort, void> _destroyAllEntitiesInCluster;
-        private readonly unsafe delegate*<uint, void> _destroyAllEntitiesInChunk;
-        private readonly unsafe delegate*<WorldStatus> _status;
-        private readonly unsafe delegate*<Type, out ComponentsHandle, bool> _tryGetComponentsHandle;
-        private readonly unsafe delegate*<Type, ref ComponentsHandle> _getComponentsHandle;
-        private readonly unsafe delegate*<ReadOnlySpan<ComponentsHandle>> _getAllComponentsHandles;
-        private readonly unsafe delegate*<Type, bool> _hasResource;
-        private readonly unsafe delegate*<Type, IResource, bool, void> _setResource;
-        private readonly unsafe delegate*<Type, IResource> _getResource;
-        private readonly unsafe delegate*<Type, void> _removeResource;
-        private readonly unsafe delegate*<string, bool> _hasResourceByKey;
-        private readonly unsafe delegate*<string, IResource> _getResourceByKey;
-        private readonly unsafe delegate*<string, IResource, bool, void> _setResourceByKey;
-        private readonly unsafe delegate*<string, void> _removeResourceByKey;
-        private readonly unsafe delegate*<IReadOnlyCollection<string>> _getAllResourcesKeys;
-        private readonly unsafe delegate*<IReadOnlyCollection<Type>> _getAllResourcesTypes;
-        private readonly unsafe delegate*<byte, bool> _isEntityTypeRegistered;
-        private readonly unsafe delegate*<byte, uint> _calculateEntitiesCountByType;
-        private readonly unsafe delegate*<byte, uint> _calculateEntitiesCapacityByType;
-        private readonly unsafe delegate*<IReadOnlyList<SystemsHandle>> _getAllSystemsHandles;
-        private readonly unsafe delegate*<Type, out SystemsHandle, bool> _tryGetSystemsHandle;
 
         /// <summary>
-        /// The <see cref="Type"/> of the <c>TWorld</c> struct that this handle represents.
+        /// The <see cref="Type"/> of the <c>World</c> class that this handle represents.
         /// Useful for distinguishing between handles for different worlds at runtime.
         /// </summary>
         public readonly Type WorldType;
 
-        internal static unsafe WorldHandle Create<TWorld>()
-            where TWorld : struct, IWorldType {
-            return new WorldHandle(
-                typeof(TWorld),
-                &World<TWorld>._GidStatus,
-                &World<TWorld>._NewEntity,
-                &World<TWorld>._CalculateEntitiesCount,
-                &World<TWorld>._CalculateEntitiesCapacity,
-                &World<TWorld>._DestroyEntity,
-                &World<TWorld>._DestroyAllEntities,
-                &World<TWorld>._DestroyAllEntitiesInCluster,
-                &World<TWorld>._DestroyAllEntitiesInChunk,
-                &World<TWorld>._WorldStatus,
-                &World<TWorld>._TryGetComponentsHandle,
-                &World<TWorld>._GetComponentsHandle,
-                &World<TWorld>._GetAllComponentsHandles,
-                &World<TWorld>._HasResource,
-                &World<TWorld>._SetResource,
-                &World<TWorld>._GetResource,
-                &World<TWorld>._RemoveResource,
-                &World<TWorld>._HasResourceByKey,
-                &World<TWorld>._GetResourceByKey,
-                &World<TWorld>._SetResourceByKey,
-                &World<TWorld>._RemoveResourceByKey,
-                &World<TWorld>._GetAllResourcesKeys,
-                &World<TWorld>._GetAllResourcesTypes,
-                &World<TWorld>._IsEntityTypeRegistered,
-                &World<TWorld>._CalculateEntitiesCountByType,
-                &World<TWorld>._CalculateEntitiesCapacityByType,
-                &World<TWorld>._GetAllSystemsHandles,
-                &World<TWorld>._TryGetSystemsHandle
-            );
-        }
+        internal static WorldHandle Create() => new(typeof(World));
 
-        internal unsafe WorldHandle(
-            Type worldType,
-            delegate*<EntityGID, GIDStatus> gidStatus,
-            delegate*<byte, ushort, EntityGID> newEntity,
-            delegate*<uint> calculateEntitiesCount,
-            delegate*<uint> calculateEntitiesCapacity,
-            delegate*<EntityGID, bool> destroyEntity,
-            delegate*<void> destroyAllEntities,
-            delegate*<ushort, void> destroyAllEntitiesInCluster,
-            delegate*<uint, void> destroyAllEntitiesInChunk,
-            delegate*<WorldStatus> status,
-            delegate*<Type, out ComponentsHandle, bool> tryGetComponentsHandle,
-            delegate*<Type, ref ComponentsHandle> getComponentsHandle,
-            delegate*<ReadOnlySpan<ComponentsHandle>> getAllComponentsHandles,
-            delegate*<Type, bool> hasResource,
-            delegate*<Type, IResource, bool, void> setResource,
-            delegate*<Type, IResource> getResource,
-            delegate*<Type, void> removeResource,
-            delegate*<string, bool> hasResourceByKey,
-            delegate*<string, IResource> getResourceByKey,
-            delegate*<string, IResource, bool, void> setResourceByKey,
-            delegate*<string, void> removeResourceByKey,
-            delegate*<IReadOnlyCollection<string>> getAllResourcesKeys,
-            delegate*<IReadOnlyCollection<Type>> getAllResourcesTypes,
-            delegate*<byte, bool> isEntityTypeRegistered,
-            delegate*<byte, uint> calculateEntitiesCountByType,
-            delegate*<byte, uint> calculateEntitiesCapacityByType,
-            delegate*<IReadOnlyList<SystemsHandle>> getAllSystemsHandles,
-            delegate*<Type, out SystemsHandle, bool> tryGetSystemsHandle) {
+        internal WorldHandle(Type worldType) {
             WorldType = worldType;
-            _gidStatus = gidStatus;
-            _newEntity = newEntity;
-            _calculateEntitiesCount = calculateEntitiesCount;
-            _calculateEntitiesCapacity = calculateEntitiesCapacity;
-            _destroyEntity = destroyEntity;
-            _destroyAllEntities = destroyAllEntities;
-            _destroyAllEntitiesInCluster = destroyAllEntitiesInCluster;
-            _destroyAllEntitiesInChunk = destroyAllEntitiesInChunk;
-            _status = status;
-            _tryGetComponentsHandle = tryGetComponentsHandle;
-            _getComponentsHandle = getComponentsHandle;
-            _getAllComponentsHandles = getAllComponentsHandles;
-            _hasResource = hasResource;
-            _setResource = setResource;
-            _getResource = getResource;
-            _removeResource = removeResource;
-            _hasResourceByKey = hasResourceByKey;
-            _getResourceByKey = getResourceByKey;
-            _setResourceByKey = setResourceByKey;
-            _removeResourceByKey = removeResourceByKey;
-            _getAllResourcesKeys = getAllResourcesKeys;
-            _getAllResourcesTypes = getAllResourcesTypes;
-            _isEntityTypeRegistered = isEntityTypeRegistered;
-            _calculateEntitiesCountByType = calculateEntitiesCountByType;
-            _calculateEntitiesCapacityByType = calculateEntitiesCapacityByType;
-            _getAllSystemsHandles = getAllSystemsHandles;
-            _tryGetSystemsHandle = tryGetSystemsHandle;
         }
 
-        /// <summary>
-        /// Returns the current lifecycle status of the world (NotCreated, Created, or Initialized).
-        /// </summary>
-        /// <returns>Current <see cref="WorldStatus"/>.</returns>
         [MethodImpl(AggressiveInlining)]
         public WorldStatus Status() {
-            unsafe { return _status(); }
+            return World._WorldStatus();
         }
 
         #region ENTITIES
         /// <summary>
         /// Returns the <see cref="GIDStatus"/> of the entity referenced by <paramref name="gid"/>.
-        /// This is the type-erased equivalent of <see cref="EntityGID.Status{TWorld}()"/>.
+        /// This is the type-erased equivalent of <see cref="EntityGID.Status()"/>.
         /// </summary>
         /// <param name="gid">The global entity identifier to check.</param>
         /// <returns>
@@ -187,12 +69,12 @@ namespace FFS.Libraries.StaticEcs {
         /// </returns>
         [MethodImpl(AggressiveInlining)]
         public GIDStatus GIDStatus(EntityGID gid) {
-            unsafe { return _gidStatus(gid); }
+            return World._GidStatus(gid);
         }
 
         /// <summary>
         /// Creates a new entity with the specified type in the specified cluster and returns its <see cref="EntityGID"/>.
-        /// Unlike the generic <c>World&lt;TWorld&gt;.NewEntity</c> which returns an <c>Entity</c>
+        /// Unlike the generic <c>World.NewEntity</c> which returns an <c>Entity</c>
         /// struct, this returns a GID suitable for storage in type-erased contexts (editors, tools).
         /// </summary>
         /// <param name="entityType">Entity type (0–255). Entities of the same type are grouped into the same segments within a cluster.</param>
@@ -200,27 +82,27 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns>The <see cref="EntityGID"/> of the newly created entity.</returns>
         [MethodImpl(AggressiveInlining)]
         public EntityGID NewEntity(byte entityType, ushort clusterId = 0) {
-            unsafe { return _newEntity(entityType, clusterId); }
+            return World._NewEntity(entityType, clusterId);
         }
 
         /// <summary>
         /// Calculates the total number of alive entities across all chunks in the world.
-        /// See <see cref="World{TWorld}.CalculateEntitiesCount"/>.
+        /// See <see cref="World.CalculateEntitiesCount"/>.
         /// </summary>
         /// <returns>Total entity count.</returns>
         [MethodImpl(AggressiveInlining)]
         public uint CalculateEntitiesCount() {
-            unsafe { return _calculateEntitiesCount(); }
+            return World._CalculateEntitiesCount();
         }
 
         /// <summary>
         /// Calculates the total entity slot capacity across all registered chunks.
-        /// See <see cref="World{TWorld}.CalculateEntitiesCapacity"/>.
+        /// See <see cref="World.CalculateEntitiesCapacity"/>.
         /// </summary>
         /// <returns>Total allocated entity slot count.</returns>
         [MethodImpl(AggressiveInlining)]
         public uint CalculateEntitiesCapacity() {
-            unsafe { return _calculateEntitiesCapacity(); }
+            return World._CalculateEntitiesCapacity();
         }
 
         /// <summary>
@@ -228,7 +110,7 @@ namespace FFS.Libraries.StaticEcs {
         /// </summary>
         [MethodImpl(AggressiveInlining)]
         public bool IsEntityTypeRegistered(byte id) {
-            unsafe { return _isEntityTypeRegistered(id); }
+            return World._IsEntityTypeRegistered(id);
         }
 
         /// <summary>
@@ -236,7 +118,7 @@ namespace FFS.Libraries.StaticEcs {
         /// </summary>
         [MethodImpl(AggressiveInlining)]
         public uint CalculateEntitiesCountByType(byte entityType) {
-            unsafe { return _calculateEntitiesCountByType(entityType); }
+            return World._CalculateEntitiesCountByType(entityType);
         }
 
         /// <summary>
@@ -244,7 +126,7 @@ namespace FFS.Libraries.StaticEcs {
         /// </summary>
         [MethodImpl(AggressiveInlining)]
         public uint CalculateEntitiesCapacityByType(byte entityType) {
-            unsafe { return _calculateEntitiesCapacityByType(entityType); }
+            return World._CalculateEntitiesCapacityByType(entityType);
         }
 
         /// <summary>
@@ -255,36 +137,36 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns><c>true</c> if the entity was destroyed; <c>false</c> if already destroyed or GID is stale.</returns>
         [MethodImpl(AggressiveInlining)]
         public bool DestroyEntity(EntityGID gid) {
-            unsafe { return _destroyEntity(gid); }
+            return World._DestroyEntity(gid);
         }
 
         /// <summary>
         /// Destroys every loaded entity in the world, triggering OnDelete hooks.
-        /// The world remains initialized. See <see cref="World{TWorld}.DestroyAllLoadedEntities"/>.
+        /// The world remains initialized. See <see cref="World.DestroyAllLoadedEntities"/>.
         /// </summary>
         [MethodImpl(AggressiveInlining)]
         public void DestroyAllLoadedEntities() {
-            unsafe { _destroyAllEntities(); }
+            World._DestroyAllEntities();
         }
 
         /// <summary>
         /// Destroys all entities within a specific cluster.
-        /// See <see cref="World{TWorld}.DestroyAllEntitiesInCluster"/>.
+        /// See <see cref="World.DestroyAllEntitiesInCluster"/>.
         /// </summary>
         /// <param name="clusterId">Cluster identifier.</param>
         [MethodImpl(AggressiveInlining)]
         public void DestroyAllEntitiesInCluster(ushort clusterId) {
-            unsafe { _destroyAllEntitiesInCluster(clusterId); }
+            World._DestroyAllEntitiesInCluster(clusterId);
         }
 
         /// <summary>
         /// Destroys all entities within a specific chunk.
-        /// See <see cref="World{TWorld}.DestroyAllEntitiesInChunk"/>.
+        /// See <see cref="World.DestroyAllEntitiesInChunk"/>.
         /// </summary>
         /// <param name="chunkId">Chunk index.</param>
         [MethodImpl(AggressiveInlining)]
         public void DestroyAllEntitiesInChunk(uint chunkId) {
-            unsafe { _destroyAllEntitiesInChunk(chunkId); }
+            World._DestroyAllEntitiesInChunk(chunkId);
         }
         #endregion
 
@@ -302,7 +184,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns><c>true</c> if the component type is registered and the handle was created.</returns>
         [MethodImpl(AggressiveInlining)]
         public bool TryGetComponentsHandle(Type componentType, out ComponentsHandle handle) {
-            unsafe { return _tryGetComponentsHandle(componentType, out handle); }
+            return World._TryGetComponentsHandle(componentType, out handle);
         }
 
         /// <summary>
@@ -318,7 +200,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns>A readonly reference to the <see cref="ComponentsHandle"/>.</returns>
         [MethodImpl(AggressiveInlining)]
         public ref readonly ComponentsHandle GetComponentsHandle(Type componentType) {
-            unsafe { return ref _getComponentsHandle(componentType); }
+            return ref World._GetComponentsHandle(componentType);
         }
 
         /// <summary>
@@ -328,7 +210,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns>Read-only span of all registered <see cref="ComponentsHandle"/> instances.</returns>
         [MethodImpl(AggressiveInlining)]
         public ReadOnlySpan<ComponentsHandle> GetAllComponentsHandles() {
-            unsafe { return _getAllComponentsHandles(); }
+            return World._GetAllComponentsHandles();
         }
         #endregion
 
@@ -338,13 +220,13 @@ namespace FFS.Libraries.StaticEcs {
         #region RESOURCES
         /// <summary>
         /// Checks whether a singleton resource of the given runtime <see cref="Type"/> exists.
-        /// Type-erased equivalent of <see cref="World{TWorld}.HasResource{TResource}()"/>.
+        /// Type-erased equivalent of <see cref="World.HasResource{TResource}()"/>.
         /// </summary>
         /// <param name="type">Runtime type of the resource.</param>
         /// <returns><c>true</c> if the resource exists.</returns>
         [MethodImpl(AggressiveInlining)]
         public bool HasResource(Type type) {
-            unsafe { return _hasResource(type); }
+            return World._HasResource(type);
         }
 
         /// <summary>
@@ -354,7 +236,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns><c>true</c> if the keyed resource exists.</returns>
         [MethodImpl(AggressiveInlining)]
         public bool HasResource(string key) {
-            unsafe { return _hasResourceByKey(key); }
+            return World._HasResourceByKey(key);
         }
 
         /// <summary>
@@ -365,7 +247,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns>The resource value as <see cref="IResource"/>.</returns>
         [MethodImpl(AggressiveInlining)]
         public IResource GetResource(Type type) {
-            unsafe { return _getResource(type); }
+            return World._GetResource(type);
         }
 
         /// <summary>
@@ -375,7 +257,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns>The resource value as <see cref="IResource"/>.</returns>
         [MethodImpl(AggressiveInlining)]
         public IResource GetResource(string key) {
-            unsafe { return _getResourceByKey(key); }
+            return World._GetResourceByKey(key);
         }
 
         /// <summary>
@@ -384,7 +266,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <param name="type">Runtime type of the resource to remove.</param>
         [MethodImpl(AggressiveInlining)]
         public void RemoveResource(Type type) {
-            unsafe { _removeResource(type); }
+            World._RemoveResource(type);
         }
 
         /// <summary>
@@ -393,7 +275,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <param name="key">String key of the resource to remove.</param>
         [MethodImpl(AggressiveInlining)]
         public void RemoveResource(string key) {
-            unsafe { _removeResourceByKey(key); }
+            World._RemoveResourceByKey(key);
         }
 
         /// <summary>
@@ -404,7 +286,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <param name="clearOnDestroy">If <c>true</c>, the resource is cleared when the world is destroyed.</param>
         [MethodImpl(AggressiveInlining)]
         public void SetResource(Type type, IResource value, bool clearOnDestroy) {
-            unsafe { _setResource(type, value, clearOnDestroy); }
+            World._SetResource(type, value, clearOnDestroy);
         }
 
         /// <summary>
@@ -415,7 +297,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <param name="clearOnDestroy">If <c>true</c>, the resource is cleared when the world is destroyed.</param>
         [MethodImpl(AggressiveInlining)]
         public void SetResource(string key, IResource value, bool clearOnDestroy) {
-            unsafe { _setResourceByKey(key, value, clearOnDestroy); }
+            World._SetResourceByKey(key, value, clearOnDestroy);
         }
 
         /// <summary>
@@ -425,7 +307,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns>Read-only collection of resource keys.</returns>
         [MethodImpl(AggressiveInlining)]
         public IReadOnlyCollection<string> GetAllResourcesKeys() {
-            unsafe { return _getAllResourcesKeys(); }
+            return World._GetAllResourcesKeys();
         }
 
         /// <summary>
@@ -435,13 +317,13 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns>Read-only collection of resource types.</returns>
         [MethodImpl(AggressiveInlining)]
         public IReadOnlyCollection<Type> GetAllResourcesTypes() {
-            unsafe { return _getAllResourcesTypes(); }
+            return World._GetAllResourcesTypes();
         }
         #endregion
 
         #region SYSTEMS
         /// <summary>
-        /// Returns handles for every <see cref="World{TWorld}.Systems{TSystemsType}"/> pipeline
+        /// Returns handles for every <see cref="World.Systems{TSystemsType}"/> pipeline
         /// currently registered for this world. Useful for editor/inspector tools that need
         /// to enumerate all systems groups and their resources without knowing the concrete
         /// <c>TSystemsType</c> at compile time.
@@ -449,7 +331,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns>Read-only list of <see cref="StaticEcs.SystemsHandle"/> instances, one per active pipeline.</returns>
         [MethodImpl(AggressiveInlining)]
         public IReadOnlyList<SystemsHandle> GetAllSystemsHandles() {
-            unsafe { return _getAllSystemsHandles(); }
+            return World._GetAllSystemsHandles();
         }
 
         /// <summary>
@@ -460,7 +342,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns><c>true</c> if a systems pipeline with the given type is registered for this world.</returns>
         [MethodImpl(AggressiveInlining)]
         public bool TryGetSystemsHandle(Type systemsType, out SystemsHandle handle) {
-            unsafe { return _tryGetSystemsHandle(systemsType, out handle); }
+            return World._TryGetSystemsHandle(systemsType, out handle);
         }
         #endregion
     }
@@ -477,7 +359,7 @@ namespace FFS.Libraries.StaticEcs {
     /// <para>
     /// <b>Performance note:</b> These operations involve boxing for component values (via
     /// <see cref="IComponent"/>) and function pointer indirection. For hot-path code, use the
-    /// generic <c>World&lt;TWorld&gt;.Components&lt;T&gt;</c> API instead. ComponentsHandle is
+    /// generic <c>World.Components&lt;T&gt;</c> API instead. ComponentsHandle is
     /// intended for editor tools, serialization, and other non-performance-critical scenarios.
     /// </para>
     /// </summary>
@@ -520,7 +402,7 @@ namespace FFS.Libraries.StaticEcs {
         public readonly Type ComponentType;
 
         /// <summary>
-        /// The <see cref="Type"/> of the <c>TWorld</c> struct this handle's world belongs to.
+        /// The <see cref="Type"/> of the <c>World</c> class this handle's world belongs to.
         /// </summary>
         public readonly Type WorldType;
 
@@ -554,49 +436,48 @@ namespace FFS.Libraries.StaticEcs {
         #if NET5_0_OR_GREATER
         [UnconditionalSuppressMessage("AOT", "IL2091", Justification = "Component metadata is preserved by the registration path.")]
         #endif
-        internal static unsafe ComponentsHandle Create<TWorld, TComponent>()
-            where TWorld : struct, IWorldType
+        internal static unsafe ComponentsHandle Create<TComponent>()
             where TComponent : struct, IComponentOrTag {
             #if FFS_ECS_DEBUG
-            ref var instance = ref World<TWorld>.Components<TComponent>.instance;
+            ref var instance = ref World.Components<TComponent>.instance;
             if (!instance.IsRegistered) {
                 throw new StaticEcsException($"Component {typeof(TComponent).GenericName()} is not registered.");
             }
             #else
-            ref var instance = ref World<TWorld>.Components<TComponent>.Instance;
+            ref var instance = ref World.Components<TComponent>.Instance;
             #endif
             
             return new ComponentsHandle(
                 typeof(TComponent),
-                typeof(TWorld),
+                typeof(World),
                 instance.Guid,
                 instance.DynamicId,
                 instance.IsTag,
                 instance.NonSerializable,
                 instance.Masks,
-                &World<TWorld>.Components<TComponent>._Initialize,
-                &World<TWorld>.Components<TComponent>._Resize,
-                &World<TWorld>.Components<TComponent>._Destroy,
-                &World<TWorld>.Components<TComponent>._HardReset,
-                &World<TWorld>.Components<TComponent>._HardResetChunk,
-                &World<TWorld>.Components<TComponent>._TryToStringComponent,
-                &World<TWorld>.Components<TComponent>._WriteChunk,
-                &World<TWorld>.Components<TComponent>._ReadChunk,
-                &World<TWorld>.Components<TComponent>._WriteEntity,
-                &World<TWorld>.Components<TComponent>._ReadEntity,
-                &World<TWorld>.Components<TComponent>._ComponentsSegments,
-                &World<TWorld>.Components<TComponent>._BatchDelete,
-                &World<TWorld>.Components<TComponent>._TryGetRaw,
-                &World<TWorld>.Components<TComponent>._SetRaw,
-                &World<TWorld>.Components<TComponent>._SetRawDirect,
-                &World<TWorld>.Components<TComponent>._Add,
-                &World<TWorld>.Components<TComponent>._Enable,
-                &World<TWorld>.Components<TComponent>._Disable,
-                &World<TWorld>.Components<TComponent>._Delete,
-                &World<TWorld>.Components<TComponent>._Copy,
-                &World<TWorld>.Components<TComponent>._Move,
-                &World<TWorld>.Components<TComponent>._Set,
-                &World<TWorld>.Components<TComponent>._DefaultValue
+                &World.Components<TComponent>._Initialize,
+                &World.Components<TComponent>._Resize,
+                &World.Components<TComponent>._Destroy,
+                &World.Components<TComponent>._HardReset,
+                &World.Components<TComponent>._HardResetChunk,
+                &World.Components<TComponent>._TryToStringComponent,
+                &World.Components<TComponent>._WriteChunk,
+                &World.Components<TComponent>._ReadChunk,
+                &World.Components<TComponent>._WriteEntity,
+                &World.Components<TComponent>._ReadEntity,
+                &World.Components<TComponent>._ComponentsSegments,
+                &World.Components<TComponent>._BatchDelete,
+                &World.Components<TComponent>._TryGetRaw,
+                &World.Components<TComponent>._SetRaw,
+                &World.Components<TComponent>._SetRawDirect,
+                &World.Components<TComponent>._Add,
+                &World.Components<TComponent>._Enable,
+                &World.Components<TComponent>._Disable,
+                &World.Components<TComponent>._Delete,
+                &World.Components<TComponent>._Copy,
+                &World.Components<TComponent>._Move,
+                &World.Components<TComponent>._Set,
+                &World.Components<TComponent>._DefaultValue
             );
         }
 

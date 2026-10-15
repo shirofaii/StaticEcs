@@ -28,7 +28,7 @@ namespace FFS.Libraries.StaticEcs.Tests {
             foreach (var e in W.With<Pos>()) if (e.HasDisabled<Hp>()) disabledHp++;
             Assert.Equal((gids.Length + 8) / 9, disabledHp);
             for (var i = 0; i < gids.Length; i += 37) {
-                Assert.True(gids[i].TryUnpack<TW>(out var e));
+                Assert.True(gids[i].TryUnpack(out var e));
                 Assert.Equal(i, e.Ref<Pos>().X);
                 Assert.Equal(i % 2 == 0, e.Has<Red>());
                 Assert.Equal(i % 3 == 0, e.Has<Hp>());

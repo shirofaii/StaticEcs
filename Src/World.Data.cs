@@ -114,7 +114,7 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
-    public abstract partial class World<TWorld> {
+    public abstract partial class World {
         #if ENABLE_IL2CPP
         [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
         [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
@@ -279,7 +279,7 @@ namespace FFS.Libraries.StaticEcs {
             
             // COMPONENTS
             private readonly Dictionary<Guid, ComponentsHandle> _componentPoolByGuid;
-            private readonly Dictionary<Guid, EcsComponentDeleteMigrationReader<TWorld>> _migratorByGuid;
+            private readonly Dictionary<Guid, EcsComponentDeleteMigrationReader> _migratorByGuid;
             internal ulong[][] BitMaskComponents;
             private ComponentsHandle[] _poolsComponents;
             private Guid[] _guidsComponents;
@@ -318,7 +318,6 @@ namespace FFS.Libraries.StaticEcs {
             #endif
 
             // CONFIG
-            internal readonly bool IndependentWorld;
             internal readonly int Generation;
             internal readonly Dictionary<Type, ComponentMasks> MasksByType;
             internal readonly Dictionary<Type, byte> EntityTypeIdByType;
@@ -334,7 +333,6 @@ namespace FFS.Libraries.StaticEcs {
             #region BASE
             public Data(WorldConfig worldConfig) {
                 worldConfig = worldConfig.MergeWith(WorldConfig.Default());
-                IndependentWorld = worldConfig.Independent.Value;
                 Generation = ++_generations;
                 MasksByType = new Dictionary<Type, ComponentMasks>();
                 EntityTypeIdByType = new Dictionary<Type, byte>();
@@ -391,7 +389,7 @@ namespace FFS.Libraries.StaticEcs {
                 _poolsComponents = new ComponentsHandle[worldConfig.BaseComponentTypesCount.Value];
                 _guidsComponents = new Guid[worldConfig.BaseComponentTypesCount.Value];
                 _componentPoolByGuid = new Dictionary<Guid, ComponentsHandle>();
-                _migratorByGuid = new Dictionary<Guid, EcsComponentDeleteMigrationReader<TWorld>>();
+                _migratorByGuid = new Dictionary<Guid, EcsComponentDeleteMigrationReader>();
                 BitMaskComponents = null;
                 _poolsCountComponents = default;
                 _poolsCountSerializableComponents = default;
@@ -449,16 +447,14 @@ namespace FFS.Libraries.StaticEcs {
                     FillEntitiesVersions(ref segment.Versions);
                     segment.Masks = new ulong[Const.BLOCKS_IN_SEGMENT * 3];
                     segment.ClusterId = EntitiesSegment.InvalidCluster;
-                    segment.SelfOwner = IndependentWorld;
+                    segment.SelfOwner = true;
                     segment.EntityType = EntitiesSegment.NoEntityType;
                 }
 
                 _selfFreeChunksCount = 0;
                 _selfFreeChunks = new uint[chunksCapacity];
-                if (IndependentWorld) {
-                    for (var i = (int) chunksCapacity - 1; i >= 0; i--) {
-                        _selfFreeChunks[_selfFreeChunksCount++] = (uint) i;
-                    }
+                for (var i = (int) chunksCapacity - 1; i >= 0; i--) {
+                    _selfFreeChunks[_selfFreeChunksCount++] = (uint) i;
                 }
                 
                 // COMPONENTS
@@ -500,14 +496,12 @@ namespace FFS.Libraries.StaticEcs {
                     FillEntitiesVersions(ref segment.Versions);
                     segment.Masks = new ulong[Const.BLOCKS_IN_SEGMENT * 3];
                     segment.ClusterId = EntitiesSegment.InvalidCluster;
-                    segment.SelfOwner = IndependentWorld;
+                    segment.SelfOwner = true;
                     segment.EntityType = EntitiesSegment.NoEntityType;
                 }
                 
-                if (IndependentWorld) {
-                    for (var i = (int) chunksCapacity - 1; i >= oldChunksCapacity; i--) {
-                        _selfFreeChunks[_selfFreeChunksCount++] = (uint) i;
-                    }
+                for (var i = (int) chunksCapacity - 1; i >= oldChunksCapacity; i--) {
+                    _selfFreeChunks[_selfFreeChunksCount++] = (uint) i;
                 }
 
                 // COMPONENTS
@@ -599,10 +593,8 @@ namespace FFS.Libraries.StaticEcs {
                 ActiveClustersCount = 0;
 
                 _selfFreeChunksCount = 0;
-                if (IndependentWorld) {
-                    for (var i = HeuristicChunks.Length - 1; i >= 0; i--) {
-                        _selfFreeChunks[_selfFreeChunksCount++] = (uint)i;
-                    }
+                for (var i = HeuristicChunks.Length - 1; i >= 0; i--) {
+                    _selfFreeChunks[_selfFreeChunksCount++] = (uint)i;
                 }
             }
             #endregion
@@ -979,7 +971,7 @@ namespace FFS.Libraries.StaticEcs {
                 AssertEntityTypeIsRegistered(EntityTypeName, entityType);
                 #endif
                 if (!TryCreateEntity(entityType, clusterId, out entity)) {
-                    throw new StaticEcsException($"World<{typeof(TWorld)}>, Method: CreateEntity, ran out of space in the attached chunks");
+                    throw new StaticEcsException($"World, Method: CreateEntity, ran out of space in the attached chunks");
                 }
                 unsafe {
                     var onCreate = EntityTypes[entityType].OnCreateFn;
@@ -996,7 +988,7 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
                 var type = EntityTypeInfo<TEntityType>.Instance;
                 if (!TryCreateEntity(type.Id, clusterId, out entity)) {
-                    throw new StaticEcsException($"World<{typeof(TWorld)}>, Method: CreateEntity, ran out of space in the attached chunks");
+                    throw new StaticEcsException($"World, Method: CreateEntity, ran out of space in the attached chunks");
                 }
                 if (type.HasOnCreate) {
                     CallOnCreate(entityType, entity);
@@ -1011,7 +1003,7 @@ namespace FFS.Libraries.StaticEcs {
                 AssertEntityTypeIsRegistered(EntityTypeName, entityType);
                 #endif
                 if (!TryCreateEntity(entityType, clusterId, out entity)) {
-                    throw new StaticEcsException($"World<{typeof(TWorld)}>, Method: CreateEntity, ran out of space in the attached chunks");
+                    throw new StaticEcsException($"World, Method: CreateEntity, ran out of space in the attached chunks");
                 }
             }
             
@@ -1023,11 +1015,7 @@ namespace FFS.Libraries.StaticEcs {
                 chunkIdx = segmentIdx >> Const.SEGMENTS_IN_CHUNK_SHIFT;
                 if (freeSegment == EntitiesSegment.Invalid) {
                     if (_selfFreeChunksCount == 0) {
-                        if (IndependentWorld) {
-                            ResizeWorld((uint) (HeuristicChunks.Length + 4));
-                        } else {
-                            return false;
-                        }
+                        ResizeWorld((uint) (HeuristicChunks.Length + 4));
                     }
 
                     chunkIdx = _selfFreeChunks[--_selfFreeChunksCount];
@@ -1123,7 +1111,7 @@ namespace FFS.Libraries.StaticEcs {
                 AssertEntityTypeIsRegistered(EntityTypeName, entityType);
                 #endif
                 if (!TryCreateEntity(entityType, chunkIdx, out entity)) {
-                    throw new StaticEcsException($"World<{typeof(TWorld)}>, Method: CreateEntity, ran out of space in chunk {chunkIdx}");
+                    throw new StaticEcsException($"World, Method: CreateEntity, ran out of space in chunk {chunkIdx}");
                 }
             }
 
@@ -1136,7 +1124,7 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
                 var type = EntityTypeInfo<TEntityType>.Instance;
                 if (!TryCreateEntity(type.Id, chunkIdx, out entity)) {
-                    throw new StaticEcsException($"World<{typeof(TWorld)}>, Method: CreateEntity, ran out of space in chunk {chunkIdx}");
+                    throw new StaticEcsException($"World, Method: CreateEntity, ran out of space in chunk {chunkIdx}");
                 }
                 if (type.HasOnCreate) {
                     CallOnCreate(entityType, entity);
@@ -1151,7 +1139,7 @@ namespace FFS.Libraries.StaticEcs {
                 AssertEntityTypeIsRegistered(EntityTypeName, entityType);
                 #endif
                 if (!TryCreateEntity(entityType, chunkIdx, out entity)) {
-                    throw new StaticEcsException($"World<{typeof(TWorld)}>, Method: CreateEntity, ran out of space in the attached chunks");
+                    throw new StaticEcsException($"World, Method: CreateEntity, ran out of space in the attached chunks");
                 }
                 unsafe {
                     var onCreate = EntityTypes[entityType].OnCreateFn;
@@ -1286,13 +1274,13 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 AssertGidIsNotActive(EntityTypeName, gid);
                 Assert(EntityTypeName, !EntitiesSegments[baseSegmentIdx].SelfOwner, "It is possible to create entities with GID only for chunks with Other ownership");
-                if (EntitiesSegments[baseSegmentIdx].ClusterId != gid.ClusterId) throw new StaticEcsException($"World<{typeof(TWorld)}>, Method: CreateEntity, Chunk cluster {EntitiesSegments[baseSegmentIdx].ClusterId} not equal GID cluster {gid.ClusterId}");
+                if (EntitiesSegments[baseSegmentIdx].ClusterId != gid.ClusterId) throw new StaticEcsException($"World, Method: CreateEntity, Chunk cluster {EntitiesSegments[baseSegmentIdx].ClusterId} not equal GID cluster {gid.ClusterId}");
                 #endif
 
                 ref var segment = ref EntitiesSegments[segmentIdx];
                 #if FFS_ECS_DEBUG
                 if (segment.Masks[segmentBlockIdx] != 0 && segment.EntityType != entityType) {
-                    throw new StaticEcsException($"World<{typeof(TWorld)}>, Method: CreateEntity, Segment {segmentIdx} already has entities of type {segment.EntityType}, cannot assign type {entityType}");
+                    throw new StaticEcsException($"World, Method: CreateEntity, Segment {segmentIdx} already has entities of type {segment.EntityType}, cannot assign type {entityType}");
                 }
                 #endif
                 segment.EntityType = entityType;
@@ -1344,7 +1332,7 @@ namespace FFS.Libraries.StaticEcs {
                     segmentIdx = (uint) freeSegment;
                     chunkIdx = segmentIdx >> Const.SEGMENTS_IN_CHUNK_SHIFT;
                 } else if (!TryCreateEntityCold(ref cluster, entityType, clusterId, out segmentIdx, out chunkIdx)) {
-                    throw new StaticEcsException($"World<{typeof(TWorld)}>, Method: CreateEntitiesBatch, ran out of space in the attached chunks");
+                    throw new StaticEcsException($"World, Method: CreateEntitiesBatch, ran out of space in the attached chunks");
                 }
 
                 ref var heuristic = ref HeuristicChunks[chunkIdx];
@@ -1394,7 +1382,7 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             [MethodImpl(AggressiveInlining)]
-            internal static void InvokeOnCreateBatch<TEntityType>(TEntityType entityType, QueryFunctionWithEntity<TWorld> onCreate, ulong mask, uint segmentIdx, byte segmentBlockIdx)
+            internal static void InvokeOnCreateBatch<TEntityType>(TEntityType entityType, QueryFunctionWithEntity onCreate, ulong mask, uint segmentIdx, byte segmentBlockIdx)
                 where TEntityType : struct, IEntityType {
 
                 var hasOnCreate = EntityTypeInfo<TEntityType>.Instance.HasOnCreate;
@@ -1520,10 +1508,10 @@ namespace FFS.Libraries.StaticEcs {
                 var baseSegmentIdx = chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT;
                 ref var segment = ref EntitiesSegments[segmentIdx];
                 #if FFS_ECS_DEBUG
-                if (!Clusters[gid.ClusterId].Registered) throw new StaticEcsException($"World<{typeof(TWorld)}>, Method: LoadEntity, Cluster {EntitiesSegments[baseSegmentIdx].ClusterId} not registered");
-                if (EntitiesSegments[baseSegmentIdx].ClusterId != gid.ClusterId) throw new StaticEcsException($"World<{typeof(TWorld)}>, Method: LoadEntity, Chunk cluster {EntitiesSegments[baseSegmentIdx].ClusterId} not equal GID cluster {gid.ClusterId}");
+                if (!Clusters[gid.ClusterId].Registered) throw new StaticEcsException($"World, Method: LoadEntity, Cluster {EntitiesSegments[baseSegmentIdx].ClusterId} not registered");
+                if (EntitiesSegments[baseSegmentIdx].ClusterId != gid.ClusterId) throw new StaticEcsException($"World, Method: LoadEntity, Chunk cluster {EntitiesSegments[baseSegmentIdx].ClusterId} not equal GID cluster {gid.ClusterId}");
                 var segmentEntityIdx = (int)(eid & Const.ENTITIES_IN_SEGMENT_MASK);
-                if (segment.Versions[segmentEntityIdx] != gid.Version) throw new StaticEcsException($"World<{typeof(TWorld)}>, Method: LoadEntity, Entity version {segment.Versions[segmentEntityIdx]} not equal GID version {gid.Version}");
+                if (segment.Versions[segmentEntityIdx] != gid.Version) throw new StaticEcsException($"World, Method: LoadEntity, Entity version {segment.Versions[segmentEntityIdx]} not equal GID version {gid.Version}");
                 #endif
                 
                 ref var loaded = ref HeuristicLoadedChunks[chunkIdx];
@@ -1994,7 +1982,7 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
 
                 if (!TryFreeClusterInternal(clusterId)) {
-                    throw new StaticEcsException($"World<{typeof(TWorld)}>", "FreeCluster", $"Cluster {clusterId} not registered");
+                    throw new StaticEcsException($"World", "FreeCluster", $"Cluster {clusterId} not registered");
                 }
             }
 
@@ -2125,7 +2113,7 @@ namespace FFS.Libraries.StaticEcs {
                     Query().BatchDestroy(chunks, EntityStatusType.Any, StaticEcs.QueryMode.Flexible);
                     ref var cluster = ref Clusters[baseSegment.ClusterId];
                     RemoveChunkFromCluster(ref cluster, chunkIdx, baseSegment.ClusterId);
-                    SetChunkSegmentsCluster(chunkIdx, EntitiesSegment.InvalidCluster, IndependentWorld);
+                    SetChunkSegmentsCluster(chunkIdx, EntitiesSegment.InvalidCluster, true);
                     if (selfOwned) {
                         #if FFS_ECS_DEBUG
                         for (var fi = 0; fi < _selfFreeChunksCount; fi++) {
@@ -2245,7 +2233,7 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
                 
                 if (!TryFindNextSelfFreeChunkInternal(out var chunkInfo)) {
-                    throw new StaticEcsException($"World<{typeof(TWorld)}>, Method: FindNextSelfFreeChunk, ran out of space in the self owned chunks");
+                    throw new StaticEcsException($"World, Method: FindNextSelfFreeChunk, ran out of space in the self owned chunks");
                 }
 
                 return chunkInfo;
@@ -2258,12 +2246,7 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
                 
                 if (_selfFreeChunksCount == 0) {
-                    if (IndependentWorld) {
-                        ResizeWorld((uint) (HeuristicChunks.Length + 4));
-                    } else {
-                        chunkInfo = default;
-                        return false;
-                    }
+                    ResizeWorld((uint) (HeuristicChunks.Length + 4));
                 }
 
                 chunkInfo = new EntitiesChunkInfo(_selfFreeChunks[_selfFreeChunksCount - 1]);
@@ -2910,7 +2893,7 @@ namespace FFS.Libraries.StaticEcs {
                 #else
                 Components<T>.Instance = storage;
                 #endif
-                Components<T>.Handle = ComponentsHandle.Create<TWorld, T>();
+                Components<T>.Handle = ComponentsHandle.Create<T>();
                 RegisterComponentPool(Components<T>.Handle, guid, nonSerializable, typeName);
             }
 
@@ -2937,7 +2920,7 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             [MethodImpl(AggressiveInlining)]
-            internal readonly void SetMigrator(Guid id, EcsComponentDeleteMigrationReader<TWorld> migrator) {
+            internal readonly void SetMigrator(Guid id, EcsComponentDeleteMigrationReader migrator) {
                 _migratorByGuid[id] = migrator;
             }
             
@@ -3138,7 +3121,7 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         internal static bool _DestroyEntity(EntityGID gid) {
-            if (gid.TryUnpack<TWorld>(out var entity)) {
+            if (gid.TryUnpack(out var entity)) {
                 return Data.Instance.DestroyEntity(entity);
             }
             return false;
@@ -3215,34 +3198,34 @@ namespace FFS.Libraries.StaticEcs {
 
         #region RESOURCES
         [MethodImpl(AggressiveInlining)]
-        internal static bool _HasResource(Type type) => ResourcesData<TWorld>.Instance.HasRaw(type);
+        internal static bool _HasResource(Type type) => ResourcesData<WorldScope>.Instance.HasRaw(type);
 
         [MethodImpl(AggressiveInlining)]
-        internal static bool _HasResourceByKey(string key) => NamedResources<TWorld>.Has(key);
+        internal static bool _HasResourceByKey(string key) => NamedResources<WorldScope>.Has(key);
 
         [MethodImpl(AggressiveInlining)]
-        internal static IResource _GetResource(Type type) => ResourcesData<TWorld>.Instance.GetRaw(type);
+        internal static IResource _GetResource(Type type) => ResourcesData<WorldScope>.Instance.GetRaw(type);
 
         [MethodImpl(AggressiveInlining)]
-        internal static IResource _GetResourceByKey(string key) => NamedResources<TWorld>.GetRaw(key);
+        internal static IResource _GetResourceByKey(string key) => NamedResources<WorldScope>.GetRaw(key);
 
         [MethodImpl(AggressiveInlining)]
-        internal static void _RemoveResource(Type type) => ResourcesData<TWorld>.Instance.RemoveRaw(type);
+        internal static void _RemoveResource(Type type) => ResourcesData<WorldScope>.Instance.RemoveRaw(type);
 
         [MethodImpl(AggressiveInlining)]
-        internal static void _RemoveResourceByKey(string key) => NamedResources<TWorld>.Remove(key);
+        internal static void _RemoveResourceByKey(string key) => NamedResources<WorldScope>.Remove(key);
 
         [MethodImpl(AggressiveInlining)]
-        internal static void _SetResource(Type type, IResource value, bool clearOnDestroy) => ResourcesData<TWorld>.Instance.SetRaw(type, value, clearOnDestroy);
+        internal static void _SetResource(Type type, IResource value, bool clearOnDestroy) => ResourcesData<WorldScope>.Instance.SetRaw(type, value, clearOnDestroy);
 
         [MethodImpl(AggressiveInlining)]
-        internal static void _SetResourceByKey(string key, IResource value, bool clearOnDestroy) => NamedResources<TWorld>.SetRaw(key, value);
+        internal static void _SetResourceByKey(string key, IResource value, bool clearOnDestroy) => NamedResources<WorldScope>.SetRaw(key, value);
 
         [MethodImpl(AggressiveInlining)]
-        internal static IReadOnlyCollection<string> _GetAllResourcesKeys() => NamedResources<TWorld>.Values.Keys;
+        internal static IReadOnlyCollection<string> _GetAllResourcesKeys() => NamedResources<WorldScope>.Values.Keys;
 
         [MethodImpl(AggressiveInlining)]
-        internal static IReadOnlyCollection<Type> _GetAllResourcesTypes() => ResourcesData<TWorld>.Instance.GetAllGetSetRemoveValuesMethods().Keys;
+        internal static IReadOnlyCollection<Type> _GetAllResourcesTypes() => ResourcesData<WorldScope>.Instance.GetAllGetSetRemoveValuesMethods().Keys;
         #endregion
         #endregion
 

@@ -17,58 +17,37 @@ using Unity.IL2CPP.CompilerServices;
 namespace FFS.Libraries.StaticEcs {
 
     /// <summary>
-    /// Marker interface that identifies a world type. Implement this on an empty struct to define
-    /// a unique world identity. Each distinct <c>TWorld</c> type creates a completely isolated
-    /// static ECS world with its own entities, components, tags, events, and resources.
-    /// <para>
-    /// Example: <c>public struct MyGameWorld : IWorldType { }</c> then use <c>World&lt;MyGameWorld&gt;</c>
-    /// to access all ECS operations for that world.
-    /// </para>
-    /// </summary>
-    public interface IWorldType { }
-
-    /// <summary>
-    /// The central static ECS world. All entity, component, tag, event, and resource data for a given
-    /// <typeparamref name="TWorld"/> is stored in static fields, providing zero-indirection access
-    /// with no per-instance overhead.
+    /// The one static ECS world. All entity, component, tag and resource data is stored in static
+    /// fields, providing zero-indirection access with no per-instance overhead.
     /// <para>
     /// <b>Lifecycle:</b> A world must go through three states in order:
     /// <list type="number">
-    /// <item><see cref="Create"/> — allocates internal structures, registers component/tag/event types.</item>
+    /// <item><see cref="Create"/> — allocates internal structures, registers component and tag types.</item>
     /// <item><see cref="Initialize"/> (or <c>InitializeFrom*Snapshot</c>) — allocates entity storage, transitions to <see cref="WorldStatus.Initialized"/>.</item>
     /// <item><see cref="Destroy"/> — destroys all entities, frees all data, returns to <see cref="WorldStatus.NotCreated"/>.</item>
     /// </list>
     /// </para>
     /// <para>
-    /// <b>Thread safety:</b> Most mutating operations assert that multi-threading is not active
-    /// (in debug builds). Use the query system's parallel runner for safe concurrent reads.
-    /// </para>
-    /// <para>
-    /// This is an abstract partial class — the remaining parts (Entity, Components, Tags, Events,
-    /// Queries, Serializer, etc.) are defined in other <c>World.*.cs</c> files.
+    /// The world is single-threaded. This is an abstract partial class — the remaining parts
+    /// (Entity, Components, Tags, Queries, Serializer, etc.) are defined in other <c>World.*.cs</c> files.
     /// </para>
     /// </summary>
-    /// <typeparam name="TWorld">
-    /// A struct implementing <see cref="IWorldType"/> that uniquely identifies this world.
-    /// Different TWorld types produce completely independent static worlds.
-    /// </typeparam>
     #if ENABLE_IL2CPP
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     [Il2CppEagerStaticClassConstruction]
     #endif
-    public abstract partial class World<TWorld> where TWorld : struct, IWorldType {
+    public abstract partial class World {
 
         #region BASE
         
         /// <summary>
         /// Type-erased <see cref="WorldHandle"/> for this world, exposing its API through
-        /// function pointers without requiring the <typeparamref name="TWorld"/> generic
-        /// parameter at the call site.
+        /// function pointers.
         /// <para>
         /// Intended for editor tools, debug visualizers, serializers, and plugin code that
         /// must operate on any world uniformly. For regular gameplay code prefer the strongly
-        /// typed <see cref="World{TWorld}"/> API — the handle adds an indirection and loses
+        /// typed <see cref="World"/> API — the handle adds an indirection and loses
         /// compile-time type safety.
         /// </para>
         /// <para>
@@ -92,17 +71,6 @@ namespace FFS.Libraries.StaticEcs {
         public static bool IsWorldInitialized {
             [MethodImpl(AggressiveInlining)]
             get => Data.Instance.WorldStatus == WorldStatus.Initialized;
-        }
-
-        /// <summary>
-        /// Whether this world was configured as independent (see <see cref="WorldConfig.Independent"/>).
-        /// Independent worlds manage their own chunk allocation and do not share entity ID space
-        /// with other worlds. Non-independent worlds can share chunks across multiple world instances
-        /// for advanced streaming or multi-world scenarios.
-        /// </summary>
-        public static bool IsIndependent {
-            [MethodImpl(AggressiveInlining)]
-            get => Data.Instance.IndependentWorld;
         }
 
         /// <summary>
@@ -134,8 +102,8 @@ namespace FFS.Libraries.StaticEcs {
             #endif
 
             Data.Instance = new Data(worldConfig);
-            Data.Handle = WorldHandle.Create<TWorld>();
-            ResourcesData<TWorld>.Create();
+            Data.Handle = WorldHandle.Create();
+            ResourcesData<WorldScope>.Create();
             Serializer.Create();
         }
 
@@ -192,8 +160,8 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             Data.Instance.DestroyInternal();
-            ResourcesData<TWorld>.Instance.Clear();
-            NamedResources<TWorld>.Clear();
+            ResourcesData<WorldScope>.Instance.Clear();
+            NamedResources<WorldScope>.Clear();
             Serializer.DestroySerializer();
 
             Data.Instance.WorldStatus = WorldStatus.NotCreated;
@@ -503,7 +471,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns><c>true</c> if a resource of this type has been set.</returns>
         [MethodImpl(AggressiveInlining)]
         public static bool HasResource<TResource>() where TResource : IResource {
-            return Resources<TWorld, TResource>.Has();
+            return Resources<WorldScope, TResource>.Has();
         }
 
         /// <summary>
@@ -515,7 +483,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns><c>true</c> if a resource with this key exists.</returns>
         [MethodImpl(AggressiveInlining)]
         public static bool HasResource<TResource>(string key) where TResource : IResource {
-            return NamedResources<TWorld>.Has(key);
+            return NamedResources<WorldScope>.Has(key);
         }
 
         /// <summary>
@@ -530,7 +498,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns>A mutable reference to the stored resource value.</returns>
         [MethodImpl(AggressiveInlining)]
         public static ref TResource GetResource<TResource>() where TResource : IResource {
-            return ref Resources<TWorld, TResource>.Value;
+            return ref Resources<WorldScope, TResource>.Value;
         }
 
         /// <summary>
@@ -541,7 +509,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <returns>A mutable reference to the stored resource value.</returns>
         [MethodImpl(AggressiveInlining)]
         public static ref TResource GetResource<TResource>(string key) where TResource : IResource {
-            return ref NamedResources<TWorld>.Get<TResource>(key);
+            return ref NamedResources<WorldScope>.Get<TResource>(key);
         }
 
         /// <summary>
@@ -559,7 +527,7 @@ namespace FFS.Libraries.StaticEcs {
         /// </param>
         [MethodImpl(AggressiveInlining)]
         public static void SetResource<TResource>(TResource value, bool clearOnDestroy = true) where TResource : IResource {
-            Resources<TWorld, TResource>.Set(value, clearOnDestroy);
+            Resources<WorldScope, TResource>.Set(value, clearOnDestroy);
         }
 
         /// <summary>
@@ -572,7 +540,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <param name="clearOnDestroy">If <c>true</c>, cleared on world destroy.</param>
         [MethodImpl(AggressiveInlining)]
         public static void SetResource<TResource>(string key, TResource value, bool clearOnDestroy = true) where TResource : IResource {
-            NamedResources<TWorld>.Set(key, value, clearOnDestroy);
+            NamedResources<WorldScope>.Set(key, value, clearOnDestroy);
         }
 
         /// <summary>
@@ -581,7 +549,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <typeparam name="TResource">The resource type to remove.</typeparam>
         [MethodImpl(AggressiveInlining)]
         public static void RemoveResource<TResource>() where TResource : IResource {
-            Resources<TWorld, TResource>.Remove();
+            Resources<WorldScope, TResource>.Remove();
         }
 
         /// <summary>
@@ -590,14 +558,14 @@ namespace FFS.Libraries.StaticEcs {
         /// <param name="key">String key of the resource to remove.</param>
         [MethodImpl(AggressiveInlining)]
         public static void RemoveResource(string key) {
-            NamedResources<TWorld>.Remove(key);
+            NamedResources<WorldScope>.Remove(key);
         }
         #endregion
 
         #region ENTITIES
         /// <summary>
         /// Creates a new entity of the specified type. If <typeparamref name="TEntityType"/> defines
-        /// <see cref="IEntityType.OnCreate{TWorld}"/>, it is called after entity creation (inlined by JIT).
+        /// <see cref="IEntityType.OnCreate"/>, it is called after entity creation (inlined by JIT).
         /// </summary>
         /// <typeparam name="TEntityType">Entity type struct implementing <see cref="IEntityType"/>. Determines segment placement and query filter matching.</typeparam>
         [MethodImpl(AggressiveInlining)]
@@ -716,7 +684,7 @@ namespace FFS.Libraries.StaticEcs {
         /// </para>
         /// </summary>
         /// <typeparam name="TEntityType">Entity type struct implementing <see cref="IEntityType"/>.</typeparam>
-        /// <param name="entityType">Entity type instance; its fields are accessible in <see cref="IEntityType.OnCreate{TWorld}"/> via <c>this</c>.</param>
+        /// <param name="entityType">Entity type instance; its fields are accessible in <see cref="IEntityType.OnCreate"/> via <c>this</c>.</param>
         /// <param name="gid">The EntityGID specifying the exact slot, version, and cluster to restore.</param>
         /// <returns>A live entity handle at the specified slot.</returns>
         [MethodImpl(AggressiveInlining)]
@@ -728,7 +696,7 @@ namespace FFS.Libraries.StaticEcs {
 
         /// <summary>
         /// Creates a new entity using a runtime entity type ID.
-        /// If the entity type defines <see cref="IEntityType.OnCreate{TWorld}"/>, it is called via type-erased dispatch.
+        /// If the entity type defines <see cref="IEntityType.OnCreate"/>, it is called via type-erased dispatch.
         /// <para>
         /// Primarily used by the serializer when the entity type is only known at runtime.
         /// In normal gameplay, prefer <see cref="NewEntity{TEntityType}(ushort)"/>.
@@ -745,7 +713,7 @@ namespace FFS.Libraries.StaticEcs {
 
         /// <summary>
         /// Creates a new entity in a specific chunk using a runtime entity type ID.
-        /// If the entity type defines <see cref="IEntityType.OnCreate{TWorld}"/>, it is called via type-erased dispatch.
+        /// If the entity type defines <see cref="IEntityType.OnCreate"/>, it is called via type-erased dispatch.
         /// <para>
         /// Primarily used by the serializer when the entity type is only known at runtime.
         /// In normal gameplay, prefer <see cref="NewEntityInChunk{TEntityType}(uint)"/>.
@@ -793,7 +761,7 @@ namespace FFS.Libraries.StaticEcs {
         /// </para>
         /// </summary>
         /// <typeparam name="TEntityType">Entity type struct implementing <see cref="IEntityType"/>.</typeparam>
-        /// <param name="entityType">Entity type instance; its fields are accessible in <see cref="IEntityType.OnCreate{TWorld}"/> via <c>this</c>.</param>
+        /// <param name="entityType">Entity type instance; its fields are accessible in <see cref="IEntityType.OnCreate"/> via <c>this</c>.</param>
         /// <param name="count">Number of entities to create.</param>
         /// <param name="clusterId">Cluster to create entities in (default: 0).</param>
         /// <param name="onCreate">
@@ -802,7 +770,7 @@ namespace FFS.Libraries.StaticEcs {
         /// </param>
         #region NEW_BY_TYPE_BATCH
         [MethodImpl(AggressiveInlining)]
-        public static void NewEntities<TEntityType>(uint count, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity<TWorld> onCreate = null) 
+        public static void NewEntities<TEntityType>(uint count, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity onCreate = null) 
             where TEntityType : struct, IEntityType {
             ref var entities = ref Data.Instance;
 
@@ -813,10 +781,10 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
 
-        /// <inheritdoc cref="NewEntities{TEntityType}(uint, TEntityType, ushort, QueryFunctionWithEntity{TWorld})"/>
+        /// <inheritdoc cref="NewEntities{TEntityType}(uint, TEntityType, ushort, QueryFunctionWithEntity)"/>
         /// <typeparam name="T1">Component type to add to all created entities (default-initialized).</typeparam>
         [MethodImpl(AggressiveInlining)]
-        public static void NewEntities<TEntityType, T1>(uint count, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity<TWorld> onCreate = null) 
+        public static void NewEntities<TEntityType, T1>(uint count, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity onCreate = null) 
             where TEntityType : struct, IEntityType
             where T1 : struct, IComponent {
             ref var entities = ref Data.Instance;
@@ -829,11 +797,11 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
 
-        /// <inheritdoc cref="NewEntities{TEntityType}(uint, TEntityType, ushort, QueryFunctionWithEntity{TWorld})"/>
+        /// <inheritdoc cref="NewEntities{TEntityType}(uint, TEntityType, ushort, QueryFunctionWithEntity)"/>
         /// <typeparam name="T1">First component type (default-initialized).</typeparam>
         /// <typeparam name="T2">Second component type (default-initialized).</typeparam>
         [MethodImpl(AggressiveInlining)]
-        public static void NewEntities<TEntityType, T1, T2>(uint count, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity<TWorld> onCreate = null) 
+        public static void NewEntities<TEntityType, T1, T2>(uint count, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity onCreate = null) 
             where TEntityType : struct, IEntityType
             where T1 : struct, IComponent
             where T2 : struct, IComponent {
@@ -848,12 +816,12 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
 
-        /// <inheritdoc cref="NewEntities{TEntityType}(uint, TEntityType, ushort, QueryFunctionWithEntity{TWorld})"/>
+        /// <inheritdoc cref="NewEntities{TEntityType}(uint, TEntityType, ushort, QueryFunctionWithEntity)"/>
         /// <typeparam name="T1">First component type (default-initialized).</typeparam>
         /// <typeparam name="T2">Second component type (default-initialized).</typeparam>
         /// <typeparam name="T3">Third component type (default-initialized).</typeparam>
         [MethodImpl(AggressiveInlining)]
-        public static void NewEntities<TEntityType, T1, T2, T3>(uint count, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity<TWorld> onCreate = null) 
+        public static void NewEntities<TEntityType, T1, T2, T3>(uint count, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity onCreate = null) 
             where TEntityType : struct, IEntityType
             where T1 : struct, IComponent
             where T2 : struct, IComponent
@@ -870,13 +838,13 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
 
-        /// <inheritdoc cref="NewEntities{TEntityType}(uint, TEntityType, ushort, QueryFunctionWithEntity{TWorld})"/>
+        /// <inheritdoc cref="NewEntities{TEntityType}(uint, TEntityType, ushort, QueryFunctionWithEntity)"/>
         /// <typeparam name="T1">First component type (default-initialized).</typeparam>
         /// <typeparam name="T2">Second component type (default-initialized).</typeparam>
         /// <typeparam name="T3">Third component type (default-initialized).</typeparam>
         /// <typeparam name="T4">Fourth component type (default-initialized).</typeparam>
         [MethodImpl(AggressiveInlining)]
-        public static void NewEntities<TEntityType, T1, T2, T3, T4>(uint count, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity<TWorld> onCreate = null) 
+        public static void NewEntities<TEntityType, T1, T2, T3, T4>(uint count, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity onCreate = null) 
             where TEntityType : struct, IEntityType
             where T1 : struct, IComponent
             where T2 : struct, IComponent
@@ -895,14 +863,14 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
 
-        /// <inheritdoc cref="NewEntities{TEntityType}(uint, TEntityType, ushort, QueryFunctionWithEntity{TWorld})"/>
+        /// <inheritdoc cref="NewEntities{TEntityType}(uint, TEntityType, ushort, QueryFunctionWithEntity)"/>
         /// <typeparam name="T1">First component type (default-initialized).</typeparam>
         /// <typeparam name="T2">Second component type (default-initialized).</typeparam>
         /// <typeparam name="T3">Third component type (default-initialized).</typeparam>
         /// <typeparam name="T4">Fourth component type (default-initialized).</typeparam>
         /// <typeparam name="T5">Fifth component type (default-initialized).</typeparam>
         [MethodImpl(AggressiveInlining)]
-        public static void NewEntities<TEntityType, T1, T2, T3, T4, T5>(uint count, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity<TWorld> onCreate = null) 
+        public static void NewEntities<TEntityType, T1, T2, T3, T4, T5>(uint count, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity onCreate = null) 
             where TEntityType : struct, IEntityType
             where T1 : struct, IComponent
             where T2 : struct, IComponent
@@ -931,13 +899,13 @@ namespace FFS.Libraries.StaticEcs {
         /// </summary>
         /// <typeparam name="TEntityType">Entity type struct implementing <see cref="IEntityType"/>.</typeparam>
         /// <typeparam name="T1">First component type.</typeparam>
-        /// <param name="entityType">Entity type instance; its fields are accessible in <see cref="IEntityType.OnCreate{TWorld}"/> via <c>this</c>.</param>
+        /// <param name="entityType">Entity type instance; its fields are accessible in <see cref="IEntityType.OnCreate"/> via <c>this</c>.</param>
         /// <param name="count">Number of entities to create.</param>
         /// <param name="c1">Value to assign to the first component on all created entities.</param>
         /// <param name="clusterId">Cluster to create entities in (default: 0).</param>
         /// <param name="onCreate">Optional per-entity callback for additional initialization.</param>
         [MethodImpl(AggressiveInlining)]
-        public static void NewEntities<TEntityType, T1>(uint count, T1 c1, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity<TWorld> onCreate = null) 
+        public static void NewEntities<TEntityType, T1>(uint count, T1 c1, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity onCreate = null) 
             where TEntityType : struct, IEntityType
             where T1 : struct, IComponent {
             ref var entities = ref Data.Instance;
@@ -950,10 +918,10 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
 
-        /// <inheritdoc cref="NewEntities{TEntityType, T1}(uint, T1, TEntityType, ushort, QueryFunctionWithEntity{TWorld})"/>
+        /// <inheritdoc cref="NewEntities{TEntityType, T1}(uint, T1, TEntityType, ushort, QueryFunctionWithEntity)"/>
         /// <typeparam name="T2">Second component type.</typeparam>
         [MethodImpl(AggressiveInlining)]
-        public static void NewEntities<TEntityType, T1, T2>(uint count, T1 c1, T2 c2, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity<TWorld> onCreate = null) 
+        public static void NewEntities<TEntityType, T1, T2>(uint count, T1 c1, T2 c2, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity onCreate = null) 
             where TEntityType : struct, IEntityType
             where T1 : struct, IComponent
             where T2 : struct, IComponent {
@@ -968,11 +936,11 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
 
-        /// <inheritdoc cref="NewEntities{TEntityType, T1}(uint, T1, TEntityType, ushort, QueryFunctionWithEntity{TWorld})"/>
+        /// <inheritdoc cref="NewEntities{TEntityType, T1}(uint, T1, TEntityType, ushort, QueryFunctionWithEntity)"/>
         /// <typeparam name="T2">Second component type.</typeparam>
         /// <typeparam name="T3">Third component type.</typeparam>
         [MethodImpl(AggressiveInlining)]
-        public static void NewEntities<TEntityType, T1, T2, T3>(uint count, T1 c1, T2 c2, T3 c3, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity<TWorld> onCreate = null) 
+        public static void NewEntities<TEntityType, T1, T2, T3>(uint count, T1 c1, T2 c2, T3 c3, TEntityType entityType = default, ushort clusterId = default, QueryFunctionWithEntity onCreate = null) 
             where TEntityType : struct, IEntityType
             where T1 : struct, IComponent
             where T2 : struct, IComponent
@@ -989,13 +957,13 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
 
-        /// <inheritdoc cref="NewEntities{TEntityType, T1}(uint, T1, TEntityType, ushort, QueryFunctionWithEntity{TWorld})"/>
+        /// <inheritdoc cref="NewEntities{TEntityType, T1}(uint, T1, TEntityType, ushort, QueryFunctionWithEntity)"/>
         /// <typeparam name="T2">Second component type.</typeparam>
         /// <typeparam name="T3">Third component type.</typeparam>
         /// <typeparam name="T4">Fourth component type.</typeparam>
         [MethodImpl(AggressiveInlining)]
         public static void NewEntities<TEntityType, T1, T2, T3, T4>(uint count, T1 c1, T2 c2, T3 c3, T4 c4, TEntityType entityType = default,
-                                                                    ushort clusterId = default, QueryFunctionWithEntity<TWorld> onCreate = null) 
+                                                                    ushort clusterId = default, QueryFunctionWithEntity onCreate = null) 
             where TEntityType : struct, IEntityType
             where T1 : struct, IComponent
             where T2 : struct, IComponent
@@ -1014,14 +982,14 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
 
-        /// <inheritdoc cref="NewEntities{TEntityType, T1}(uint, T1, TEntityType, ushort, QueryFunctionWithEntity{TWorld})"/>
+        /// <inheritdoc cref="NewEntities{TEntityType, T1}(uint, T1, TEntityType, ushort, QueryFunctionWithEntity)"/>
         /// <typeparam name="T2">Second component type.</typeparam>
         /// <typeparam name="T3">Third component type.</typeparam>
         /// <typeparam name="T4">Fourth component type.</typeparam>
         /// <typeparam name="T5">Fifth component type.</typeparam>
         [MethodImpl(AggressiveInlining)]
         public static void NewEntities<TEntityType, T1, T2, T3, T4, T5>(uint count, T1 c1, T2 c2, T3 c3, T4 c4, T5 c5, TEntityType entityType = default,
-                                                                        ushort clusterId = default, QueryFunctionWithEntity<TWorld> onCreate = null) 
+                                                                        ushort clusterId = default, QueryFunctionWithEntity onCreate = null) 
             where TEntityType : struct, IEntityType
             where T1 : struct, IComponent
             where T2 : struct, IComponent
@@ -1042,7 +1010,7 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
 
-        /// <inheritdoc cref="NewEntities{TEntityType, T1}(uint, T1, TEntityType, ushort, QueryFunctionWithEntity{TWorld})"/>
+        /// <inheritdoc cref="NewEntities{TEntityType, T1}(uint, T1, TEntityType, ushort, QueryFunctionWithEntity)"/>
         /// <typeparam name="T2">Second component type.</typeparam>
         /// <typeparam name="T3">Third component type.</typeparam>
         /// <typeparam name="T4">Fourth component type.</typeparam>
@@ -1050,7 +1018,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <typeparam name="T6">Sixth component type.</typeparam>
         [MethodImpl(AggressiveInlining)]
         public static void NewEntities<TEntityType, T1, T2, T3, T4, T5, T6>(uint count, T1 c1, T2 c2, T3 c3, T4 c4, T5 c5, T6 c6, TEntityType entityType = default,
-                                                                            ushort clusterId = default, QueryFunctionWithEntity<TWorld> onCreate = null) 
+                                                                            ushort clusterId = default, QueryFunctionWithEntity onCreate = null) 
             where TEntityType : struct, IEntityType
             where T1 : struct, IComponent
             where T2 : struct, IComponent
@@ -1073,7 +1041,7 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
 
-        /// <inheritdoc cref="NewEntities{TEntityType, T1}(uint, T1, TEntityType, ushort, QueryFunctionWithEntity{TWorld})"/>
+        /// <inheritdoc cref="NewEntities{TEntityType, T1}(uint, T1, TEntityType, ushort, QueryFunctionWithEntity)"/>
         /// <typeparam name="T2">Second component type.</typeparam>
         /// <typeparam name="T3">Third component type.</typeparam>
         /// <typeparam name="T4">Fourth component type.</typeparam>
@@ -1082,7 +1050,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <typeparam name="T7">Seventh component type.</typeparam>
         [MethodImpl(AggressiveInlining)]
         public static void NewEntities<TEntityType, T1, T2, T3, T4, T5, T6, T7>(uint count, T1 c1, T2 c2, T3 c3, T4 c4, T5 c5, T6 c6, T7 c7, TEntityType entityType = default,
-                                                                                ushort clusterId = default, QueryFunctionWithEntity<TWorld> onCreate = null) 
+                                                                                ushort clusterId = default, QueryFunctionWithEntity onCreate = null) 
             where TEntityType : struct, IEntityType
             where T1 : struct, IComponent
             where T2 : struct, IComponent
@@ -1107,7 +1075,7 @@ namespace FFS.Libraries.StaticEcs {
             }
         }
 
-        /// <inheritdoc cref="NewEntities{TEntityType, T1}(uint, T1, TEntityType, ushort, QueryFunctionWithEntity{TWorld})"/>
+        /// <inheritdoc cref="NewEntities{TEntityType, T1}(uint, T1, TEntityType, ushort, QueryFunctionWithEntity)"/>
         /// <typeparam name="T2">Second component type.</typeparam>
         /// <typeparam name="T3">Third component type.</typeparam>
         /// <typeparam name="T4">Fourth component type.</typeparam>
@@ -1117,7 +1085,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <typeparam name="T8">Eighth component type.</typeparam>
         [MethodImpl(AggressiveInlining)]
         public static void NewEntities<TEntityType, T1, T2, T3, T4, T5, T6, T7, T8>(uint count, T1 c1, T2 c2, T3 c3, T4 c4, T5 c5, T6 c6, T7 c7, T8 c8, TEntityType entityType = default,
-                                                                                    ushort clusterId = default, QueryFunctionWithEntity<TWorld> onCreate = null) 
+                                                                                    ushort clusterId = default, QueryFunctionWithEntity onCreate = null) 
             where TEntityType : struct, IEntityType
             where T1 : struct, IComponent
             where T2 : struct, IComponent
@@ -1159,13 +1127,13 @@ namespace FFS.Libraries.StaticEcs {
         public static TypeRegistrar Types() => default;
 
         /// <summary>
-        /// Fluent builder for registering ECS types (components, tags, events, links, multi-components).
+        /// Fluent builder for registering ECS types (components, tags, links, multi-components).
         /// Obtained via <see cref="Types"/>. Each method returns <c>this</c> for chaining.
         /// </summary>
         public readonly struct TypeRegistrar {
 
             /// <summary>
-            /// Auto-discovers and registers all ECS types found in the assembly that declares <typeparamref name="TWorld"/>.
+            /// Auto-discovers and registers all ECS types found in the assembly that calls this method.
             /// Scans for structs implementing the following marker interfaces and registers each one:
             /// <list type="bullet">
             /// <item><see cref="IComponent"/> — registered as component (excludes internal framework components).</item>
@@ -1176,13 +1144,12 @@ namespace FFS.Libraries.StaticEcs {
             /// <item><see cref="IEntityType"/> — registered as entity type with Id from a static <c>byte Id</c> field. <see cref="Default"/> is skipped (already registered).</item>
             /// </list>
             /// <para>
-            /// The scanned assembly is resolved as <c>typeof(TWorld).Assembly</c>. This is a pure reflection lookup
-            /// and does not rely on stack walking, so it works correctly on all runtimes, including
-            /// <b>Unity IL2CPP, Unity WebGL, and NativeAOT</b> (where <c>Assembly.GetCallingAssembly</c> returns
-            /// unreliable results).
+            /// The scanned assembly is resolved with <c>Assembly.GetCallingAssembly</c>, which is reliable on CoreCLR
+            /// but not on <b>Unity IL2CPP, Unity WebGL, or NativeAOT</b>; there, use
+            /// <see cref="RegisterAll(Assembly, Assembly[])"/> and pass the assemblies explicitly.
             /// </para>
             /// <para>
-            /// If <typeparamref name="TWorld"/> lives in a different assembly than your ECS types (e.g. a shared
+            /// If your ECS types live in a different assembly than the caller (e.g. a shared
             /// "core" assembly), use the overload <see cref="RegisterAll(Assembly, Assembly[])"/> and pass the
             /// assemblies explicitly.
             /// </para>
@@ -1194,24 +1161,24 @@ namespace FFS.Libraries.StaticEcs {
             /// </para>
             /// <para>
             /// Must be called during the <see cref="WorldStatus.Created"/> phase
-            /// (after <see cref="World{TWorld}.Create"/>, before <see cref="World{TWorld}.Initialize"/>).
+            /// (after <see cref="World.Create"/>, before <see cref="World.Initialize"/>).
             /// A type that implements multiple interfaces (e.g., both <see cref="IComponent"/> and <see cref="IMultiComponent"/>)
             /// will be registered for each applicable interface.
             /// </para>
             /// </summary>
             /// <returns>This registrar for chaining.</returns>
-            [MethodImpl(AggressiveInlining)]
+            [MethodImpl(NoInlining)]
             public TypeRegistrar RegisterAll() {
-                AutoRegistration.RegisterAll<TWorld>(typeof(TWorld).Assembly);
+                AutoRegistration.RegisterAll(Assembly.GetCallingAssembly());
                 return this;
             }
 
             /// <summary>
             /// Auto-discovers and registers all ECS types found in the specified assemblies via reflection.
             /// Use this overload when ECS types live in one or more assemblies different from the one that
-            /// declares <typeparamref name="TWorld"/>, e.g.:
+            /// calls it, e.g.:
             /// <code>
-            /// World&lt;MyWorld&gt;.Types().RegisterAll(typeof(MyWorld).Assembly, typeof(SomeComponent).Assembly);
+            /// W.Types().RegisterAll(typeof(SomeSystem).Assembly, typeof(SomeComponent).Assembly);
             /// </code>
             /// <para>
             /// Discovery rules, excluded types, configuration defaults and lifecycle constraints are identical to
@@ -1224,12 +1191,12 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             public TypeRegistrar RegisterAll(Assembly first, params Assembly[] rest) {
                 if (rest == null || rest.Length == 0) {
-                    AutoRegistration.RegisterAll<TWorld>(first);
+                    AutoRegistration.RegisterAll(first);
                 } else {
                     var assemblies = new Assembly[rest.Length + 1];
                     assemblies[0] = first;
                     Array.Copy(rest, 0, assemblies, 1, rest.Length);
-                    AutoRegistration.RegisterAll<TWorld>(assemblies);
+                    AutoRegistration.RegisterAll(assemblies);
                 }
                 return this;
             }
@@ -1291,7 +1258,7 @@ namespace FFS.Libraries.StaticEcs {
             public TypeRegistrar Link<T>() where T : unmanaged, ILinkType {
                 ComponentTypeConfig<Link<T>> config = default;
                 if (default(T) is ILinkConfig<T> cfg) {
-                    config = cfg.Config<TWorld>();
+                    config = cfg.Config();
                 }
                 RegisterLinkComponentType(config);
                 return this;
@@ -1307,7 +1274,7 @@ namespace FFS.Libraries.StaticEcs {
             public TypeRegistrar Links<T>() where T : unmanaged, ILinksType {
                 ComponentTypeConfig<Links<T>> config = default;
                 if (default(T) is ILinksConfig<T> cfg) {
-                    config = cfg.Config<TWorld>();
+                    config = cfg.Config();
                 }
                 RegisterLinksComponentType(config);
                 return this;
@@ -1324,7 +1291,7 @@ namespace FFS.Libraries.StaticEcs {
                 ComponentTypeConfig<Multi<T>> config = default;
                 IPackArrayStrategy<T> elementStrategy = null;
                 if (default(T) is IMultiComponentConfig<T> cfg) {
-                    config = cfg.Config<TWorld>();
+                    config = cfg.Config();
                     elementStrategy = cfg.ElementPackStrategy();
                 }
                 RegisterMultiComponentType(config, elementStrategy);
@@ -1335,22 +1302,22 @@ namespace FFS.Libraries.StaticEcs {
     }
 
     /// <summary>
-    /// Lifecycle state of a <see cref="World{TWorld}"/>.
+    /// Lifecycle state of a <see cref="World"/>.
     /// The world progresses through these states in order: NotCreated → Created → Initialized.
-    /// <see cref="World{TWorld}.Destroy"/> resets back to NotCreated.
+    /// <see cref="World.Destroy"/> resets back to NotCreated.
     /// </summary>
     public enum WorldStatus {
         /// <summary>
         /// The world has not been created yet, or has been destroyed.
-        /// No operations are valid in this state except <see cref="World{TWorld}.Create"/>.
+        /// No operations are valid in this state except <see cref="World.Create"/>.
         /// </summary>
         NotCreated,
 
         /// <summary>
         /// The world has been created (internal structures allocated) and is ready for type
-        /// registration (via <c>World&lt;TWorld&gt;.Types().Component&lt;T&gt;()</c>,
+        /// registration (via <c>World.Types().Component&lt;T&gt;()</c>,
         /// <c>Types().Tag&lt;T&gt;()</c>, etc.).
-        /// Entity creation is not yet available — call <see cref="World{TWorld}.Initialize"/>
+        /// Entity creation is not yet available — call <see cref="World.Initialize"/>
         /// to transition to <see cref="Initialized"/>.
         /// </summary>
         Created,
@@ -1363,9 +1330,9 @@ namespace FFS.Libraries.StaticEcs {
     }
 
     /// <summary>
-    /// Configuration for creating a <see cref="World{TWorld}"/>.
+    /// Configuration for creating a <see cref="World"/>.
     /// Controls initial capacities, threading model, and behavioral settings.
-    /// Pass to <see cref="World{TWorld}.Create"/>.
+    /// Pass to <see cref="World.Create"/>.
     /// All parameters are optional - any unset value falls back to <see cref="WorldConfig.Default"/>.
     /// </summary>
     public struct WorldConfig {
@@ -1383,29 +1350,18 @@ namespace FFS.Libraries.StaticEcs {
         public ushort? BaseClustersCapacity;
 
         /// <summary>
-        /// If <c>true</c> (default), this world independently manages its own chunk allocation.
-        /// If <c>false</c>, the world can share chunk address space with other worlds,
-        /// enabling advanced multi-world streaming where the same entity slots are visible
-        /// from multiple worlds. Most applications should use <c>true</c>.
-        /// </summary>
-        public bool? Independent;
-
-        /// <summary>
         /// Returns a default configuration suitable for most applications:
-        /// 64 component types, 64 tag types, 16 clusters, independent world.
+        /// 64 component types, 64 tag types, 16 clusters.
         /// </summary>
-        /// <param name="independent">Whether the world should be independent (default: true).</param>
         /// <returns>A <see cref="WorldConfig"/> with sensible defaults.</returns>
-        public static WorldConfig Default(bool independent = true) => new() {
+        public static WorldConfig Default() => new() {
             BaseComponentTypesCount = 64,
             BaseClustersCapacity = 16,
-            Independent = independent,
         };
 
         internal WorldConfig MergeWith(WorldConfig other) => new() {
             BaseComponentTypesCount = BaseComponentTypesCount ?? other.BaseComponentTypesCount,
-            BaseClustersCapacity = BaseClustersCapacity ?? other.BaseClustersCapacity,
-            Independent = Independent ?? other.Independent
+            BaseClustersCapacity = BaseClustersCapacity ?? other.BaseClustersCapacity
         };
     }
 }

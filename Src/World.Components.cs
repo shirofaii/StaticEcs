@@ -63,13 +63,12 @@ namespace FFS.Libraries.StaticEcs {
         /// subscribe to events, or set up cross-component relationships.
         /// <para>
         /// For the value-overwrite case (<c>Set(entity, value)</c> when component already exists),
-        /// <see cref="OnDelete{TWorld}"/> is called on the old value first, then the value is replaced,
+        /// <see cref="OnDelete"/> is called on the old value first, then the value is replaced,
         /// then this hook is called on the new value.
         /// </para>
         /// </summary>
-        /// <typeparam name="TWorld">World type for static context access.</typeparam>
         /// <param name="self">The entity this component was added to.</param>
-        public void OnAdd<TWorld>(World<TWorld>.Entity self) where TWorld : struct, IWorldType {}
+        public void OnAdd(World.Entity self) {}
 
         /// <summary>
         /// Called when this component is about to be removed from an entity via <c>Delete</c>,
@@ -79,20 +78,18 @@ namespace FFS.Libraries.StaticEcs {
         /// Also called during entity destruction for each component the entity has.
         /// </para>
         /// </summary>
-        /// <typeparam name="TWorld">World type for static context access.</typeparam>
         /// <param name="self">The entity this component is being removed from.</param>
-        public void OnDelete<TWorld>(World<TWorld>.Entity self, HookReason reason) where TWorld : struct, IWorldType {}
+        public void OnDelete(World.Entity self, HookReason reason) {}
 
         /// <summary>
-        /// Custom copy logic invoked by <see cref="World{TWorld}.Components{T}.Copy"/>.
+        /// Custom copy logic invoked by <see cref="World.Components{T}.Copy"/>.
         /// When implemented, this replaces the default behavior (which is a bitwise copy + Add on destination).
         /// Use this for components that require deep copy, reference counting, or conditional copy logic.
         /// </summary>
-        /// <typeparam name="TWorld">World type for static context access.</typeparam>
         /// <param name="self">The source entity being copied from.</param>
         /// <param name="other">The destination entity being copied to.</param>
         /// <param name="disabled">Whether the component is currently disabled on the source entity.</param>
-        public void CopyTo<TWorld>(World<TWorld>.Entity self, World<TWorld>.Entity other, bool disabled) where TWorld : struct, IWorldType {}
+        public void CopyTo(World.Entity self, World.Entity other, bool disabled) {}
 
         /// <summary>
         /// Custom serialization hook for writing this component to a binary stream.
@@ -112,10 +109,9 @@ namespace FFS.Libraries.StaticEcs {
         /// Non-unmanaged types always use this hook in all serialization paths.
         /// </para>
         /// </summary>
-        /// <typeparam name="TWorld">World type for static context access.</typeparam>
         /// <param name="writer">Binary writer to serialize data into.</param>
         /// <param name="self">The entity this component belongs to.</param>
-        public void Write<TWorld>(ref BinaryPackWriter writer, World<TWorld>.Entity self) where TWorld : struct, IWorldType {}
+        public void Write(ref BinaryPackWriter writer, World.Entity self) {}
 
         /// <summary>
         /// Custom deserialization hook for reading this component from a binary stream.
@@ -134,16 +130,15 @@ namespace FFS.Libraries.StaticEcs {
         /// Non-unmanaged types always use this hook in all deserialization paths.
         /// </para>
         /// </summary>
-        /// <typeparam name="TWorld">World type for static context access.</typeparam>
         /// <param name="reader">Binary reader to deserialize data from.</param>
         /// <param name="self">The entity this component is being loaded onto.</param>
         /// <param name="version">The version byte that was stored during serialization, for migration logic.</param>
         /// <param name="disabled">Whether the component was disabled when it was serialized.</param>
-        public void Read<TWorld>(ref BinaryPackReader reader, World<TWorld>.Entity self, byte version, bool disabled) where TWorld : struct, IWorldType {}
+        public void Read(ref BinaryPackReader reader, World.Entity self, byte version, bool disabled) {}
     }
 
     internal interface IComponentInternal {
-        internal void OnInitialize<TWorld>() where TWorld : struct, IWorldType;
+        internal void OnInitialize();
     }
 
     internal interface IComponentHookOverride {
@@ -157,7 +152,7 @@ namespace FFS.Libraries.StaticEcs {
     }
     
     /// <summary>
-    /// Result of a <see cref="World{TWorld}.Components{T}.Disable"/> or <see cref="World{TWorld}.Components{T}.Enable"/> operation.
+    /// Result of a <see cref="World.Components{T}.Disable"/> or <see cref="World.Components{T}.Enable"/> operation.
     /// </summary>
     public enum ToggleResult : byte {
         /// <summary>The entity does not have this component.</summary>
@@ -169,7 +164,7 @@ namespace FFS.Libraries.StaticEcs {
     }
 
     /// <summary>
-    /// Configuration for registering a component type with <c>World&lt;TWorld&gt;.Types().Component&lt;T&gt;()</c>.
+    /// Configuration for registering a component type with <c>World.Types().Component&lt;T&gt;()</c>.
     /// Controls serialization identity (Guid), data versioning, and binary read/write strategy.
     /// </summary>
     /// <typeparam name="T">The component type being configured.</typeparam>
@@ -189,7 +184,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <summary>
         /// Schema version byte written alongside serialized component data.
         /// When the serialized version differs from the current version, the component's
-        /// <see cref="IComponent.Read{TWorld}"/> hook is invoked for data migration instead of
+        /// <see cref="IComponent.Read"/> hook is invoked for data migration instead of
         /// the default binary deserialization strategy.
         /// Increment this when changing the component's data layout to enable backward-compatible loading.
         /// </summary>
@@ -198,10 +193,10 @@ namespace FFS.Libraries.StaticEcs {
         /// <summary>
         /// When <c>false</c> (default), the framework manages component data lifecycle:
         /// new segments are pre-initialized with <see cref="DefaultValue"/>, and data is reset
-        /// to <see cref="DefaultValue"/> upon deletion (if no <see cref="IComponent.OnDelete{TWorld}"/> hook).
+        /// to <see cref="DefaultValue"/> upon deletion (if no <see cref="IComponent.OnDelete"/> hook).
         /// When <c>true</c>, the framework does not initialize or clear component data — the user
         /// is responsible for all data management. Useful for high-frequency unmanaged types.
-        /// When <see cref="IComponent.OnDelete{TWorld}"/> is defined, the hook handles cleanup
+        /// When <see cref="IComponent.OnDelete"/> is defined, the hook handles cleanup
         /// regardless of this flag.
         /// </summary>
         public readonly bool? NoDataLifecycle;
@@ -216,7 +211,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <summary>
         /// Default value for component data lifecycle. Used in two ways:
         /// (1) New storage segments are pre-initialized with this value, so <c>Add&lt;T&gt;()</c> returns it.
-        /// (2) On deletion, data is reset to this value (if no <see cref="IComponent.OnDelete{TWorld}"/> hook).
+        /// (2) On deletion, data is reset to this value (if no <see cref="IComponent.OnDelete"/> hook).
         /// Only effective when <see cref="NoDataLifecycle"/> is <c>false</c> (default).
         /// </summary>
         public readonly T? DefaultValue;
@@ -284,7 +279,7 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
-    public abstract partial class World<TWorld> {
+    public abstract partial class World {
 
         /// <summary>
         /// Static storage and operations for component type <typeparamref name="T"/> within this world.
@@ -330,7 +325,7 @@ namespace FFS.Libraries.StaticEcs {
             #else
             /// <summary>
             /// Singleton instance of this component storage. All public methods operate on this instance.
-            /// Initialized when <c>World&lt;TWorld&gt;.Types().Component&lt;T&gt;()</c> is called.
+            /// Initialized when <c>World.Types().Component&lt;T&gt;()</c> is called.
             /// </summary>
             public static Components<T> Instance;
             #endif
@@ -345,7 +340,7 @@ namespace FFS.Libraries.StaticEcs {
             /// <summary>
             /// Safe registration check that does not throw when the type is not yet registered.
             /// Returns <c>true</c> after <c>Types().Component&lt;T&gt;()</c> / <c>Tag&lt;T&gt;()</c> has been called
-            /// for this world, and <c>false</c> before registration and after <c>World&lt;TWorld&gt;.Destroy()</c>.
+            /// for this world, and <c>false</c> before registration and after <c>World.Destroy()</c>.
             /// Unlike <see cref="Instance"/>, this property never asserts and can be called in any world state.
             /// </summary>
             public static bool IsTypeRegistered {
@@ -388,7 +383,7 @@ namespace FFS.Libraries.StaticEcs {
                 #else
                 Instance = new Components<T>(Data.Instance.ComponentPoolsCount, guid, 0, false, null, false, default, isTag, nonSerializable, typeName);
                 #endif
-                Handle = ComponentsHandle.Create<TWorld, T>();
+                Handle = ComponentsHandle.Create<T>();
                 Data.Instance.RegisterComponentPool(Handle, guid, nonSerializable, typeName);
             }
 
@@ -453,7 +448,7 @@ namespace FFS.Libraries.StaticEcs {
             /// <summary>
             /// Schema version of this component type, as specified in <see cref="ComponentTypeConfig{T}.Version"/>.
             /// Written during serialization and compared during deserialization to trigger data migration
-            /// via <see cref="IComponent.Read{TWorld}"/> when versions differ.
+            /// via <see cref="IComponent.Read"/> when versions differ.
             /// </summary>
             public readonly byte Version;
 
@@ -634,7 +629,7 @@ namespace FFS.Libraries.StaticEcs {
             /// Ensures entity has component <typeparamref name="T"/> and returns a mutable reference to it.
             /// If the component already exists, returns the existing value without modification and without
             /// triggering any hooks. If the component is new, default-initializes it, updates query caches,
-            /// and triggers the <see cref="IComponent.OnAdd{TWorld}"/> hook.
+            /// and triggers the <see cref="IComponent.OnAdd"/> hook.
             /// <para>
             /// This is the idiomatic "get-or-add" operation. Use when you want to ensure a component
             /// exists and then modify it via the returned reference:
@@ -709,8 +704,8 @@ namespace FFS.Libraries.StaticEcs {
             /// <summary>
             /// Sets component <typeparamref name="T"/> to the given value on the entity, always overwriting.
             /// <para>
-            /// If the component already exists: calls <see cref="IComponent.OnDelete{TWorld}"/> on the old value,
-            /// overwrites with <paramref name="value"/>, then calls <see cref="IComponent.OnAdd{TWorld}"/> on the new value.
+            /// If the component already exists: calls <see cref="IComponent.OnDelete"/> on the old value,
+            /// overwrites with <paramref name="value"/>, then calls <see cref="IComponent.OnAdd"/> on the new value.
             /// If the component is new: sets the value, updates query caches, and calls OnAdd.
             /// </para>
             /// <para>
@@ -757,7 +752,7 @@ namespace FFS.Libraries.StaticEcs {
             /// <summary>
             /// Removes component <typeparamref name="T"/> from the entity.
             /// If the component is present: clears presence and disabled bitmasks, updates query caches,
-            /// and optionally calls <see cref="IComponent.OnDelete{TWorld}"/> on the stored value.
+            /// and optionally calls <see cref="IComponent.OnDelete"/> on the stored value.
             /// If the entity's segment becomes completely empty after deletion, the segment is returned to the pool.
             /// <para>
             /// The <paramref name="reason"/> parameter indicates why the component is being removed
@@ -805,7 +800,7 @@ namespace FFS.Libraries.StaticEcs {
             /// Copies component <typeparamref name="T"/> from <paramref name="source"/> to <paramref name="destination"/>.
             /// If the source entity has this component:
             /// <list type="bullet">
-            /// <item>If <see cref="IComponent.CopyTo{TWorld}"/> is implemented: delegates to that hook
+            /// <item>If <see cref="IComponent.CopyTo"/> is implemented: delegates to that hook
             /// (allowing custom deep-copy logic, reference counting, etc.).
             /// <b>Note:</b> The CopyTo hook is responsible for managing the disabled state on the destination entity.
             /// The <paramref name="source"/> disabled state is passed via the <c>disabled</c> parameter.</item>
@@ -1417,7 +1412,7 @@ namespace FFS.Libraries.StaticEcs {
                 }
 
                 if (default(T) is IComponentInternal component) {
-                    component.OnInitialize<TWorld>();
+                    component.OnInitialize();
                 }
             }
 
@@ -2044,13 +2039,11 @@ namespace FFS.Libraries.StaticEcs {
     /// backward-compatible loading of save files after component types are deleted or replaced.
     /// </para>
     /// </summary>
-    /// <typeparam name="TWorld">World type.</typeparam>
     /// <param name="reader">Binary reader positioned at the start of the component's serialized data.</param>
     /// <param name="entity">The entity this component was saved on.</param>
     /// <param name="version">The schema version byte that was stored during serialization.</param>
     /// <param name="disabled">Whether the component was in the disabled state when serialized.</param>
-    public delegate void EcsComponentDeleteMigrationReader<TWorld>(ref BinaryPackReader reader, World<TWorld>.Entity entity, byte version, bool disabled)
-        where TWorld : struct, IWorldType;
+    public delegate void EcsComponentDeleteMigrationReader(ref BinaryPackReader reader, World.Entity entity, byte version, bool disabled);
     
     internal static class ComponentSerializerUtils {
         internal const int DisabledBit = 0b_10000000_00000000;
@@ -2066,8 +2059,7 @@ namespace FFS.Libraries.StaticEcs {
         }
         
         [MethodImpl(AggressiveInlining)]
-        internal static void DeleteOneComponentMigration<TWorld>(this ref BinaryPackReader reader, World<TWorld>.Entity entity, EcsComponentDeleteMigrationReader<TWorld> migration) 
-            where TWorld : struct, IWorldType {
+        internal static void DeleteOneComponentMigration(this ref BinaryPackReader reader, World.Entity entity, EcsComponentDeleteMigrationReader migration) {
             var isTag = reader.ReadBool();
             if (!isTag) {
                 var disabled = (reader.ReadUshort() & DisabledBit) == DisabledBit;
@@ -2080,8 +2072,7 @@ namespace FFS.Libraries.StaticEcs {
         }
         
         [MethodImpl(AggressiveInlining)]
-        internal static void DeleteAllComponentMigration<TWorld>(this ref BinaryPackReader reader, EcsComponentDeleteMigrationReader<TWorld> migration, uint chunkIdx) 
-            where TWorld : struct, IWorldType {
+        internal static void DeleteAllComponentMigration(this ref BinaryPackReader reader, EcsComponentDeleteMigrationReader migration, uint chunkIdx) {
             var isTag = reader.ReadBool();
             var notEmptyBlocks = reader.ReadUlong();
 
@@ -2092,7 +2083,7 @@ namespace FFS.Libraries.StaticEcs {
 
                 reader.ReadUlong(); // FullBlocks;
                 
-                var entity = new World<TWorld>.Entity();
+                var entity = new World.Entity();
                 ref var entityId = ref entity.IdWithOffset;
                 
                 if (isTag) {

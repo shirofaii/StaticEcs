@@ -19,8 +19,8 @@ using Unity.IL2CPP.CompilerServices;
 namespace FFS.Libraries.StaticEcs {
     /// <summary>
     /// Marker interface for systems group identity. Each unique <c>ISystemsType</c> implementation
-    /// creates an isolated <see cref="World{TWorld}.Systems{SysType}"/> instance with its own static storage,
-    /// following the same pattern as <c>World&lt;TWorld&gt;</c>.
+    /// creates an isolated <see cref="World.Systems{SysType}"/> instance with its own static storage,
+    /// following the same pattern as <c>World</c>.
     /// <para>
     /// This allows multiple independent system pipelines to coexist (e.g., separate groups
     /// for game logic, rendering, physics, or network sync), each with their own lifecycle.
@@ -38,14 +38,14 @@ namespace FFS.Libraries.StaticEcs {
     /// </summary>
     public interface ISystem {
         /// <summary>
-        /// Called once during <see cref="World{TWorld}.Systems{SysType}.Initialize"/>, after all systems are added.
+        /// Called once during <see cref="World.Systems{SysType}.Initialize"/>, after all systems are added.
         /// Systems are initialized in order (by <c>order</c> parameter, then by registration order).
         /// Use for one-time setup: caching queries, loading resources, subscribing to events.
         /// </summary>
         public void Init() { }
 
         /// <summary>
-        /// Called every frame by <see cref="World{TWorld}.Systems{SysType}.Update"/>, but only if
+        /// Called every frame by <see cref="World.Systems{SysType}.Update"/>, but only if
         /// <see cref="UpdateIsActive"/> returns <c>true</c>. This is the main per-frame logic entry point.
         /// Only invoked if the system actually overrides this method.
         /// </summary>
@@ -59,7 +59,7 @@ namespace FFS.Libraries.StaticEcs {
         public bool UpdateIsActive() => true;
 
         /// <summary>
-        /// Called once during <see cref="World{TWorld}.Systems{SysType}.Destroy"/>, in initialization order
+        /// Called once during <see cref="World.Systems{SysType}.Destroy"/>, in initialization order
         /// (sorted by order, then registration order).
         /// Use for cleanup: releasing resources, unsubscribing from events, saving state.
         /// </summary>
@@ -94,7 +94,7 @@ namespace FFS.Libraries.StaticEcs {
     }
 
     /// <summary>
-    /// Lifecycle state of a <see cref="World{TWorld}.Systems{TSystemsType}"/> pipeline.
+    /// Lifecycle state of a <see cref="World.Systems{TSystemsType}"/> pipeline.
     /// </summary>
     public enum SystemsStatus : byte {
         /// <summary>Pipeline not created yet — call <c>Create</c> first.</summary>
@@ -122,7 +122,7 @@ namespace FFS.Libraries.StaticEcs {
         #endif
     }
 
-    public abstract partial class World<TWorld> where TWorld : struct, IWorldType {
+    public abstract partial class World {
 
         /// <summary>
         /// Static systems pipeline keyed by <typeparamref name="TSystemsType"/>.
@@ -195,7 +195,7 @@ namespace FFS.Libraries.StaticEcs {
 
                 ResourcesData<TSystemsType>.Create();
                 Guid = snapshotGuid ?? typeof(TSystemsType).GuidFromAQN();
-                Handle = SystemsHandle.Create<TWorld, TSystemsType>(Guid);
+                Handle = SystemsHandle.Create<TSystemsType>(Guid);
                 Data.Instance.RegisteredSystems.Add(Handle);
             }
 
@@ -446,7 +446,7 @@ namespace FFS.Libraries.StaticEcs {
             /// Lightweight handle for accessing a singleton resource of type <typeparamref name="T"/>
             /// scoped to the systems pipeline <see cref="Systems{TSystemsType}"/>.
             /// <para>
-            /// Functionally identical to <see cref="World{TWorld}.Resource{T}"/>, but the underlying
+            /// Functionally identical to <see cref="World.Resource{T}"/>, but the underlying
             /// storage is keyed by <typeparamref name="TSystemsType"/> rather than the world.
             /// Such resources are automatically cleared when the systems pipeline is destroyed
             /// via <see cref="Destroy"/>, decoupled from the world's own resource lifecycle.
@@ -494,7 +494,7 @@ namespace FFS.Libraries.StaticEcs {
             #endif
             /// <summary>
             /// Handle for accessing a keyed resource scoped to <see cref="Systems{TSystemsType}"/>.
-            /// Functionally identical to <see cref="World{TWorld}.NamedResource{T}"/>, but the
+            /// Functionally identical to <see cref="World.NamedResource{T}"/>, but the
             /// underlying dictionary is per-systems-pipeline and is cleared on <see cref="Destroy"/>.
             /// <para>
             /// <b>Warning:</b> mutable struct that caches an internal box reference on first
@@ -526,7 +526,7 @@ namespace FFS.Libraries.StaticEcs {
                     get {
                         if (_cache == null || !_cache.IsValid) {
                             if (!NamedResources<TSystemsType>.Values.TryGetValue(Key, out var boxObj)) {
-                                throw new StaticEcsException($"NamedResource<{typeof(T).Name}> with key '{Key}' not found in Systems<{typeof(TSystemsType).Name}> of World<{typeof(TWorld).Name}>");
+                                throw new StaticEcsException($"NamedResource<{typeof(T).Name}> with key '{Key}' not found in Systems<{typeof(TSystemsType).Name}> of World<{typeof(World).Name}>");
                             }
                             _cache = (NamedResources<TSystemsType>.BoxBase)boxObj;
                         }
@@ -688,8 +688,8 @@ namespace FFS.Libraries.StaticEcs {
 
     /// <summary>
     /// Type-erased handle for accessing the resources of a specific
-    /// <see cref="World{TWorld}.Systems{TSystemsType}"/> pipeline without knowing
-    /// <c>TWorld</c> or <c>TSystemsType</c> at compile time. Mirrors the resources
+    /// <see cref="World.Systems{TSystemsType}"/> pipeline without knowing
+    /// <c>TSystemsType</c> at compile time. Mirrors the resources
     /// portion of <see cref="WorldHandle"/> but is scoped to one systems group.
     /// <para>
     /// <b>Primary use cases:</b> editor/inspector tools, debug visualizers, and
@@ -698,7 +698,7 @@ namespace FFS.Libraries.StaticEcs {
     /// pointers captured at handle creation, so overhead is minimal.
     /// </para>
     /// <para>
-    /// Obtain a <see cref="SystemsHandle"/> via <c>World&lt;TWorld&gt;.Systems&lt;TSystemsType&gt;.Handle</c>.
+    /// Obtain a <see cref="SystemsHandle"/> via <c>World.Systems&lt;TSystemsType&gt;.Handle</c>.
     /// The handle is initialized when the systems pipeline is created and reset on destroy.
     /// </para>
     /// </summary>
@@ -722,7 +722,7 @@ namespace FFS.Libraries.StaticEcs {
         private readonly unsafe delegate*<ref BinaryPackReader, void> _readSnapshot;
         private readonly unsafe delegate*<Span<SystemData>> _getAllSystems;
 
-        /// <summary>The <see cref="Type"/> of the <c>TWorld</c> struct that owns this systems pipeline.</summary>
+        /// <summary>The <see cref="Type"/> of the <c>World</c> class that owns this systems pipeline.</summary>
         public readonly Type WorldType;
 
         /// <summary>The <see cref="Type"/> of the <c>TSystemsType</c> struct identifying this pipeline.</summary>
@@ -735,27 +735,26 @@ namespace FFS.Libraries.StaticEcs {
         /// </summary>
         public readonly Guid Guid;
 
-        internal static unsafe SystemsHandle Create<TWorld, TSystemsType>(Guid guid)
-            where TWorld : struct, IWorldType
+        internal static unsafe SystemsHandle Create<TSystemsType>(Guid guid)
             where TSystemsType : struct, ISystemsType {
             return new SystemsHandle(
-                typeof(TWorld),
+                typeof(World),
                 typeof(TSystemsType),
                 guid,
-                &World<TWorld>.Systems<TSystemsType>._Status,
-                &World<TWorld>.Systems<TSystemsType>._HasResource,
-                &World<TWorld>.Systems<TSystemsType>._SetResource,
-                &World<TWorld>.Systems<TSystemsType>._GetResource,
-                &World<TWorld>.Systems<TSystemsType>._RemoveResource,
-                &World<TWorld>.Systems<TSystemsType>._HasResourceByKey,
-                &World<TWorld>.Systems<TSystemsType>._GetResourceByKey,
-                &World<TWorld>.Systems<TSystemsType>._SetResourceByKey,
-                &World<TWorld>.Systems<TSystemsType>._RemoveResourceByKey,
-                &World<TWorld>.Systems<TSystemsType>._GetAllResourcesKeys,
-                &World<TWorld>.Systems<TSystemsType>._GetAllResourcesTypes,
-                &World<TWorld>.Systems<TSystemsType>.WriteSnapshot,
-                &World<TWorld>.Systems<TSystemsType>.ReadSnapshot,
-                &World<TWorld>.Systems<TSystemsType>._GetAllSystems
+                &World.Systems<TSystemsType>._Status,
+                &World.Systems<TSystemsType>._HasResource,
+                &World.Systems<TSystemsType>._SetResource,
+                &World.Systems<TSystemsType>._GetResource,
+                &World.Systems<TSystemsType>._RemoveResource,
+                &World.Systems<TSystemsType>._HasResourceByKey,
+                &World.Systems<TSystemsType>._GetResourceByKey,
+                &World.Systems<TSystemsType>._SetResourceByKey,
+                &World.Systems<TSystemsType>._RemoveResourceByKey,
+                &World.Systems<TSystemsType>._GetAllResourcesKeys,
+                &World.Systems<TSystemsType>._GetAllResourcesTypes,
+                &World.Systems<TSystemsType>.WriteSnapshot,
+                &World.Systems<TSystemsType>.ReadSnapshot,
+                &World.Systems<TSystemsType>._GetAllSystems
             );
         }
 

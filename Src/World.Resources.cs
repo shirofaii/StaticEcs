@@ -18,10 +18,10 @@ using Unity.IL2CPP.CompilerServices;
 namespace FFS.Libraries.StaticEcs {
     /// <summary>
     /// Marker interface for types used as world resources
-    /// (singleton <see cref="World{TWorld}.Resource{T}"/> and keyed <see cref="World{TWorld}.NamedResource{T}"/>).
+    /// (singleton <see cref="World.Resource{T}"/> and keyed <see cref="World.NamedResource{T}"/>).
     /// <para>
     /// All resource types must implement this interface. This provides an explicit contract
-    /// (alongside <see cref="IComponent"/>, <see cref="ITag"/>),
+    /// (alongside <see cref="IComponent"/>, <see cref="ITag"/>, <see cref="IEvent"/>),
     /// prevents accidental use of arbitrary types as resources, and allows tooling/editors
     /// to distinguish resources from other types.
     /// </para>
@@ -66,7 +66,7 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
-    public abstract partial class World<TWorld> {
+    public abstract partial class World {
 
         #if ENABLE_IL2CPP
         [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
@@ -83,7 +83,7 @@ namespace FFS.Libraries.StaticEcs {
         /// </para>
         /// <para>
         /// This struct is a zero-cost handle — it contains no data. All access goes through static
-        /// generic storage (<c>Resources&lt;TWorld,T&gt;</c>), so creating or copying this struct is free.
+        /// generic storage (<c>Resources&lt;T&gt;</c>), so creating or copying this struct is free.
         /// Register the resource via <see cref="SetResource{TResource}(TResource, bool)"/>
         /// before accessing <see cref="Value"/>.
         /// </para>
@@ -97,7 +97,7 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             public bool IsRegistered {
                 [MethodImpl(AggressiveInlining)]
-                get => Resources<TWorld, T>.IsRegistered;
+                get => Resources<WorldScope, T>.IsRegistered;
             }
 
             /// <summary>
@@ -110,7 +110,7 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             public ref T Value {
                 [MethodImpl(AggressiveInlining)]
-                get => ref Resources<TWorld, T>.Value;
+                get => ref Resources<WorldScope, T>.Value;
             }
 
             /// <summary>
@@ -119,7 +119,7 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             public ref readonly T ValueRO {
                 [MethodImpl(AggressiveInlining)]
-                get => ref Resources<TWorld, T>.Value;
+                get => ref Resources<WorldScope, T>.Value;
             }
 
             /// <summary>
@@ -127,18 +127,18 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             /// <param name="value">The resource value to store.</param>
             /// <param name="clearOnDestroy">
-            /// If <c>true</c> (default), the resource is automatically cleared on <see cref="World{TWorld}.Destroy"/>.
+            /// If <c>true</c> (default), the resource is automatically cleared on <see cref="World.Destroy"/>.
             /// Only applied on the first registration — replacing preserves the original setting.
             /// </param>
             [MethodImpl(AggressiveInlining)]
-            public void Set(T value, bool clearOnDestroy = true) => Resources<TWorld, T>.Set(value, clearOnDestroy);
+            public void Set(T value, bool clearOnDestroy = true) => Resources<WorldScope, T>.Set(value, clearOnDestroy);
 
             /// <summary>
             /// Removes the resource of type <typeparamref name="T"/> from the world.
             /// Equivalent to <see cref="RemoveResource{TResource}"/>.
             /// </summary>
             [MethodImpl(AggressiveInlining)]
-            public void Remove() => Resources<TWorld, T>.Remove();
+            public void Remove() => Resources<WorldScope, T>.Remove();
         }
 
         #if ENABLE_IL2CPP
@@ -176,7 +176,7 @@ namespace FFS.Libraries.StaticEcs {
             /// The string key identifying this resource in the keyed resource dictionary.
             /// </summary>
             public readonly string Key;
-            private NamedResources<TWorld>.BoxBase _cache;
+            private NamedResources<WorldScope>.BoxBase _cache;
 
             /// <summary>
             /// Creates a keyed resource handle bound to the specified key.
@@ -195,7 +195,7 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             public bool IsRegistered {
                 [MethodImpl(AggressiveInlining)]
-                get => NamedResources<TWorld>.Has(Key);
+                get => NamedResources<WorldScope>.Has(Key);
             }
 
             /// <summary>
@@ -212,12 +212,12 @@ namespace FFS.Libraries.StaticEcs {
                 [MethodImpl(AggressiveInlining)]
                 get {
                     if (_cache == null || !_cache.IsValid) {
-                        if (!NamedResources<TWorld>.Values.TryGetValue(Key, out var boxObj)) {
-                            throw new StaticEcsException($"NamedResource<{typeof(T).Name}> with key '{Key}' not found in World<{typeof(TWorld).Name}>");
+                        if (!NamedResources<WorldScope>.Values.TryGetValue(Key, out var boxObj)) {
+                            throw new StaticEcsException($"NamedResource<{typeof(T).Name}> with key '{Key}' not found in World<{typeof(World).Name}>");
                         }
-                        _cache = (NamedResources<TWorld>.BoxBase)boxObj;
+                        _cache = (NamedResources<WorldScope>.BoxBase)boxObj;
                     }
-                    return ref ((NamedResources<TWorld>.Box<T>)_cache).Value;
+                    return ref ((NamedResources<WorldScope>.Box<T>)_cache).Value;
                 }
             }
 
@@ -229,12 +229,12 @@ namespace FFS.Libraries.StaticEcs {
                 [MethodImpl(AggressiveInlining)]
                 get {
                     if (_cache == null || !_cache.IsValid) {
-                        if (!NamedResources<TWorld>.Values.TryGetValue(Key, out var boxObj)) {
-                            throw new StaticEcsException($"NamedResource<{typeof(T).Name}> with key '{Key}' not found in World<{typeof(TWorld).Name}>");
+                        if (!NamedResources<WorldScope>.Values.TryGetValue(Key, out var boxObj)) {
+                            throw new StaticEcsException($"NamedResource<{typeof(T).Name}> with key '{Key}' not found in World<{typeof(World).Name}>");
                         }
-                        _cache = (NamedResources<TWorld>.BoxBase)boxObj;
+                        _cache = (NamedResources<WorldScope>.BoxBase)boxObj;
                     }
-                    return ref ((NamedResources<TWorld>.Box<T>)_cache).Value;
+                    return ref ((NamedResources<WorldScope>.Box<T>)_cache).Value;
                 }
             }
 
@@ -244,11 +244,11 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             /// <param name="value">The resource value to store.</param>
             /// <param name="clearOnDestroy">
-            /// If <c>true</c> (default), the resource is cleared on <see cref="World{TWorld}.Destroy"/>.
+            /// If <c>true</c> (default), the resource is cleared on <see cref="World.Destroy"/>.
             /// Only applied on the first registration of this key.
             /// </param>
             [MethodImpl(AggressiveInlining)]
-            public void Set(T value, bool clearOnDestroy = true) => NamedResources<TWorld>.Set(Key, value, clearOnDestroy);
+            public void Set(T value, bool clearOnDestroy = true) => NamedResources<WorldScope>.Set(Key, value, clearOnDestroy);
 
             /// <summary>
             /// Removes the resource bound to <see cref="Key"/>.
@@ -256,7 +256,7 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             [MethodImpl(AggressiveInlining)]
             public void Remove() {
-                NamedResources<TWorld>.Remove(Key);
+                NamedResources<WorldScope>.Remove(Key);
                 _cache = null;
             }
         }
@@ -266,6 +266,8 @@ namespace FFS.Libraries.StaticEcs {
         [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
         [Il2CppEagerStaticClassConstruction]
         #endif
+        internal struct WorldScope { }
+
         internal readonly struct Resources<TScope, T> where TScope : struct where T : IResource {
             internal static T Value;
             internal static bool IsRegistered;
@@ -333,7 +335,7 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             internal static IResource GetRaw(string key) {
                 if (!Values.TryGetValue(key, out var boxObj)) {
-                    throw new StaticEcsException($"NamedResource with key `{key}` not found in World<{typeof(TWorld).Name}>");
+                    throw new StaticEcsException($"NamedResource with key `{key}` not found in World<{typeof(World).Name}>");
                 }
                 return ((BoxBase) boxObj).GetValue();
             }
@@ -369,7 +371,7 @@ namespace FFS.Libraries.StaticEcs {
             internal static void SetRaw(string key, IResource value) {
                 if (!Values.TryGetValue(key, out var existing)) {
                     throw new StaticEcsException(
-                        $"NamedResource with key `{key}` is not registered in World<{typeof(TWorld).Name}>. " +
+                        $"NamedResource with key `{key}` is not registered in World<{typeof(World).Name}>. " +
                         $"Raw SetResource(string, IResource, bool) requires the key to be registered first via typed SetResource<T>(key, value, clearOnDestroy).");
                 }
                 ((BoxBase) existing).SetValue(value);
@@ -496,7 +498,7 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             internal readonly IResource GetRaw(Type type) {
                 if (!ValuesGetSetRawMethods.TryGetValue(type, out var methods)) {
-                    throw new StaticEcsException($"Resource of type `{type}` is not registered in World<{typeof(TWorld).Name}>");
+                    throw new StaticEcsException($"Resource of type `{type}` is not registered in World<{typeof(World).Name}>");
                 }
                 return methods.get();
             }
@@ -504,7 +506,7 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             internal readonly void RemoveRaw(Type type) {
                 if (!ValuesGetSetRawMethods.TryGetValue(type, out var methods)) {
-                    throw new StaticEcsException($"Resource of type `{type}` is not registered in World<{typeof(TWorld).Name}>");
+                    throw new StaticEcsException($"Resource of type `{type}` is not registered in World<{typeof(World).Name}>");
                 }
                 methods.remove();
             }
@@ -513,7 +515,7 @@ namespace FFS.Libraries.StaticEcs {
             internal readonly void SetRaw(Type type, IResource value, bool clearOnDestroy) {
                 if (!ValuesGetSetRawMethods.TryGetValue(type, out var methods)) {
                     throw new StaticEcsException(
-                        $"Resource of type `{type}` is not registered in World<{typeof(TWorld).Name}>. " +
+                        $"Resource of type `{type}` is not registered in World<{typeof(World).Name}>. " +
                         $"Raw SetResource requires the type to be registered first via typed SetResource<{type.Name}>(...)");
                 }
                 methods.set(value, clearOnDestroy);

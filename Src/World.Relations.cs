@@ -20,7 +20,7 @@ namespace FFS.Libraries.StaticEcs {
 
     /// <summary>
     /// Interface for defining link type hooks. Implement methods to receive callbacks when
-    /// a <see cref="World{TWorld}.Link{TLinkType}"/> is added, deleted, or copied.
+    /// a <see cref="World.Link{TLinkType}"/> is added, deleted, or copied.
     /// <para>All methods have default empty implementations; override only the hooks you need.</para>
     /// </summary>
     public interface ILinkType {
@@ -29,14 +29,14 @@ namespace FFS.Libraries.StaticEcs {
         /// </summary>
         /// <param name="self">The entity receiving the link.</param>
         /// <param name="link">The <see cref="EntityGID"/> of the linked entity.</param>
-        public void OnAdd<TWorld>(World<TWorld>.Entity self, EntityGID link) where TWorld : struct, IWorldType { }
+        public void OnAdd(World.Entity self, EntityGID link) { }
 
         /// <summary>
         /// Called when a link of this type is removed from <paramref name="self"/>, previously pointing at <paramref name="link"/>.
         /// </summary>
         /// <param name="self">The entity losing the link.</param>
         /// <param name="link">The <see cref="EntityGID"/> of the previously linked entity.</param>
-        public void OnDelete<TWorld>(World<TWorld>.Entity self, EntityGID link, HookReason reason) where TWorld : struct, IWorldType { }
+        public void OnDelete(World.Entity self, EntityGID link, HookReason reason) { }
 
         /// <summary>
         /// Called when a link of this type is copied from <paramref name="self"/> to <paramref name="other"/>.
@@ -44,22 +44,22 @@ namespace FFS.Libraries.StaticEcs {
         /// <param name="self">The source entity that owns the link.</param>
         /// <param name="other">The destination entity receiving the copied link.</param>
         /// <param name="link">The <see cref="EntityGID"/> of the linked entity.</param>
-        public void CopyTo<TWorld>(World<TWorld>.Entity self, World<TWorld>.Entity other, EntityGID link) where TWorld : struct, IWorldType { }
+        public void CopyTo(World.Entity self, World.Entity other, EntityGID link) { }
     }
 
     /// <summary>
     /// Marker interface extending <see cref="ILinkType"/> that designates a link type for use with
-    /// <see cref="World{TWorld}.Links{TLinkType}"/> (multi-link collections).
-    /// Types used as <c>TLinkType</c> in <see cref="World{TWorld}.Links{TLinkType}"/> must implement this interface.
+    /// <see cref="World.Links{TLinkType}"/> (multi-link collections).
+    /// Types used as <c>TLinkType</c> in <see cref="World.Links{TLinkType}"/> must implement this interface.
     /// </summary>
     public interface ILinksType : ILinkType {}
 
     public interface ILinkConfig<T> where T : unmanaged, ILinkType {
-        ComponentTypeConfig<World<TWorld>.Link<T>> Config<TWorld>() where TWorld : struct, IWorldType;
+        ComponentTypeConfig<World.Link<T>> Config();
     }
 
     public interface ILinksConfig<T> where T : unmanaged, ILinksType {
-        ComponentTypeConfig<World<TWorld>.Links<T>> Config<TWorld>() where TWorld : struct, IWorldType;
+        ComponentTypeConfig<World.Links<T>> Config();
     }
 
     internal interface ILinkComponent : IComponent {
@@ -75,7 +75,7 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
-    public abstract partial class World<TWorld> {
+    public abstract partial class World {
         #if ENABLE_IL2CPP
         [Il2CppSetOption(Option.NullChecks, Const.IL2CPPNullChecks)]
         [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
@@ -108,7 +108,7 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
                 ComponentTypeConfig<Link<TLinkType>> config = default;
                 if (default(TLinkType) is ILinkConfig<TLinkType> cfg) {
-                    config = cfg.Config<TWorld>();
+                    config = cfg.Config();
                 }
 				RegisterLinkComponentType(config);
             }
@@ -132,30 +132,30 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             [MethodImpl(AggressiveInlining)]
-            public void OnAdd<TW>(World<TW>.Entity self) where TW : struct, IWorldType {
+            public void OnAdd(World.Entity self) {
                 var linkType = default(TLinkType);
                 linkType.OnAdd(self, _value);
             }
 
             [MethodImpl(AggressiveInlining)]
-            public void OnDelete<TW>(World<TW>.Entity self, HookReason reason) where TW : struct, IWorldType {
+            public void OnDelete(World.Entity self, HookReason reason) {
                 var linkType = default(TLinkType);
                 linkType.OnDelete(self, _value, reason);
             }
 
             [MethodImpl(AggressiveInlining)]
-            public void CopyTo<TW>(World<TW>.Entity self, World<TW>.Entity other, bool disabled) where TW : struct, IWorldType {
+            public void CopyTo(World.Entity self, World.Entity other, bool disabled) {
                 var linkType = default(TLinkType);
                 linkType.CopyTo(self, other, _value);
             }
 
             [MethodImpl(AggressiveInlining)]
-            public void Write<TW>(ref BinaryPackWriter writer, World<TW>.Entity self) where TW : struct, IWorldType {
+            public void Write(ref BinaryPackWriter writer, World.Entity self) {
                 writer.WriteEntityGID(in _value);
             }
 
             [MethodImpl(AggressiveInlining)]
-            public void Read<TW>(ref BinaryPackReader reader, World<TW>.Entity self, byte version, bool disabled) where TW : struct, IWorldType {
+            public void Read(ref BinaryPackReader reader, World.Entity self, byte version, bool disabled) {
                 _value = reader.ReadEntityGID();
             }
 
@@ -253,7 +253,7 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
                 ComponentTypeConfig<Links<TLinkType>> config = default;
                 if (default(TLinkType) is ILinksConfig<TLinkType> cfg) {
-                    config = cfg.Config<TWorld>();
+                    config = cfg.Config();
                 }
                 RegisterLinksComponentType(config);
             }
@@ -314,7 +314,7 @@ namespace FFS.Libraries.StaticEcs {
                         throw new StaticEcsException($"[ Links<{typeof(TLinkType)}>.Indexer ] index out of bounds: {idx}, count: {Count}");
                     }
                     #endif
-                    return Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx][Offset + idx];
+                    return Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx][Offset + idx];
                 }
             }
 
@@ -322,7 +322,7 @@ namespace FFS.Libraries.StaticEcs {
             /// Returns a read-only span over the links in this collection.
             /// </summary>
             public readonly ReadOnlySpan<Link<TLinkType>> AsReadOnlySpan {
-                [MethodImpl(AggressiveInlining)] get => new(Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx], (int)Offset, Count);
+                [MethodImpl(AggressiveInlining)] get => new(Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx], (int)Offset, Count);
             }
 
             /// <summary>
@@ -335,7 +335,7 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 if (Count == 0) throw new StaticEcsException($"[ Links<{typeof(TLinkType)}>.First ] empty");
                 #endif
-                return Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx][Offset];
+                return Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx][Offset];
             }
 
             /// <summary>
@@ -348,7 +348,7 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 if (Count == 0) throw new StaticEcsException($"[ Links<{typeof(TLinkType)}>.Last ] empty");
                 #endif
-                return Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx][Offset + Count - 1];
+                return Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx][Offset + Count - 1];
             }
 
             #region ADD
@@ -364,7 +364,7 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 AssertNotBlockedByIteration();
                 #endif
-                ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 var values = storage.Segments[SegmentIdx];
                 
                 for (var i = Offset; i < Offset + Count; i++) {
@@ -394,7 +394,7 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 AssertNotBlockedByIteration();
                 #endif
-                ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 var values = storage.Segments[SegmentIdx];
                 var end = Offset + Count;
 
@@ -430,7 +430,7 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 AssertNotBlockedByIteration();
                 #endif
-                ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 var values = storage.Segments[SegmentIdx];
                 var end = Offset + Count;
 
@@ -470,7 +470,7 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 AssertNotBlockedByIteration();
                 #endif
-                ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 var values = storage.Segments[SegmentIdx];
                 var end = Offset + Count;
 
@@ -505,7 +505,7 @@ namespace FFS.Libraries.StaticEcs {
 
             /// <summary>
             /// Adds a link to this collection. The link must not already exist.
-            /// Always fires the <see cref="ILinkType.OnAdd{TWorld}"/> hook if present.
+            /// Always fires the <see cref="ILinkType.OnAdd"/> hook if present.
             /// </summary>
             /// <param name="val">The link to add.</param>
             /// <exception cref="StaticEcsException">In debug builds, thrown if the link is a duplicate.</exception>
@@ -515,7 +515,7 @@ namespace FFS.Libraries.StaticEcs {
                 AssertNotBlockedByIteration();
                 AssertNotContains(val);
                 #endif
-                ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 if (Count >= SegmentAllocator.MinSlotCapacity << Level) {
                     Grow(ref storage);
                 }
@@ -536,7 +536,7 @@ namespace FFS.Libraries.StaticEcs {
                 AssertNotContains(val1);
                 AssertNotContains(val2);
                 #endif
-                ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 var cap = SegmentAllocator.MinSlotCapacity << Level;
                 if (Count + 1 >= cap) {
                     EnsureCapacityInternal(ref storage, (ushort)(Count + 2));
@@ -563,7 +563,7 @@ namespace FFS.Libraries.StaticEcs {
                 AssertNotContains(val2);
                 AssertNotContains(val3);
                 #endif
-                ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 var cap = SegmentAllocator.MinSlotCapacity << Level;
                 if (Count + 2 >= cap) {
                     EnsureCapacityInternal(ref storage, (ushort)(Count + 3));
@@ -594,7 +594,7 @@ namespace FFS.Libraries.StaticEcs {
                 AssertNotContains(val3);
                 AssertNotContains(val4);
                 #endif
-                ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 var cap = SegmentAllocator.MinSlotCapacity << Level;
                 if (Count + 3 >= cap) {
                     EnsureCapacityInternal(ref storage, (ushort)(Count + 4));
@@ -615,7 +615,7 @@ namespace FFS.Libraries.StaticEcs {
 
             /// <summary>
             /// Bulk adds all links from the source array. All links must be unique (not already present).
-            /// Fires <see cref="ILinkType.OnAdd{TWorld}"/> for each added link if the hook is present.
+            /// Fires <see cref="ILinkType.OnAdd"/> for each added link if the hook is present.
             /// </summary>
             /// <param name="src">Array of links to add.</param>
             /// <exception cref="StaticEcsException">In debug builds, thrown if <paramref name="src"/> is null or contains duplicates.</exception>
@@ -630,7 +630,7 @@ namespace FFS.Libraries.StaticEcs {
 
             /// <summary>
             /// Bulk adds a range of links from the source array. All links must be unique (not already present).
-            /// Fires <see cref="ILinkType.OnAdd{TWorld}"/> for each added link if the hook is present.
+            /// Fires <see cref="ILinkType.OnAdd"/> for each added link if the hook is present.
             /// </summary>
             /// <param name="src">Source array of links.</param>
             /// <param name="srcIdx">Starting index in <paramref name="src"/>.</param>
@@ -647,7 +647,7 @@ namespace FFS.Libraries.StaticEcs {
                         AssertNotContains(src[j]);
                     }
                     #endif
-                    ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                    ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                     var cap = SegmentAllocator.MinSlotCapacity << Level;
                     if (Count + len > cap) {
                         EnsureCapacityInternal(ref storage, (ushort)(Count + len));
@@ -670,7 +670,7 @@ namespace FFS.Libraries.StaticEcs {
             #region REMOVE
             /// <summary>
             /// Removes the link at the specified index, shifting subsequent elements left to fill the gap.
-            /// Fires <see cref="ILinkType.OnDelete{TWorld}"/> on the removed link if the hook is present.
+            /// Fires <see cref="ILinkType.OnDelete"/> on the removed link if the hook is present.
             /// </summary>
             /// <param name="idx">Zero-based index of the link to remove.</param>
             /// <exception cref="StaticEcsException">In debug builds, thrown if <paramref name="idx"/> is out of bounds.</exception>
@@ -680,7 +680,7 @@ namespace FFS.Libraries.StaticEcs {
                 AssertNotBlockedByIteration();
                 if (idx < 0 || idx >= Count) throw new StaticEcsException($"[ Links<{typeof(TLinkType)}>.RemoveAt ] index out of bounds: {idx}");
                 #endif
-                ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 var values = storage.Segments[SegmentIdx];
                 if (storage.HasOnDelete) {
                     values[Offset + idx].OnDelete(EntityOwner, HookReason.Default);
@@ -697,7 +697,7 @@ namespace FFS.Libraries.StaticEcs {
 
             /// <summary>
             /// Removes the link at the specified index by swapping it with the last element (O(1), does not preserve order).
-            /// Optionally fires <see cref="ILinkType.OnDelete{TWorld}"/> on the removed link.
+            /// Optionally fires <see cref="ILinkType.OnDelete"/> on the removed link.
             /// </summary>
             /// <param name="idx">Zero-based index of the link to remove.</param>
             /// <param name="withOnDelete">If <c>true</c>, fires the OnDelete hook on the removed link (when the hook is present).</param>
@@ -708,7 +708,7 @@ namespace FFS.Libraries.StaticEcs {
                 AssertNotBlockedByIteration();
                 if (idx < 0 || idx >= Count) throw new StaticEcsException($"[ Links<{typeof(TLinkType)}>.RemoveAtSwap ] index out of bounds: {idx}");
                 #endif
-                ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 var values = storage.Segments[SegmentIdx];
                 if (withOnDelete && storage.HasOnDelete) {
                     values[Offset + idx].OnDelete(EntityOwner, HookReason.Default);
@@ -719,7 +719,7 @@ namespace FFS.Libraries.StaticEcs {
 
             /// <summary>
             /// Removes the first link, shifting all subsequent elements left.
-            /// Fires <see cref="ILinkType.OnDelete{TWorld}"/> on the removed link if the hook is present.
+            /// Fires <see cref="ILinkType.OnDelete"/> on the removed link if the hook is present.
             /// </summary>
             /// <exception cref="StaticEcsException">In debug builds, thrown if the collection is empty.</exception>
             [MethodImpl(AggressiveInlining)]
@@ -728,7 +728,7 @@ namespace FFS.Libraries.StaticEcs {
                 AssertNotBlockedByIteration();
                 if (Count == 0) throw new StaticEcsException($"[ Links<{typeof(TLinkType)}>.RemoveFirst ] empty");
                 #endif
-                ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 var values = storage.Segments[SegmentIdx];
                 if (storage.HasOnDelete) {
                     values[Offset].OnDelete(EntityOwner, HookReason.Default);
@@ -745,7 +745,7 @@ namespace FFS.Libraries.StaticEcs {
 
             /// <summary>
             /// Removes the first link by swapping it with the last element (O(1), does not preserve order).
-            /// Fires <see cref="ILinkType.OnDelete{TWorld}"/> on the removed link if the hook is present.
+            /// Fires <see cref="ILinkType.OnDelete"/> on the removed link if the hook is present.
             /// </summary>
             /// <exception cref="StaticEcsException">In debug builds, thrown if the collection is empty.</exception>
             [MethodImpl(AggressiveInlining)]
@@ -754,7 +754,7 @@ namespace FFS.Libraries.StaticEcs {
                 AssertNotBlockedByIteration();
                 if (Count == 0) throw new StaticEcsException($"[ Links<{typeof(TLinkType)}>.RemoveFirstSwap ] empty");
                 #endif
-                ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 var values = storage.Segments[SegmentIdx];
                 if (storage.HasOnDelete) {
                     values[Offset].OnDelete(EntityOwner, HookReason.Default);
@@ -765,7 +765,7 @@ namespace FFS.Libraries.StaticEcs {
 
             /// <summary>
             /// Removes the last link in the collection.
-            /// Fires <see cref="ILinkType.OnDelete{TWorld}"/> on the removed link if the hook is present.
+            /// Fires <see cref="ILinkType.OnDelete"/> on the removed link if the hook is present.
             /// </summary>
             /// <exception cref="StaticEcsException">In debug builds, thrown if the collection is empty.</exception>
             [MethodImpl(AggressiveInlining)]
@@ -774,7 +774,7 @@ namespace FFS.Libraries.StaticEcs {
                 AssertNotBlockedByIteration();
                 if (Count == 0) throw new StaticEcsException($"[ Links<{typeof(TLinkType)}>.RemoveLast ] empty");
                 #endif
-                ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 var values = storage.Segments[SegmentIdx];
                 if (storage.HasOnDelete) {
                     values[Offset + Count - 1].OnDelete(EntityOwner, HookReason.Default);
@@ -784,7 +784,7 @@ namespace FFS.Libraries.StaticEcs {
 
             /// <summary>
             /// Finds and removes the specified link, shifting subsequent elements left to preserve order.
-            /// Fires <see cref="ILinkType.OnDelete{TWorld}"/> on the removed link if found and the hook is present.
+            /// Fires <see cref="ILinkType.OnDelete"/> on the removed link if found and the hook is present.
             /// </summary>
             /// <param name="item">The link to find and remove.</param>
             /// <returns><c>true</c> if the link was found and removed; <c>false</c> if not found.</returns>
@@ -816,7 +816,7 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             /// <summary>
-            /// Removes all links from the collection. Fires <see cref="ILinkType.OnDelete{TWorld}"/> on each link
+            /// Removes all links from the collection. Fires <see cref="ILinkType.OnDelete"/> on each link
             /// if the hook is present. Resets count to zero.
             /// </summary>
             [MethodImpl(AggressiveInlining)]
@@ -825,7 +825,7 @@ namespace FFS.Libraries.StaticEcs {
                 AssertNotBlockedByIteration();
                 #endif
                 if (Count > 0) {
-                    ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                    ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                     var values = storage.Segments[SegmentIdx];
                     if (storage.HasOnDelete) {
                         var owner = EntityOwner;
@@ -863,7 +863,7 @@ namespace FFS.Libraries.StaticEcs {
             /// <returns>The index of the link, or -1 if not present.</returns>
             [MethodImpl(AggressiveInlining)]
             public readonly int IndexOf(Link<TLinkType> item) {
-                var values = Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx];
+                var values = Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx];
                 var indexOf = Array.IndexOf(values, item, (int)Offset, Count);
                 return indexOf >= 0 ? (int)(indexOf - Offset) : -1;
             }
@@ -875,7 +875,7 @@ namespace FFS.Libraries.StaticEcs {
             /// <returns><c>true</c> if found; otherwise <c>false</c>.</returns>
             [MethodImpl(AggressiveInlining)]
             public readonly bool Contains(Link<TLinkType> item) {
-                var values = Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx];
+                var values = Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx];
                 for (var i = Offset; i < Offset + Count; i++) {
                     if (values[i].Equals(item)) return true;
                 }
@@ -892,7 +892,7 @@ namespace FFS.Libraries.StaticEcs {
             /// <returns><c>true</c> if found; otherwise <c>false</c>.</returns>
             [MethodImpl(AggressiveInlining)]
             public readonly bool Contains<TComparer>(Link<TLinkType> item, TComparer comparer) where TComparer : IEqualityComparer<Link<TLinkType>> {
-                var values = Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx];
+                var values = Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx];
                 for (var i = Offset; i < Offset + Count; i++) {
                     if (comparer.Equals(values[i], item)) return true;
                 }
@@ -916,7 +916,7 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
                 var cap = SegmentAllocator.MinSlotCapacity << Level;
                 if (Count + additionalSize > cap) {
-                    ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                    ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                     EnsureCapacityInternal(ref storage, (ushort)(Count + additionalSize));
                 }
             }
@@ -933,7 +933,7 @@ namespace FFS.Libraries.StaticEcs {
                 #endif
                 var cap = SegmentAllocator.MinSlotCapacity << Level;
                 if (cap < newCapacity) {
-                    ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                    ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                     EnsureCapacityInternal(ref storage, newCapacity);
                 }
             }
@@ -949,7 +949,7 @@ namespace FFS.Libraries.StaticEcs {
                 if (dst == null) throw new StaticEcsException($"[ Links<{typeof(TLinkType)}>.CopyTo ] dst is null");
                 if (Count > dst.Length) throw new StaticEcsException($"[ Links<{typeof(TLinkType)}>.CopyTo ] count > dst.Length");
                 #endif
-                Utils.LoopFallbackCopy(Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx], Offset, dst, 0, Count);
+                Utils.LoopFallbackCopy(Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx], Offset, dst, 0, Count);
             }
 
             /// <summary>
@@ -966,7 +966,7 @@ namespace FFS.Libraries.StaticEcs {
                 if (dstIdx + len > dst.Length) throw new StaticEcsException($"[ Links<{typeof(TLinkType)}>.CopyTo ] dstIdx + len > dst.Length");
                 if (len > Count) throw new StaticEcsException($"[ Links<{typeof(TLinkType)}>.CopyTo ] len > count");
                 #endif
-                Utils.LoopFallbackCopy(Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx], Offset, dst, (uint)dstIdx, (uint)len);
+                Utils.LoopFallbackCopy(Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx], Offset, dst, (uint)dstIdx, (uint)len);
             }
 
             /// <summary>
@@ -974,7 +974,7 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             [MethodImpl(AggressiveInlining)]
             public readonly void Sort() {
-                Array.Sort(Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx], (int)Offset, Count);
+                Array.Sort(Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx], (int)Offset, Count);
             }
 
             /// <summary>
@@ -984,7 +984,7 @@ namespace FFS.Libraries.StaticEcs {
             /// <param name="comparer">The comparer to use for ordering.</param>
             [MethodImpl(AggressiveInlining)]
             public readonly void Sort<TComparer>(TComparer comparer) where TComparer : IComparer<Link<TLinkType>> {
-                Array.Sort(Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx], (int)Offset, Count, comparer);
+                Array.Sort(Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx], (int)Offset, Count, comparer);
             }
 
             /// <summary>
@@ -992,7 +992,7 @@ namespace FFS.Libraries.StaticEcs {
             /// </summary>
             public readonly override string ToString() {
                 var res = "";
-                var values = Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx];
+                var values = Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx];
                 for (int i = 0; i < Count; i++) {
                     res += values[Offset + i].ToString();
                     if (i + 1 < Count) res += ", ";
@@ -1007,7 +1007,7 @@ namespace FFS.Libraries.StaticEcs {
             /// <returns>A <see cref="ROMultiComponentsIterator{T}"/> for iterating over the links.</returns>
             [MethodImpl(AggressiveInlining)]
             public ROMultiComponentsIterator<Link<TLinkType>> GetEnumerator() => new(
-                Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx],
+                Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx],
                 SegmentIdx,
                 Offset,
                 Count
@@ -1047,12 +1047,12 @@ namespace FFS.Libraries.StaticEcs {
 
             #region ICOMPONENT
             [MethodImpl(AggressiveInlining)]
-            public void OnAdd<TW>(World<TW>.Entity self) where TW : struct, IWorldType {
+            public void OnAdd(World.Entity self) {
                 var entityId = self.IdWithOffset - Const.ENTITY_ID_OFFSET;
                 var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
                 var segmentEntityIdx = (byte)(entityId & Const.ENTITIES_IN_SEGMENT_MASK);
 
-                ref var storage = ref World<TW>.Resources<TW, MultiValueStorage<Link<TLinkType>>>.Value;
+                ref var storage = ref World.Resources<World.WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 storage.EnsureSegment(segmentIdx);
 
                 SegmentIdx = segmentIdx;
@@ -1063,8 +1063,8 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             [MethodImpl(AggressiveInlining)]
-            public void OnDelete<TW>(World<TW>.Entity self, HookReason reason) where TW : struct, IWorldType {
-                ref var storage = ref World<TW>.Resources<TW, MultiValueStorage<Link<TLinkType>>>.Value;
+            public void OnDelete(World.Entity self, HookReason reason) {
+                ref var storage = ref World.Resources<World.WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 Clear();
                 storage.Allocators[SegmentIdx].Free(Offset, Level, out var empty);
                 if (empty) {
@@ -1073,10 +1073,10 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             [MethodImpl(AggressiveInlining)]
-            public void CopyTo<TW>(World<TW>.Entity self, World<TW>.Entity other, bool disabled) where TW : struct, IWorldType {
-                ref var storage = ref World<TW>.Resources<TW, MultiValueStorage<Link<TLinkType>>>.Value;
+            public void CopyTo(World.Entity self, World.Entity other, bool disabled) {
+                ref var storage = ref World.Resources<World.WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 if (storage.HasOnCopy) {
-                    ref var dst = ref World<TW>.Components<Links<TLinkType>>.Instance.Add(other);
+                    ref var dst = ref World.Components<Links<TLinkType>>.Instance.Add(other);
 
                     var neededCapacity = (ushort)Utils.RoundUpToPowerOf2(Math.Max(Count, SegmentAllocator.MinSlotCapacity));
                     var neededLevel = SegmentAllocator.LevelForCapacity(neededCapacity);
@@ -1101,21 +1101,21 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             [MethodImpl(AggressiveInlining)]
-            public void Write<TW>(ref BinaryPackWriter writer, World<TW>.Entity self) where TW : struct, IWorldType {
+            public void Write(ref BinaryPackWriter writer, World.Entity self) {
                 writer.WriteUshort(Count);
                 if (Count > 0) {
-                    writer.WriteArrayUnmanaged(World<TW>.Resources<TW, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx], (int)Offset, Count);
+                    writer.WriteArrayUnmanaged(World.Resources<World.WorldScope, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx], (int)Offset, Count);
                 }
             }
 
             [MethodImpl(AggressiveInlining)]
-            public void Read<TW>(ref BinaryPackReader reader, World<TW>.Entity self, byte version, bool disabled) where TW : struct, IWorldType {
+            public void Read(ref BinaryPackReader reader, World.Entity self, byte version, bool disabled) {
                 Count = reader.ReadUshort();
                 var entityId = self.IdWithOffset - Const.ENTITY_ID_OFFSET;
                 var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
                 var segmentEntityIdx = (byte)(entityId & Const.ENTITIES_IN_SEGMENT_MASK);
 
-                ref var storage = ref World<TW>.Resources<TW, MultiValueStorage<Link<TLinkType>>>.Value;
+                ref var storage = ref World.Resources<World.WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 storage.EnsureSegment(segmentIdx);
 
                 SegmentIdx = segmentIdx;
@@ -1129,17 +1129,17 @@ namespace FFS.Libraries.StaticEcs {
                 }
             }
             
-            void IComponentInternal.OnInitialize<TW>() {
-                ref var storage = ref World<TW>.ResourcesData<TW>.Instance.GetOrCreate<MultiValueStorage<Link<TLinkType>>>(out var isNew);
+            void IComponentInternal.OnInitialize() {
+                ref var storage = ref World.ResourcesData<World.WorldScope>.Instance.GetOrCreate<MultiValueStorage<Link<TLinkType>>>(out var isNew);
                 if (isNew) {
                     storage.Init(Data.Instance.EntitiesSegments.Length, TypeHooks.LinkHasOnAdd(typeof(TLinkType)), TypeHooks.LinkHasOnDelete(typeof(TLinkType)), TypeHooks.LinkHasCopyTo(typeof(TLinkType)), false, false);
                     storage.ElementStrategy = new UnmanagedPackArrayStrategy<Link<TLinkType>>();
-                    World<TW>.Data.Instance.RegisterMultiStorageResizer(_ResizeStorage);
+                    World.Data.Instance.RegisterMultiStorageResizer(_ResizeStorage);
                 }
             }
             
             IPackArrayStrategy<T> IComponentStrategyOverride.ArrayPackStrategy<T>() {
-                return new LinksUnmanagedPackArrayStrategy<TWorld, TLinkType>() as IPackArrayStrategy<T>;
+                return new LinksUnmanagedPackArrayStrategy<TLinkType>() as IPackArrayStrategy<T>;
             }
             #endregion
 
@@ -1151,14 +1151,14 @@ namespace FFS.Libraries.StaticEcs {
             #if FFS_ECS_DEBUG
             [MethodImpl(AggressiveInlining)]
             private readonly void AssertNotBlockedByIteration() {
-                if (Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value.IsBlockedByIteration(SegmentIdx, Offset)) {
+                if (Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value.IsBlockedByIteration(SegmentIdx, Offset)) {
                     throw new StaticEcsException($"[ Links<{typeof(TLinkType)}> ] Cannot modify while being iterated.");
                 }
             }
 
             [MethodImpl(AggressiveInlining)]
             private readonly void AssertNotContains(Link<TLinkType> val) {
-                var values = Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx];
+                var values = Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value.Segments[SegmentIdx];
                 for (var i = Offset; i < Offset + Count; i++) {
                     if (values[i].Equals(val)) {
                         throw new StaticEcsException($"[ Links<{typeof(TLinkType)}>.Add ] duplicate value: {val}");
@@ -1169,7 +1169,7 @@ namespace FFS.Libraries.StaticEcs {
 
             [MethodImpl(AggressiveInlining)]
             internal static void _ResizeStorage(uint segmentCapacity) {
-                ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 if (storage.Segments != null) {
                     storage.EnsureCapacity((int)segmentCapacity);
                 }
@@ -1228,7 +1228,7 @@ namespace FFS.Libraries.StaticEcs {
                     ref var components = ref Components<Link<TLinkType>>.Instance;
 
                     var gid = value;
-                    while (gid.TryUnpack<TWorld>(out var entity)) {
+                    while (gid.TryUnpack(out var entity)) {
                         var hasLink = components.TryGet(entity, out var link);
                         entity.Destroy();
                         if (!hasLink) break;
@@ -1255,12 +1255,12 @@ namespace FFS.Libraries.StaticEcs {
                     Ranges ??= new Stack<EntityGID>(64);
 
                     ref var components = ref Components<Links<TLinkType>>.Instance;
-                    ref var storage = ref Resources<TWorld, MultiValueStorage<Link<TLinkType>>>.Value;
+                    ref var storage = ref Resources<WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                     Ranges.Push(value);
 
                     while (Ranges.Count > 0) {
                         var gid = Ranges.Pop();
-                        if (gid.TryUnpack<TWorld>(out var entity)) {
+                        if (gid.TryUnpack(out var entity)) {
                             if (components.TryGet(entity, out var links)) {
                                 var values = storage.Segments[links.SegmentIdx];
                                 for (var i = links.Offset; i < links.Offset + links.Count; i++) {
@@ -1278,7 +1278,7 @@ namespace FFS.Libraries.StaticEcs {
     }
 
     /// <summary>
-    /// Status codes returned by link operations (e.g., <see cref="Link.TryAddLink{TW,TLink}"/>, <see cref="Links.TryAddLinkItem{TW,TLink}"/>).
+    /// Status codes returned by link operations (e.g., <see cref="Link.TryAddLink{TLink}"/>, <see cref="Links.TryAddLinkItem{TLink}"/>).
     /// </summary>
     public enum LinkOppStatus : byte {
         /// <summary>The operation completed successfully.</summary>
@@ -1298,7 +1298,7 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
     /// <summary>
-    /// Extension methods for single-link (<see cref="World{TWorld}.Link{TLinkType}"/>) operations on <see cref="EntityGID"/>.
+    /// Extension methods for single-link (<see cref="World.Link{TLinkType}"/>) operations on <see cref="EntityGID"/>.
     /// Provides safe add, delete, deep-destroy, and deep-copy operations that validate the target entity's liveness.
     /// </summary>
     public static class Link {
@@ -1307,21 +1307,19 @@ namespace FFS.Libraries.StaticEcs {
         /// If the target already has a link to the same entity, returns <see cref="LinkOppStatus.LinkAlreadyExists"/>.
         /// If the link points to a different entity, the old link is replaced (OnDelete then OnAdd are fired).
         /// </summary>
-        /// <typeparam name="TW">The world type.</typeparam>
         /// <typeparam name="TLink">The link type.</typeparam>
         /// <param name="targetGID">The <see cref="EntityGID"/> of the entity to add the link to.</param>
         /// <param name="link">The entity to link to.</param>
         /// <param name="withCyclicHooks">If <c>true</c>, fires OnAdd/OnDelete hooks even when this is a cyclic (re-entrant) call.</param>
         /// <returns>A <see cref="LinkOppStatus"/> indicating the result of the operation.</returns>
         [MethodImpl(AggressiveInlining)]
-        public static LinkOppStatus TryAddLink<TW, TLink>(this EntityGID targetGID, World<TW>.Entity link, bool withCyclicHooks = false)
-            where TW : struct, IWorldType
+        public static LinkOppStatus TryAddLink<TLink>(this EntityGID targetGID, World.Entity link, bool withCyclicHooks = false)
             where TLink : unmanaged, ILinkType {
-            if (targetGID.TryUnpack<TW>(out var target, out var status)) {
+            if (targetGID.TryUnpack(out var target, out var status)) {
                 var linkGID = link.GID;
-                ref var components = ref World<TW>.Components<World<TW>.Link<TLink>>.Instance;
+                ref var components = ref World.Components<World.Link<TLink>>.Instance;
                 if (!components.TryGet(target, out var stored) || !stored.Value.Equals(linkGID)) {
-                    components.Set(target, new World<TW>.Link<TLink>(linkGID), withCyclicHooks);
+                    components.Set(target, new World.Link<TLink>(linkGID), withCyclicHooks);
                     return LinkOppStatus.Ok;
                 }
                 
@@ -1336,18 +1334,16 @@ namespace FFS.Libraries.StaticEcs {
         /// but only if it currently points to the specified <paramref name="link"/> entity.
         /// Returns <see cref="LinkOppStatus.LinkNotExists"/> if the link component is absent or points elsewhere.
         /// </summary>
-        /// <typeparam name="TW">The world type.</typeparam>
         /// <typeparam name="TLink">The link type.</typeparam>
         /// <param name="targetGID">The <see cref="EntityGID"/> of the entity to remove the link from.</param>
         /// <param name="link">The expected linked entity. Deletion only occurs if the current link matches.</param>
         /// <param name="withCyclicHooks">If <c>true</c>, fires OnDelete hook even when this is a cyclic (re-entrant) call.</param>
         /// <returns>A <see cref="LinkOppStatus"/> indicating the result of the operation.</returns>
         [MethodImpl(AggressiveInlining)]
-        public static LinkOppStatus TryDeleteLink<TW, TLink>(this EntityGID targetGID, World<TW>.Entity link, bool withCyclicHooks = false)
-            where TW : struct, IWorldType
+        public static LinkOppStatus TryDeleteLink<TLink>(this EntityGID targetGID, World.Entity link, bool withCyclicHooks = false)
             where TLink : unmanaged, ILinkType {
-            if (targetGID.TryUnpack<TW>(out var target, out var status)) {
-                ref var components = ref World<TW>.Components<World<TW>.Link<TLink>>.Instance;
+            if (targetGID.TryUnpack(out var target, out var status)) {
+                ref var components = ref World.Components<World.Link<TLink>>.Instance;
                 if (components.TryGet(target, out var stored) && stored.Value.Equals(link.GID)) {
                     components.Delete(target, withOnDelete: withCyclicHooks);
                     return LinkOppStatus.Ok;
@@ -1367,31 +1363,27 @@ namespace FFS.Libraries.StaticEcs {
         /// until an entity without the link or a dead/unloaded entity is reached.
         /// <para>Re-entrant calls (cycles) are detected and safely ignored.</para>
         /// </summary>
-        /// <typeparam name="TW">The world type.</typeparam>
         /// <typeparam name="TLink">The link type to follow.</typeparam>
         /// <param name="targetGID">The <see cref="EntityGID"/> of the first entity in the chain to destroy.</param>
         [MethodImpl(AggressiveInlining)]
-        public static void DeepDestroyLink<TW, TLink>(this EntityGID targetGID)
-            where TW : struct, IWorldType 
+        public static void DeepDestroyLink<TLink>(this EntityGID targetGID) 
             where TLink : unmanaged, ILinkType {
-            World<TW>.ResourcesData<TW>.Instance.GetOrCreate<World<TW>.DeepDestroyLinkFunction<TLink>>(out _).Invoke(targetGID);
+            World.ResourcesData<World.WorldScope>.Instance.GetOrCreate<World.DeepDestroyLinkFunction<TLink>>(out _).Invoke(targetGID);
         }
 
         /// <summary>
-        /// Clones the entity referenced by <paramref name="link"/> (via <see cref="World{TWorld}.Entity.Clone()"/>)
-        /// and returns a new <see cref="World{TWorld}.Link{TLinkType}"/> pointing to the clone.
+        /// Clones the entity referenced by <paramref name="link"/> (via <see cref="World.Entity.Clone()"/>)
+        /// and returns a new <see cref="World.Link{TLinkType}"/> pointing to the clone.
         /// </summary>
-        /// <typeparam name="TW">The world type.</typeparam>
         /// <typeparam name="TLink">The link type.</typeparam>
         /// <param name="link">The <see cref="EntityGID"/> of the entity to clone.</param>
         /// <param name="copied">When successful, receives the new link pointing to the cloned entity.</param>
         /// <returns><see cref="LinkOppStatus.Ok"/> on success, or an error status if the entity is not loaded or not actual.</returns>
         [MethodImpl(AggressiveInlining)]
-        public static LinkOppStatus TryDeepCopyLink<TW, TLink>(this EntityGID link, out World<TW>.Link<TLink> copied)
-            where TW : struct, IWorldType 
+        public static LinkOppStatus TryDeepCopyLink<TLink>(this EntityGID link, out World.Link<TLink> copied) 
             where TLink : unmanaged, ILinkType {
-            if (link.TryUnpack<TW>(out var entity, out var status)) {
-                copied = new World<TW>.Link<TLink>(entity.Clone().GID);
+            if (link.TryUnpack(out var entity, out var status)) {
+                copied = new World.Link<TLink>(entity.Clone().GID);
                 return LinkOppStatus.Ok;
             }
 
@@ -1407,31 +1399,29 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
     /// <summary>
-    /// Extension methods for multi-link (<see cref="World{TWorld}.Links{TLinkType}"/>) operations on <see cref="EntityGID"/>.
+    /// Extension methods for multi-link (<see cref="World.Links{TLinkType}"/>) operations on <see cref="EntityGID"/>.
     /// Provides safe add, delete, and deep-destroy operations that validate the target entity's liveness
-    /// and automatically manage the <see cref="World{TWorld}.Links{TLinkType}"/> component lifecycle.
+    /// and automatically manage the <see cref="World.Links{TLinkType}"/> component lifecycle.
     /// </summary>
     public static class Links {
         /// <summary>
-        /// Adds a link to the target entity's <see cref="World{TWorld}.Links{TLinkType}"/> collection.
-        /// If the target does not yet have the <see cref="World{TWorld}.Links{TLinkType}"/> component, it is created automatically.
+        /// Adds a link to the target entity's <see cref="World.Links{TLinkType}"/> collection.
+        /// If the target does not yet have the <see cref="World.Links{TLinkType}"/> component, it is created automatically.
         /// Returns <see cref="LinkOppStatus.LinkAlreadyExists"/> if the link is already present in the collection.
         /// </summary>
-        /// <typeparam name="TW">The world type.</typeparam>
         /// <typeparam name="TLink">The multi-link type (must implement <see cref="ILinksType"/>).</typeparam>
         /// <param name="targetGID">The <see cref="EntityGID"/> of the entity to add the link to.</param>
         /// <param name="link">The entity to link to.</param>
         /// <param name="withCyclicHooks">If <c>true</c>, fires the OnAdd hook even when this is a cyclic (re-entrant) call.</param>
         /// <returns>A <see cref="LinkOppStatus"/> indicating the result of the operation.</returns>
         [MethodImpl(AggressiveInlining)]
-        public static LinkOppStatus TryAddLinkItem<TW, TLink>(this EntityGID targetGID, World<TW>.Entity link, bool withCyclicHooks = false)
-            where TW : struct, IWorldType
+        public static LinkOppStatus TryAddLinkItem<TLink>(this EntityGID targetGID, World.Entity link, bool withCyclicHooks = false)
             where TLink : unmanaged, ILinksType {
-            if (targetGID.TryUnpack<TW>(out var target, out var status)) {
+            if (targetGID.TryUnpack(out var target, out var status)) {
                 var linkGID = link.GID;
-                ref var components = ref World<TW>.Components<World<TW>.Links<TLink>>.Instance;
+                ref var components = ref World.Components<World.Links<TLink>>.Instance;
                 ref var links = ref components.Add(target);
-                return links.TryAdd(new World<TW>.Link<TLink>(linkGID), withCyclicHooks) 
+                return links.TryAdd(new World.Link<TLink>(linkGID), withCyclicHooks) 
                     ? LinkOppStatus.Ok 
                     : LinkOppStatus.LinkAlreadyExists;
             }
@@ -1442,25 +1432,23 @@ namespace FFS.Libraries.StaticEcs {
         }
             
         /// <summary>
-        /// Removes a specific link from the target entity's <see cref="World{TWorld}.Links{TLinkType}"/> collection.
-        /// If the collection becomes empty after removal, the <see cref="World{TWorld}.Links{TLinkType}"/> component
+        /// Removes a specific link from the target entity's <see cref="World.Links{TLinkType}"/> collection.
+        /// If the collection becomes empty after removal, the <see cref="World.Links{TLinkType}"/> component
         /// is automatically deleted from the entity.
         /// </summary>
-        /// <typeparam name="TW">The world type.</typeparam>
         /// <typeparam name="TLink">The multi-link type (must implement <see cref="ILinksType"/>).</typeparam>
         /// <param name="targetGID">The <see cref="EntityGID"/> of the entity to remove the link from.</param>
         /// <param name="link">The entity whose link should be removed.</param>
         /// <param name="withCyclicHooks">If <c>true</c>, fires the OnDelete hook even when this is a cyclic (re-entrant) call.</param>
         /// <returns>A <see cref="LinkOppStatus"/> indicating the result of the operation.</returns>
         [MethodImpl(AggressiveInlining)]
-        public static LinkOppStatus TryDeleteLinkItem<TW, TLink>(this EntityGID targetGID, World<TW>.Entity link, bool withCyclicHooks = false)
-            where TW : struct, IWorldType
+        public static LinkOppStatus TryDeleteLinkItem<TLink>(this EntityGID targetGID, World.Entity link, bool withCyclicHooks = false)
             where TLink : unmanaged, ILinksType {
-            if (targetGID.TryUnpack<TW>(out var target, out var status)) {
-                ref var components = ref World<TW>.Components<World<TW>.Links<TLink>>.Instance;
+            if (targetGID.TryUnpack(out var target, out var status)) {
+                ref var components = ref World.Components<World.Links<TLink>>.Instance;
                 if (components.Has(target)) {
                     ref var links = ref components.Ref(target);
-                    var result = links.TryRemoveSwap(new World<TW>.Link<TLink>(link.GID), withCyclicHooks);
+                    var result = links.TryRemoveSwap(new World.Link<TLink>(link.GID), withCyclicHooks);
                     if (links.IsEmpty) {
                         components.Delete(target);
                     }
@@ -1479,18 +1467,16 @@ namespace FFS.Libraries.StaticEcs {
         /// <summary>
         /// Recursively destroys an entity graph following multi-links of type <typeparamref name="TLink"/>.
         /// Starting from <paramref name="targetGID"/>, performs a depth-first traversal: for each entity,
-        /// all links in its <see cref="World{TWorld}.Links{TLinkType}"/> collection are pushed onto a stack,
+        /// all links in its <see cref="World.Links{TLinkType}"/> collection are pushed onto a stack,
         /// then the entity is destroyed. Continues until the stack is empty.
         /// <para>Re-entrant calls (cycles) are detected and safely ignored.</para>
         /// </summary>
-        /// <typeparam name="TW">The world type.</typeparam>
         /// <typeparam name="TLink">The multi-link type to follow (must implement <see cref="ILinksType"/>).</typeparam>
         /// <param name="targetGID">The <see cref="EntityGID"/> of the root entity to begin destroying from.</param>
         [MethodImpl(AggressiveInlining)]
-        public static void DeepDestroyLinkItem<TW, TLink>(this EntityGID targetGID)
-            where TW : struct, IWorldType 
+        public static void DeepDestroyLinkItem<TLink>(this EntityGID targetGID) 
             where TLink : unmanaged, ILinksType {
-            World<TW>.ResourcesData<TW>.Instance.GetOrCreate<World<TW>.DeepDestroyLinksFunction<TLink>>(out _).Invoke(targetGID);
+            World.ResourcesData<World.WorldScope>.Instance.GetOrCreate<World.DeepDestroyLinksFunction<TLink>>(out _).Invoke(targetGID);
         }
     }
     
@@ -1504,19 +1490,18 @@ namespace FFS.Libraries.StaticEcs {
     [Il2CppSetOption(Option.ArrayBoundsChecks, Const.IL2CPPArrayBoundsChecks)]
     #endif
     /// <summary>
-    /// Bulk segment serialization strategy for <see cref="World{TWorld}.Links{TLinkType}"/> components.
+    /// Bulk segment serialization strategy for <see cref="World.Links{TLinkType}"/> components.
     /// <para>
     /// Writes raw <c>Links&lt;TLinkType&gt;</c> struct bytes via unmanaged bulk copy and serializes
-    /// the underlying <see cref="MultiValueStorage{TValue}"/> segments (containing <see cref="World{TWorld}.Link{TLinkType}"/>
+    /// the underlying <see cref="MultiValueStorage{TValue}"/> segments (containing <see cref="World.Link{TLinkType}"/>
     /// values) with their <see cref="SegmentAllocator"/> state. On deserialization, segments and
     /// allocators are restored in bulk — no per-entity data copying.
     /// </para>
     /// <para>
     /// Segment deduplication and entity-level serialization behavior are identical to
-    /// <see cref="MultiUnmanagedPackArrayStrategy{TWorld, TValue}"/>.
+    /// <see cref="MultiUnmanagedPackArrayStrategy{TValue}"/>.
     /// </para>
     /// </summary>
-    /// <typeparam name="TWorld">World type for static storage access.</typeparam>
     /// <typeparam name="TLinkType">Link type implementing <see cref="ILinksType"/>. Must be <c>unmanaged</c>.</typeparam>
     /// <example>
     /// <code>
@@ -1526,11 +1511,10 @@ namespace FFS.Libraries.StaticEcs {
     /// ));
     /// </code>
     /// </example>
-    public sealed class LinksUnmanagedPackArrayStrategy<TWorld, TLinkType> : IPackArrayStrategy<World<TWorld>.Links<TLinkType>>, IPackArrayStrategyResettable
-        where TWorld : struct, IWorldType
+    public sealed class LinksUnmanagedPackArrayStrategy<TLinkType> : IPackArrayStrategy<World.Links<TLinkType>>, IPackArrayStrategyResettable
         where TLinkType : unmanaged, ILinksType {
 
-        private World<TWorld>.Links<TLinkType>[] _lastWriteArray;
+        private World.Links<TLinkType>[] _lastWriteArray;
 
         [MethodImpl(AggressiveInlining)]
         public bool IsUnmanaged() => true;
@@ -1542,11 +1526,11 @@ namespace FFS.Libraries.StaticEcs {
 
         [MethodImpl(AggressiveInlining)]
         public void Register() {
-            new UnmanagedPackArrayStrategy<World<TWorld>.Links<TLinkType>>().Register();
+            new UnmanagedPackArrayStrategy<World.Links<TLinkType>>().Register();
         }
 
         [MethodImpl(AggressiveInlining)]
-        public void WriteArray(ref BinaryPackWriter writer, World<TWorld>.Links<TLinkType>[] value, int idx, int count) {
+        public void WriteArray(ref BinaryPackWriter writer, World.Links<TLinkType>[] value, int idx, int count) {
             writer.WriteArrayUnmanaged(value, idx, count);
 
             var newSegment = !ReferenceEquals(value, _lastWriteArray);
@@ -1555,7 +1539,7 @@ namespace FFS.Libraries.StaticEcs {
 
             if (newSegment) {
                 var segIdx = value[idx].SegmentIdx;
-                ref var storage = ref World<TWorld>.Resources<TWorld, MultiValueStorage<World<TWorld>.Link<TLinkType>>>.Value;
+                ref var storage = ref World.Resources<World.WorldScope, MultiValueStorage<World.Link<TLinkType>>>.Value;
                 ref var alloc = ref storage.Allocators[segIdx];
 
                 writer.WriteUint(alloc.Used);
@@ -1576,12 +1560,12 @@ namespace FFS.Libraries.StaticEcs {
         }
 
         [MethodImpl(AggressiveInlining)]
-        public void ReadArray(ref BinaryPackReader reader, ref World<TWorld>.Links<TLinkType>[] result, int idx) {
+        public void ReadArray(ref BinaryPackReader reader, ref World.Links<TLinkType>[] result, int idx) {
             reader.ReadArrayUnmanaged(ref result, idx);
 
             if (reader.ReadBool()) {
                 var segIdx = result[idx].SegmentIdx;
-                ref var storage = ref World<TWorld>.Resources<TWorld, MultiValueStorage<World<TWorld>.Link<TLinkType>>>.Value;
+                ref var storage = ref World.Resources<World.WorldScope, MultiValueStorage<World.Link<TLinkType>>>.Value;
 
                 storage.EnsureSegment(segIdx);
                 ref var alloc = ref storage.Allocators[segIdx];
@@ -1613,39 +1597,39 @@ namespace FFS.Libraries.StaticEcs {
         }
 
         [MethodImpl(AggressiveInlining)]
-        public void WriteArray(ref BinaryPackWriter writer, World<TWorld>.Links<TLinkType>[] value) {
+        public void WriteArray(ref BinaryPackWriter writer, World.Links<TLinkType>[] value) {
             writer.WriteArrayUnmanaged(value);
         }
 
         [MethodImpl(AggressiveInlining)]
-        public World<TWorld>.Links<TLinkType>[] ReadArray(ref BinaryPackReader reader) {
-            return reader.ReadArrayUnmanaged<World<TWorld>.Links<TLinkType>>();
+        public World.Links<TLinkType>[] ReadArray(ref BinaryPackReader reader) {
+            return reader.ReadArrayUnmanaged<World.Links<TLinkType>>();
         }
 
         [MethodImpl(AggressiveInlining)]
-        public void ReadArray(ref BinaryPackReader reader, ref World<TWorld>.Links<TLinkType>[] result) {
+        public void ReadArray(ref BinaryPackReader reader, ref World.Links<TLinkType>[] result) {
             reader.ReadArrayUnmanaged(ref result);
         }
 
         #if !FFS_PACK_DISABLE_MULTI_ARRAYS && !UNITY_WEBGL
         [MethodImpl(AggressiveInlining)]
-        public void WriteArray(ref BinaryPackWriter writer, World<TWorld>.Links<TLinkType>[,] value) {
+        public void WriteArray(ref BinaryPackWriter writer, World.Links<TLinkType>[,] value) {
             writer.WriteArrayUnmanaged(value);
         }
 
         [MethodImpl(AggressiveInlining)]
-        public void WriteArray(ref BinaryPackWriter writer, World<TWorld>.Links<TLinkType>[,,] value) {
+        public void WriteArray(ref BinaryPackWriter writer, World.Links<TLinkType>[,,] value) {
             writer.WriteArrayUnmanaged(value);
         }
 
         [MethodImpl(AggressiveInlining)]
-        public World<TWorld>.Links<TLinkType>[,] ReadArray2D(ref BinaryPackReader reader) {
-            return reader.ReadArray2DUnmanaged<World<TWorld>.Links<TLinkType>>();
+        public World.Links<TLinkType>[,] ReadArray2D(ref BinaryPackReader reader) {
+            return reader.ReadArray2DUnmanaged<World.Links<TLinkType>>();
         }
 
         [MethodImpl(AggressiveInlining)]
-        public World<TWorld>.Links<TLinkType>[,,] ReadArray3D(ref BinaryPackReader reader) {
-            return reader.ReadArray3DUnmanaged<World<TWorld>.Links<TLinkType>>();
+        public World.Links<TLinkType>[,,] ReadArray3D(ref BinaryPackReader reader) {
+            return reader.ReadArray3DUnmanaged<World.Links<TLinkType>>();
         }
         #endif
     }
