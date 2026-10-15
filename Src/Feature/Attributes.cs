@@ -17,5 +17,6 @@ public class LatAttribute : Attribute { }
 public class FixAttribute : Attribute { }
 public class DrwAttribute : Attribute { }
 public class ClnAttribute : Attribute { }
+public class TikAttribute : Attribute { } // called manually each game tick
 
 }
