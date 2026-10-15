@@ -279,19 +279,20 @@ namespace FFS.Libraries.StaticEcs {
                     case EntityStatusType.Disabled when !entity.IsDisabled: return false;
                 }
 
-                var found = true;
                 if (!clusters.IsEmpty) {
                     var clusterId = entity.ClusterId;
+                    var found = false;
                     for (var i = 0; i < clusters.Length; i++) {
                         if (clusters[i] == clusterId) {
+                            found = true;
                             break;
                         }
                     }
 
-                    found = false;
+                    if (!found) return false;
                 }
 
-                return found && entity.IsMatch(Filter);
+                return entity.IsMatch(Filter);
             }
         }
         
@@ -325,17 +326,17 @@ namespace FFS.Libraries.StaticEcs {
     }
 
     /// <summary>
-    /// Interface for query filter types that determine which entities match a query.
-    /// Filters operate at two levels: chunk-level (coarse, via heuristic bitmasks) and entity-level (fine, via presence bitmasks).
-    /// <para>
-    /// Built-in filter implementations for components and tags:
-    /// <see cref="All{T0}"/>, <see cref="None{T0}"/>, <see cref="Any{T0, T1}"/> — accept both components and tags as type arguments,
-    /// <see cref="AllOnlyDisabled{T0}"/>, <see cref="AllWithDisabled{T0}"/>,
-    /// <see cref="NoneWithDisabled{T0}"/>, <see cref="AnyOnlyDisabled{T0, T1}"/>, <see cref="AnyWithDisabled{T0, T1}"/> — components only.
-    /// Combine multiple filters as query type parameters for complex matching logic.
-    /// </para>
+    /// Marker for query filters. <see cref="All{T0}"/>, <see cref="None{T0}"/>, <see cref="EntityIs{T0}"/>,
+    /// <see cref="And{TFilter0, TFilter1}"/> and <see cref="Nothing"/> are read by the query engine from their
+    /// type alone; anything else must implement <see cref="ICustomQueryFilter"/>.
     /// </summary>
-    public interface IQueryFilter {
+    public interface IQueryFilter { }
+
+    /// <summary>
+    /// A query filter that computes its own masks, for filters the engine cannot describe from the type,
+    /// such as editor tools filtering by runtime-chosen component types.
+    /// </summary>
+    public interface ICustomQueryFilter : IQueryFilter {
         /// <summary>
         /// Coarse-grained chunk-level filtering. Returns heuristic bitmask
         /// to quickly skip entire blocks (64 entities) that cannot match.

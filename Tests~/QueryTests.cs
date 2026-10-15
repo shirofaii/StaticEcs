@@ -66,6 +66,27 @@ namespace FFS.Libraries.StaticEcs.Tests {
         }
 
         [Fact]
+        public void IsMatchAndContainsFollowTheFilter() {
+            var a = W.NewEntity<Default>();
+            a.Set(new Pos { X = 1 });
+            var b = W.NewEntity<Default>();
+            b.Set(new Pos { X = 2 });
+            b.Set<Red>();
+            var c = W.NewEntity<Npc>();
+            c.Set(new Pos { X = 3 });
+
+            Assert.True(W.With<Pos>().Without<Red>().Contains(a));
+            Assert.False(W.With<Pos>().Without<Red>().Contains(b));
+            Assert.True(W.With<Pos, Red>().Contains(b));
+            Assert.True(W.Is<Npc>().Contains(c));
+            Assert.False(W.Is<Npc>().Contains(a));
+            Assert.True(a.IsMatch<All<Pos>>());
+            Assert.False(a.IsMatch<All<Red>>());
+            b.Disable();
+            Assert.False(W.With<Pos>().Contains(b));
+        }
+
+        [Fact]
         public void AnEntityTypeOnCreateHookRunsWithItsData() {
             var e = W.NewEntity(new Spawned { Start = 7 });
             Assert.True(e.Has<Pos>());

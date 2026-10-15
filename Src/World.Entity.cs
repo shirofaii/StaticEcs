@@ -528,11 +528,7 @@ namespace FFS.Libraries.StaticEcs {
             /// <returns><c>true</c> if the entity passes the filter.</returns>
             [MethodImpl(AggressiveInlining)]
             public readonly bool IsMatch<Q>(Q filter = default) where Q : struct, IQueryFilter {
-                var id = IdWithOffset - Const.ENTITY_ID_OFFSET;
-                var segmentIdx = id >> Const.ENTITIES_IN_SEGMENT_SHIFT;
-                var segmentBlockIdx = (byte) ((id >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
-                var blockEntityMask = 1UL << (int) (id & Const.ENTITIES_IN_BLOCK_MASK);
-                return (filter.FilterEntities(segmentIdx, segmentBlockIdx) & blockEntityMask) != 0UL;
+                return EntityMatches(QueryDefOf(filter), IdWithOffset - Const.ENTITY_ID_OFFSET);
             }
             #endregion
 

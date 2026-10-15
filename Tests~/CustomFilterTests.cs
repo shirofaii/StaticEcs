@@ -1,7 +1,7 @@
 using Xunit;
 
 namespace FFS.Libraries.StaticEcs.Tests {
-    public struct EveryNth : IQueryFilter {
+    public struct EveryNth : ICustomQueryFilter {
         public ulong Pattern;
 
         public ulong FilterChunk(uint chunkIdx) => ulong.MaxValue;

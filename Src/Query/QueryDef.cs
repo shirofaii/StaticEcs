@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using static System.Runtime.CompilerServices.MethodImplOptions;
 #if ENABLE_IL2CPP
@@ -20,18 +21,18 @@ namespace FFS.Libraries.StaticEcs {
         internal readonly ComponentMasks[] With;
         internal readonly ComponentMasks[] Without;
         internal readonly int EntityType;
-        internal readonly IQueryFilter Custom;
+        internal readonly ICustomQueryFilter[] Customs;
         internal readonly int Generation;
         internal readonly ulong[][] WithSegments;
         internal readonly ulong[][] WithoutSegments;
 
-        internal QueryDef(ComponentMasks[] with, ComponentMasks[] without, int entityType, IQueryFilter custom, int generation) {
+        internal QueryDef(ComponentMasks[] with, ComponentMasks[] without, int entityType, ICustomQueryFilter[] customs, int generation) {
             With = with;
             Without = without;
             WithSegments = new ulong[with.Length][];
             WithoutSegments = new ulong[without.Length][];
             EntityType = entityType;
-            Custom = custom;
+            Customs = customs;
             Generation = generation;
         }
 
@@ -43,25 +44,28 @@ namespace FFS.Libraries.StaticEcs {
             typeof(None<>), typeof(None<,>), typeof(None<,,>), typeof(None<,,,>), typeof(None<,,,,>), typeof(None<,,,,,>), typeof(None<,,,,,,>), typeof(None<,,,,,,,>)
         };
 
-        internal static QueryDef Build(Type filterType, IQueryFilter filter, Dictionary<Type, ComponentMasks> masksByType, Dictionary<Type, byte> entityTypeIds, int generation) {
+        internal static QueryDef Build(Type filterType, object filter, Dictionary<Type, ComponentMasks> masksByType, Dictionary<Type, byte> entityTypeIds, int generation) {
             var with = new List<ComponentMasks>();
             var without = new List<ComponentMasks>();
+            var customs = new List<ICustomQueryFilter>();
             var entityType = -1;
-            if (!Collect(filterType, with, without, ref entityType, masksByType, entityTypeIds)) {
-                return new QueryDef(Array.Empty<ComponentMasks>(), Array.Empty<ComponentMasks>(), -1, filter, generation);
-            }
-
-            return new QueryDef(with.ToArray(), without.ToArray(), entityType, null, generation);
+            Collect(filterType, filter, with, without, customs, ref entityType, masksByType, entityTypeIds);
+            return new QueryDef(with.ToArray(), without.ToArray(), entityType, customs.ToArray(), generation);
         }
 
-        private static bool Collect(Type type, List<ComponentMasks> with, List<ComponentMasks> without, ref int entityType,
-                                    Dictionary<Type, ComponentMasks> masksByType, Dictionary<Type, byte> entityTypeIds) {
+        private static void Collect(Type type, object filter, List<ComponentMasks> with, List<ComponentMasks> without, List<ICustomQueryFilter> customs,
+                                    ref int entityType, Dictionary<Type, ComponentMasks> masksByType, Dictionary<Type, byte> entityTypeIds) {
             if (type == typeof(Nothing)) {
-                return true;
+                return;
+            }
+
+            if (filter is ICustomQueryFilter custom) {
+                customs.Add(custom);
+                return;
             }
 
             if (!type.IsGenericType) {
-                return false;
+                throw new StaticEcsException($"Query filter {type.Name} must implement {nameof(ICustomQueryFilter)}");
             }
 
             var definition = type.GetGenericTypeDefinition();
@@ -74,23 +78,29 @@ namespace FFS.Libraries.StaticEcs {
                     }
                     target.Add(masks);
                 }
-                return true;
+                return;
             }
 
             if (definition == typeof(EntityIs<>)) {
-                if (entityType >= 0 || !entityTypeIds.TryGetValue(args[0], out var id)) {
-                    return false;
+                if (!entityTypeIds.TryGetValue(args[0], out var id)) {
+                    throw new StaticEcsException($"Query uses entity type {args[0].Name}, which is not registered");
+                }
+                if (entityType >= 0 && entityType != id) {
+                    throw new StaticEcsException("A query can match only one entity type");
                 }
                 entityType = id;
-                return true;
+                return;
             }
 
             if (definition == typeof(And<,>)) {
-                return Collect(args[0], with, without, ref entityType, masksByType, entityTypeIds)
-                    && Collect(args[1], with, without, ref entityType, masksByType, entityTypeIds);
+                Collect(args[0], type.GetField(nameof(And<Nothing, Nothing>.Filter0), BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(filter),
+                    with, without, customs, ref entityType, masksByType, entityTypeIds);
+                Collect(args[1], type.GetField(nameof(And<Nothing, Nothing>.Filter1), BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(filter),
+                    with, without, customs, ref entityType, masksByType, entityTypeIds);
+                return;
             }
 
-            return false;
+            throw new StaticEcsException($"Query filter {type.Name} must implement {nameof(ICustomQueryFilter)}");
         }
     }
 
@@ -117,7 +127,7 @@ namespace FFS.Libraries.StaticEcs {
         private static QueryDef BuildQueryDef<TFilter>(TFilter filter) where TFilter : struct, IQueryFilter {
             ref var world = ref Data.Instance;
             var def = QueryDef.Build(typeof(TFilter), filter, world.MasksByType, world.EntityTypeIdByType, world.Generation);
-            if (def.Custom == null) {
+            if (def.Customs.Length == 0) {
                 QueryDefCache<TFilter>.Def = def;
             }
             return def;
@@ -140,8 +150,9 @@ namespace FFS.Libraries.StaticEcs {
                 mask &= Data.Instance.EntityTypes[def.EntityType].HeuristicChunks[chunkIdx].Value;
             }
 
-            if (def.Custom != null) {
-                mask &= def.Custom.FilterChunk(chunkIdx);
+            var customs = def.Customs;
+            for (var i = 0; i < customs.Length; i++) {
+                mask &= customs[i].FilterChunk(chunkIdx);
             }
 
             return mask;
@@ -188,18 +199,30 @@ namespace FFS.Libraries.StaticEcs {
                 }
             }
 
-            if (def.Custom != null) {
-                mask &= def.Custom.FilterEntities(segmentIdx, segmentBlockIdx);
+            var customs = def.Customs;
+            for (var i = 0; i < customs.Length; i++) {
+                mask &= customs[i].FilterEntities(segmentIdx, segmentBlockIdx);
             }
 
             return mask;
+        }
+
+        internal static bool EntityMatches(QueryDef def, uint entityId) {
+            var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;
+            if (def.EntityType >= 0 && Data.Instance.EntitiesSegments[segmentIdx].EntityType != def.EntityType) {
+                return false;
+            }
+
+            LoadSegments(def, segmentIdx);
+            var segmentBlockIdx = (byte) ((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK);
+            return (FilterBlock(def, segmentIdx, segmentBlockIdx) & (1UL << (int) (entityId & Const.ENTITIES_IN_BLOCK_MASK))) != 0UL;
         }
 
         #if FFS_ECS_DEBUG
         internal static void BlockQuery(QueryDef def, int val) {
             foreach (var masks in def.With) masks.BlockDeleteDisable(val);
             foreach (var masks in def.Without) masks.BlockAddEnable(val);
-            def.Custom?.Block(val);
+            foreach (var custom in def.Customs) custom.Block(val);
         }
         #endif
     }
