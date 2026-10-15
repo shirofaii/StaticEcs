@@ -22,8 +22,7 @@ namespace FFS.Libraries.StaticEcs {
 
         internal readonly ushort Id;
         internal readonly bool IsTag;
-        internal readonly bool HasDisable;
-        internal readonly byte SegmentMaskLen;
+        internal const byte SegmentMaskLen = Const.BLOCKS_IN_SEGMENT;
         internal readonly ulong IdMask;
         internal readonly ulong IdMaskInv;
         internal readonly ushort IdDiv;
@@ -38,15 +37,11 @@ namespace FFS.Libraries.StaticEcs {
         #if FFS_ECS_DEBUG
         internal int BlockerDelete;
         internal int BlockerAdd;
-        internal int BlockerDisable;
-        internal int BlockerEnable;
         #endif
 
-        internal ComponentMasks(ushort id, bool isTag, bool hasDisable) {
+        internal ComponentMasks(ushort id, bool isTag) {
             Id = id;
             IsTag = isTag;
-            HasDisable = hasDisable;
-            SegmentMaskLen = (byte) (hasDisable ? Const.BLOCKS_IN_SEGMENT * 2 : Const.BLOCKS_IN_SEGMENT);
             IdDiv = (ushort) (id >> Const.U64_SHIFT);
             IdMask = 1UL << (id & Const.U64_MASK);
             IdMaskInv = ~IdMask;
@@ -74,55 +69,6 @@ namespace FFS.Libraries.StaticEcs {
         internal bool Has(uint entityId) {
             var segment = Segments[entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT];
             return segment != null && (segment[(entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK] & (1UL << (int) (entityId & Const.ENTITIES_IN_BLOCK_MASK))) != 0;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        internal bool HasDisabled(uint entityId) {
-            if (!HasDisable) return false;
-            var segment = Segments[entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT];
-            return segment != null && (segment[((entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK) + Const.BLOCKS_IN_SEGMENT] & (1UL << (int) (entityId & Const.ENTITIES_IN_BLOCK_MASK))) != 0;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        internal bool HasEnabled(uint entityId) {
-            if (!HasDisable) return Has(entityId);
-            var segment = Segments[entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT];
-            var blockIdx = (entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK;
-            return segment != null && (segment[blockIdx] & ~segment[blockIdx + Const.BLOCKS_IN_SEGMENT] & (1UL << (int) (entityId & Const.ENTITIES_IN_BLOCK_MASK))) != 0;
-        }
-
-        internal ToggleResult Disable(uint entityId) {
-            var segment = Segments[entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT];
-            var blockIdx = (entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK;
-            var bit = 1UL << (int) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-            if (segment == null || (segment[blockIdx] & bit) == 0) {
-                return ToggleResult.MissingComponent;
-            }
-
-            ref var disabled = ref segment[blockIdx + Const.BLOCKS_IN_SEGMENT];
-            if ((disabled & bit) != 0) {
-                return ToggleResult.Unchanged;
-            }
-
-            disabled |= bit;
-            return ToggleResult.Changed;
-        }
-
-        internal ToggleResult Enable(uint entityId) {
-            var segment = Segments[entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT];
-            var blockIdx = (entityId >> Const.ENTITIES_IN_BLOCK_SHIFT) & Const.BLOCKS_IN_SEGMENT_MASK;
-            var bit = 1UL << (int) (entityId & Const.ENTITIES_IN_BLOCK_MASK);
-            if (segment == null || (segment[blockIdx] & bit) == 0) {
-                return ToggleResult.MissingComponent;
-            }
-
-            ref var disabled = ref segment[blockIdx + Const.BLOCKS_IN_SEGMENT];
-            if ((disabled & bit) == 0) {
-                return ToggleResult.Unchanged;
-            }
-
-            disabled &= ~bit;
-            return ToggleResult.Changed;
         }
 
         [MethodImpl(AggressiveInlining)]
@@ -184,9 +130,6 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             mask &= ~bit;
-            if (HasDisable) {
-                segment[blockIdx + Const.BLOCKS_IN_SEGMENT] &= ~bit;
-            }
 
             return segment;
         }
@@ -252,23 +195,7 @@ namespace FFS.Libraries.StaticEcs {
         }
 
         [MethodImpl(AggressiveInlining)]
-        internal ulong EnabledMask(uint segmentIdx, int segmentBlockIdx) {
-            var segment = Segments[segmentIdx];
-            if (segment == null) return 0UL;
-            return HasDisable
-                ? segment[segmentBlockIdx] & ~segment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT]
-                : segment[segmentBlockIdx];
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        internal ulong DisabledMask(uint segmentIdx, int segmentBlockIdx) {
-            if (!HasDisable) return 0UL;
-            var segment = Segments[segmentIdx];
-            return segment != null ? segment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT] : 0UL;
-        }
-
-        [MethodImpl(AggressiveInlining)]
-        internal ulong AnyMask(uint segmentIdx, int segmentBlockIdx) {
+        internal ulong Mask(uint segmentIdx, int segmentBlockIdx) {
             var segment = Segments[segmentIdx];
             return segment != null ? segment[segmentBlockIdx] : 0UL;
         }
@@ -307,24 +234,10 @@ namespace FFS.Libraries.StaticEcs {
             BlockerDelete += val;
         }
 
-        internal void BlockDeleteDisable(int val) {
-            BlockerDelete += val;
-            if (!IsTag) BlockerDisable += val;
-        }
-
-        internal void BlockDeleteEnable(int val) {
-            BlockerDelete += val;
-            if (!IsTag) BlockerEnable += val;
-        }
-
         internal void BlockAdd(int val) {
             BlockerAdd += val;
         }
 
-        internal void BlockAddEnable(int val) {
-            BlockerAdd += val;
-            if (!IsTag) BlockerEnable += val;
-        }
         #endif
     }
 }

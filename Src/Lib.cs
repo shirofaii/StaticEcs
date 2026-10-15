@@ -411,18 +411,6 @@ namespace FFS.Libraries.StaticEcs {
         }
 
         [MethodImpl(AggressiveInlining)]
-        internal static void AssertComponentDisableable<T>(string type, [CallerMemberName] string method = "") where T : struct, IComponentOrTag {
-            if (!Components<T>.Instance.Masks.HasDisable) AssertComponentDisableableFailed<T>(type, method);
-        }
-
-        [MethodImpl(NoInlining)]
-        private static void AssertComponentDisableableFailed<T>(string type, string method) where T : struct, IComponentOrTag {
-            if (!Components<T>.Instance.Masks.HasDisable) {
-                throw new StaticEcsException(type, method, $"Component {typeof(T).GenericName()} does not implement IDisableable.");
-            }
-        }
-
-        [MethodImpl(AggressiveInlining)]
         internal static void AssertEntityIsNotDestroyedAndLoaded(string type, Entity entity, [CallerMemberName] string method = "") {
             if ((entity.IsDestroyed) || (!Data.Instance.EntityIsLoaded(entity))) AssertEntityIsNotDestroyedAndLoadedFailed(type, entity, method);
         }

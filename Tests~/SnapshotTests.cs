@@ -3,16 +3,13 @@ using Xunit;
 namespace FFS.Libraries.StaticEcs.Tests {
     public class SnapshotTests : WorldTest {
         [Fact]
-        public void AWorldSnapshotRestoresComponentsTagsAndDisabledState() {
+        public void AWorldSnapshotRestoresComponentsAndTags() {
             var gids = new EntityGID[3000];
             for (var i = 0; i < gids.Length; i++) {
                 var e = W.NewEntity<Default>();
                 e.Set(new Pos { X = i });
                 if (i % 2 == 0) e.Set<Red>();
-                if (i % 3 == 0) {
-                    e.Set(new Hp { Value = i });
-                    if (i % 9 == 0) e.Disable<Hp>();
-                }
+                if (i % 3 == 0) e.Set(new Hp { Value = i });
                 if (i % 10 == 0) e.Set(new Name { Value = $"n{i}" });
                 gids[i] = e.GID;
             }
@@ -23,19 +20,13 @@ namespace FFS.Libraries.StaticEcs.Tests {
 
             Assert.Equal(gids.Length, Count<All<Pos>>());
             Assert.Equal(gids.Length / 2, Count<All<Red>>());
-            Assert.Equal(1000 - 334, Count<All<Hp>>());
-            var disabledHp = 0;
-            foreach (var e in W.With<Pos>()) if (e.HasDisabled<Hp>()) disabledHp++;
-            Assert.Equal((gids.Length + 8) / 9, disabledHp);
+            Assert.Equal(1000, Count<All<Hp>>());
             for (var i = 0; i < gids.Length; i += 37) {
                 Assert.True(gids[i].TryUnpack(out var e));
                 Assert.Equal(i, e.Ref<Pos>().X);
                 Assert.Equal(i % 2 == 0, e.Has<Red>());
                 Assert.Equal(i % 3 == 0, e.Has<Hp>());
-                if (i % 3 == 0) {
-                    Assert.Equal(i, e.Read<Hp>().Value);
-                    Assert.Equal(i % 9 == 0, e.HasDisabled<Hp>());
-                }
+                if (i % 3 == 0) Assert.Equal(i, e.Read<Hp>().Value);
                 Assert.Equal(i % 10 == 0, e.Has<Name>());
                 if (i % 10 == 0) Assert.Equal($"n{i}", e.Read<Name>().Value);
             }

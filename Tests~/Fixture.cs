@@ -10,13 +10,13 @@ namespace FFS.Libraries.StaticEcs.Tests {
 
     public struct Pos : IComponent { public int X; }
     public struct Vel : IComponent { public int V; }
-    public struct Hp : IComponent, IDisableable { public int Value; }
+    public struct Hp : IComponent { public int Value; }
     public struct Tracked : IComponent { public int V; }
 
     public struct Name : IComponent {
         public string Value;
         public void Write(ref BinaryPackWriter writer, World.Entity self) => writer.WriteString16(Value);
-        public void Read(ref BinaryPackReader reader, World.Entity self, byte version, bool disabled) => Value = reader.ReadString16();
+        public void Read(ref BinaryPackReader reader, World.Entity self, byte version) => Value = reader.ReadString16();
     }
 
     public struct Hooked : IComponent {

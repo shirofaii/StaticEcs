@@ -82,7 +82,7 @@ namespace FFS.Libraries.StaticEcs {
         #if NET5_0_OR_GREATER
         [UnconditionalSuppressMessage("AOT", "IL2091", Justification = "Multi-component metadata is preserved by the registration path.")]
         #endif
-        public struct Multi<TValue> : IComponent, IDisableable, IComponentStrategyOverride, IComponentInternal, IEquatable<Multi<TValue>> where TValue : struct, IMultiComponent {
+        public struct Multi<TValue> : IComponent, IComponentStrategyOverride, IComponentInternal, IEquatable<Multi<TValue>> where TValue : struct, IMultiComponent {
             internal static IPackArrayStrategy<TValue> ElementStrategy;
 
             #if UNITY_2022_1_OR_NEWER
@@ -815,7 +815,7 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             [MethodImpl(AggressiveInlining)]
-            public void CopyTo(World.Entity self, World.Entity other, bool disabled) {
+            public void CopyTo(World.Entity self, World.Entity other) {
                 ref var dst = ref World.Components<Multi<TValue>>.Instance.Add(other);
                 ref var storage = ref World.Resources<World.WorldScope, MultiValueStorage<TValue>>.Value;
 
@@ -839,10 +839,6 @@ namespace FFS.Libraries.StaticEcs {
                 }
                 Utils.LoopFallbackCopy(storage.Segments[SegmentIdx], Offset, storage.Segments[dst.SegmentIdx], dst.Offset, Count);
                 dst.Count = Count;
-
-                if (disabled) {
-                    World.Components<Multi<TValue>>.Instance.Disable(other);
-                }
             }
 
             [MethodImpl(AggressiveInlining)]
@@ -867,7 +863,7 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             [MethodImpl(AggressiveInlining)]
-            public void Read(ref BinaryPackReader reader, World.Entity self, byte version, bool disabled) {
+            public void Read(ref BinaryPackReader reader, World.Entity self, byte version) {
                 Count = reader.ReadUshort();
                 var entityId = self.IdWithOffset - Const.ENTITY_ID_OFFSET;
                 var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;

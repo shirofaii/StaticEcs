@@ -20,16 +20,14 @@ namespace FFS.Libraries.StaticEcs {
         internal readonly bool HasCopyTo;
         internal readonly bool HasWrite;
         internal readonly bool HasRead;
-        internal readonly bool HasDisable;
         internal readonly bool IsInternal;
 
-        internal ComponentHooks(bool hasOnAdd, bool hasOnDelete, bool hasCopyTo, bool hasWrite, bool hasRead, bool hasDisable, bool isInternal) {
+        internal ComponentHooks(bool hasOnAdd, bool hasOnDelete, bool hasCopyTo, bool hasWrite, bool hasRead, bool isInternal) {
             HasOnAdd = hasOnAdd;
             HasOnDelete = hasOnDelete;
             HasCopyTo = hasCopyTo;
             HasWrite = hasWrite;
             HasRead = hasRead;
-            HasDisable = hasDisable;
             IsInternal = isInternal;
         }
     }
@@ -42,18 +40,18 @@ namespace FFS.Libraries.StaticEcs {
 
             if (probe is IComponentHookOverride hookOverride) {
                 return new ComponentHooks(hookOverride.HasOnAdd(), hookOverride.HasOnDelete(), hookOverride.HasCopyTo(),
-                    ComponentHasWrite(type), ComponentHasRead(type), probe is IDisableable, probe is IComponentInternal);
+                    ComponentHasWrite(type), ComponentHasRead(type), probe is IComponentInternal);
             }
 
             return new ComponentHooks(ComponentHasOnAdd(type), ComponentHasOnDelete(type), ComponentHasCopyTo(type),
-                ComponentHasWrite(type), ComponentHasRead(type), probe is IDisableable, probe is IComponentInternal);
+                ComponentHasWrite(type), ComponentHasRead(type), probe is IComponentInternal);
         }
 
         private static readonly Type[] ComponentOnAddParams = { typeof(World.Entity) };
         private static readonly Type[] ComponentOnDeleteParams = { typeof(World.Entity), typeof(HookReason) };
-        private static readonly Type[] ComponentCopyToParams = { typeof(World.Entity), typeof(World.Entity), typeof(bool) };
+        private static readonly Type[] ComponentCopyToParams = { typeof(World.Entity), typeof(World.Entity) };
         private static readonly Type[] ComponentWriteParams = { typeof(BinaryPackWriter).MakeByRefType(), typeof(World.Entity) };
-        private static readonly Type[] ComponentReadParams = { typeof(BinaryPackReader).MakeByRefType(), typeof(World.Entity), typeof(byte), typeof(bool) };
+        private static readonly Type[] ComponentReadParams = { typeof(BinaryPackReader).MakeByRefType(), typeof(World.Entity), typeof(byte) };
 
         private static readonly Type[] LinkOnAddParams = { typeof(World.Entity), typeof(EntityGID) };
         private static readonly Type[] LinkOnDeleteParams = { typeof(World.Entity), typeof(EntityGID), typeof(HookReason) };

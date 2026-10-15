@@ -248,7 +248,7 @@ namespace FFS.Libraries.StaticEcs {
             /// <see cref="BinaryPackReader.RentAndFillFromFile"/> would mistake a raw snapshot for a
             /// gzip-compressed one. There is plenty of headroom; this is a future-proofing note.</para>
             /// </summary>
-            internal const ushort SnapshotFormatVersion = 4;
+            internal const ushort SnapshotFormatVersion = 5;
 
             /// <summary>
             /// Size in bytes of the snapshot header: <c>ushort</c> version (2 bytes) +

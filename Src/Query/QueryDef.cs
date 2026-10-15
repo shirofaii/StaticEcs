@@ -183,9 +183,7 @@ namespace FFS.Libraries.StaticEcs {
                 if (segment == null) {
                     return 0UL;
                 }
-                mask &= with[i].HasDisable
-                    ? segment[segmentBlockIdx] & ~segment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT]
-                    : segment[segmentBlockIdx];
+                mask &= segment[segmentBlockIdx];
             }
 
             var without = def.Without;
@@ -193,9 +191,7 @@ namespace FFS.Libraries.StaticEcs {
             for (var i = 0; i < withoutSegments.Length; i++) {
                 var segment = withoutSegments[i];
                 if (segment != null) {
-                    mask &= ~(without[i].HasDisable
-                        ? segment[segmentBlockIdx] & ~segment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT]
-                        : segment[segmentBlockIdx]);
+                    mask &= ~segment[segmentBlockIdx];
                 }
             }
 
@@ -220,8 +216,8 @@ namespace FFS.Libraries.StaticEcs {
 
         #if FFS_ECS_DEBUG
         internal static void BlockQuery(QueryDef def, int val) {
-            foreach (var masks in def.With) masks.BlockDeleteDisable(val);
-            foreach (var masks in def.Without) masks.BlockAddEnable(val);
+            foreach (var masks in def.With) masks.BlockDelete(val);
+            foreach (var masks in def.Without) masks.BlockAdd(val);
             foreach (var custom in def.Customs) custom.Block(val);
         }
         #endif

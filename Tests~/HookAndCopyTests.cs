@@ -48,16 +48,14 @@ namespace FFS.Libraries.StaticEcs.Tests {
         }
 
         [Fact]
-        public void CloneCopiesComponentsTagsAndDisabledState() {
+        public void CloneCopiesComponentsAndTags() {
             var a = W.NewEntity<Default>();
             a.Set(new Pos { X = 3 });
             a.Set(new Hp { Value = 8 });
-            a.Disable<Hp>();
             a.Set<Blue>();
             var c = a.Clone();
             Assert.NotEqual(a.ID, c.ID);
             Assert.Equal(3, c.Ref<Pos>().X);
-            Assert.True(c.HasDisabled<Hp>());
             Assert.Equal(8, c.Read<Hp>().Value);
             Assert.True(c.Has<Blue>());
             c.Ref<Pos>().X = 10;

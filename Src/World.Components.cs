@@ -27,24 +27,6 @@ namespace FFS.Libraries.StaticEcs {
     public interface ITag : IComponentOrTag { }
 
     /// <summary>
-    /// Marker: opts a component into Disable/Enable support. Standalone marker — Disable/Enable APIs
-    /// (<c>Entity.Disable&lt;T&gt;()</c>/<c>Enable&lt;T&gt;()</c>/<c>HasDisabled&lt;T&gt;()</c>/<c>HasEnabled&lt;T&gt;()</c>)
-    /// and the <c>AllOnlyDisabled</c>/<c>AllWithDisabled</c>/<c>NoneWithDisabled</c>/<c>AnyOnlyDisabled</c>/<c>AnyWithDisabled</c>
-    /// filters all constrain <c>T</c> to <c>struct, IComponent, IDisableable</c>, so the marker is meaningful
-    /// only when paired with <see cref="IComponent"/>.
-    /// <para>
-    /// Components without this marker pay no memory or serialization overhead for disabled state — the
-    /// per-component disabled bitmask is not allocated, and the per-entity / per-chunk disabled flag is not
-    /// written into snapshots.
-    /// </para>
-    /// <para>
-    /// Built-in component types <c>Multi&lt;TValue&gt;</c>, <c>Link&lt;TLinkType&gt;</c>, <c>Links&lt;TLinkType&gt;</c>
-    /// implement this interface — Disable/Enable on relations and multi-components works out of the box.
-    /// </para>
-    /// </summary>
-    public interface IDisableable { }
-
-    /// <summary>
     /// Marker interface for ECS data components. Components carry data (as opposed to <see cref="ITag"/> which is zero-size).
     /// Inherits hooks from <see cref="IComponentOrTag"/>.
     /// </summary>
@@ -88,8 +70,7 @@ namespace FFS.Libraries.StaticEcs {
         /// </summary>
         /// <param name="self">The source entity being copied from.</param>
         /// <param name="other">The destination entity being copied to.</param>
-        /// <param name="disabled">Whether the component is currently disabled on the source entity.</param>
-        public void CopyTo(World.Entity self, World.Entity other, bool disabled) {}
+        public void CopyTo(World.Entity self, World.Entity other) {}
 
         /// <summary>
         /// Custom serialization hook for writing this component to a binary stream.
@@ -133,8 +114,7 @@ namespace FFS.Libraries.StaticEcs {
         /// <param name="reader">Binary reader to deserialize data from.</param>
         /// <param name="self">The entity this component is being loaded onto.</param>
         /// <param name="version">The version byte that was stored during serialization, for migration logic.</param>
-        /// <param name="disabled">Whether the component was disabled when it was serialized.</param>
-        public void Read(ref BinaryPackReader reader, World.Entity self, byte version, bool disabled) {}
+        public void Read(ref BinaryPackReader reader, World.Entity self, byte version) {}
     }
 
     internal interface IComponentInternal {
@@ -151,18 +131,6 @@ namespace FFS.Libraries.StaticEcs {
         internal IPackArrayStrategy<T> ArrayPackStrategy<T>() where T : struct;
     }
     
-    /// <summary>
-    /// Result of a <see cref="World.Components{T}.Disable"/> or <see cref="World.Components{T}.Enable"/> operation.
-    /// </summary>
-    public enum ToggleResult : byte {
-        /// <summary>The entity does not have this component.</summary>
-        MissingComponent,
-        /// <summary>The component was already in the target state (already disabled / already enabled).</summary>
-        Unchanged,
-        /// <summary>The component state was changed (enabled → disabled or disabled → enabled).</summary>
-        Changed
-    }
-
     /// <summary>
     /// Configuration for registering a component type with <c>World.Types().Component&lt;T&gt;()</c>.
     /// Controls serialization identity (Guid), data versioning, and binary read/write strategy.
@@ -503,90 +471,6 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             /// <summary>
-            /// Checks whether the entity has component <typeparamref name="T"/> in the disabled state.
-            /// A disabled component has its data preserved but is excluded from queries that filter
-            /// by enabled components. Returns <c>false</c> if the component is absent or enabled.
-            /// </summary>
-            /// <param name="entity">Entity to check. Must not be destroyed or unloaded.</param>
-            /// <returns><c>true</c> if the entity has this component and it is currently disabled.</returns>
-            [MethodImpl(AggressiveInlining)]
-            public readonly bool HasDisabled(Entity entity) {
-                #if FFS_ECS_DEBUG
-                AssertIsNotTag<T>(ComponentsTypeName);
-                AssertComponentDisableable<T>(ComponentsTypeName);
-                AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                #endif
-
-                return Masks.HasDisabled(entity.IdWithOffset - Const.ENTITY_ID_OFFSET);
-            }
-
-            /// <summary>
-            /// Checks whether the entity has component <typeparamref name="T"/> in the enabled state.
-            /// Returns <c>true</c> only if the component is present AND not disabled.
-            /// This is the state that matches standard query filters (without explicit disabled-component filters).
-            /// </summary>
-            /// <param name="entity">Entity to check. Must not be destroyed or unloaded.</param>
-            /// <returns><c>true</c> if the entity has this component and it is currently enabled.</returns>
-            [MethodImpl(AggressiveInlining)]
-            public readonly bool HasEnabled(Entity entity) {
-                #if FFS_ECS_DEBUG
-                AssertIsNotTag<T>(ComponentsTypeName);
-                AssertComponentDisableable<T>(ComponentsTypeName);
-                AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                #endif
-
-                return Masks.HasEnabled(entity.IdWithOffset - Const.ENTITY_ID_OFFSET);
-            }
-
-            /// <summary>
-            /// Disables component <typeparamref name="T"/> on the entity without removing its data.
-            /// A disabled component is excluded from standard query iteration but retains its value,
-            /// allowing it to be re-enabled later with <see cref="Enable"/>. This is useful for
-            /// temporarily deactivating behavior (e.g., disabling a "Poisoned" effect component).
-            /// <para>
-            /// Returns <see cref="ToggleResult.MissingComponent"/> if the entity does not have this component.
-            /// Returns <see cref="ToggleResult.Unchanged"/> if the component is already disabled.
-            /// Returns <see cref="ToggleResult.Changed"/> if the component was enabled and is now disabled.
-            /// </para>
-            /// </summary>
-            /// <param name="entity">Target entity. Must not be destroyed or unloaded.</param>
-            /// <returns>A <see cref="ToggleResult"/> indicating what happened.</returns>
-            [MethodImpl(AggressiveInlining)]
-            public readonly ToggleResult Disable(Entity entity) {
-                #if FFS_ECS_DEBUG
-                AssertIsNotTag<T>(ComponentsTypeName);
-                AssertComponentDisableable<T>(ComponentsTypeName);
-                AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                AssertNotBlockedByQuery(ComponentsTypeName, entity, Masks.BlockerDisable);
-                #endif
-
-                return Masks.Disable(entity.IdWithOffset - Const.ENTITY_ID_OFFSET);
-            }
-
-            /// <summary>
-            /// Re-enables a previously disabled component <typeparamref name="T"/> on the entity.
-            /// After enabling, the component will again be visible to standard query iteration.
-            /// <para>
-            /// Returns <see cref="ToggleResult.MissingComponent"/> if the entity does not have this component.
-            /// Returns <see cref="ToggleResult.Unchanged"/> if the component is already enabled.
-            /// Returns <see cref="ToggleResult.Changed"/> if the component was disabled and is now enabled.
-            /// </para>
-            /// </summary>
-            /// <param name="entity">Target entity. Must not be destroyed or unloaded.</param>
-            /// <returns>A <see cref="ToggleResult"/> indicating what happened.</returns>
-            [MethodImpl(AggressiveInlining)]
-            public readonly ToggleResult Enable(Entity entity) {
-                #if FFS_ECS_DEBUG
-                AssertIsNotTag<T>(ComponentsTypeName);
-                AssertComponentDisableable<T>(ComponentsTypeName);
-                AssertEntityIsNotDestroyedAndLoaded(ComponentsTypeName, entity);
-                AssertNotBlockedByQuery(ComponentsTypeName, entity, Masks.BlockerEnable);
-                #endif
-
-                return Masks.Enable(entity.IdWithOffset - Const.ENTITY_ID_OFFSET);
-            }
-
-            /// <summary>
             /// Returns a mutable reference to component <typeparamref name="T"/> on the given entity.
             /// The entity MUST have this component (asserted in debug mode). Use <see cref="Has"/>
             /// to check first if unsure.
@@ -828,16 +712,12 @@ namespace FFS.Libraries.StaticEcs {
                     if (IsTag) {
                         Set(destination);
                     } else {
-                        var disabled = Masks.HasDisable && (maskSegment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT] & sourceBlockEntityMask) != 0;
                         var sourceSegmentEntityIdx = (byte) (sourceEntityId & Const.ENTITIES_IN_SEGMENT_MASK);
                         if (HasCopyTo) {
-                            ComponentSegments[segmentIdx][sourceSegmentEntityIdx].CopyTo(source, destination, disabled);
+                            ComponentSegments[segmentIdx][sourceSegmentEntityIdx].CopyTo(source, destination);
                         }
                         else {
                             Set(destination, ComponentSegments[segmentIdx][sourceSegmentEntityIdx]);
-                            if (disabled) {
-                                Disable(destination);
-                            }
                         }
                     }
                     return true;
@@ -1181,26 +1061,18 @@ namespace FFS.Libraries.StaticEcs {
                 if (entitiesMaskFilter == 0) {
                     return;
                 }
-
-                ulong scratch = 0;
-                ref var disabledEntitiesMask = ref Masks.HasDisable 
-                    ? ref maskSegment[segmentBlockIdx + Const.BLOCKS_IN_SEGMENT] 
-                    : ref scratch;
                 if (entitiesMask == ulong.MaxValue) {
                     Masks.HeuristicChunks[chunkIdx].FullBlocks.ClearBit(chunkBlockIdx);
                 }
                 
                 if (!HasOnDelete && !DataLifecycle) {
                     entitiesMask &= ~entitiesMaskFilter;
-                    disabledEntitiesMask &= ~entitiesMaskFilter;
                 }
                 else if (entitiesMaskFilter == ulong.MaxValue && !HasOnDelete && !DataLifecycle) {
                     entitiesMask = 0;
-                    disabledEntitiesMask = 0;
                 }
                 else if (entitiesMaskFilter == ulong.MaxValue && !HasOnDelete) {
                     entitiesMask = 0;
-                    disabledEntitiesMask = 0;
                     if (HasDefaultValue) {
                         componentSegment.AsSpan(baseSegmentEntityIdx, Const.ENTITIES_IN_BLOCK).Fill(DefaultValue);
                     } else {
@@ -1225,7 +1097,6 @@ namespace FFS.Libraries.StaticEcs {
                         var runMask = ((2UL << (endIncluded - start)) - 1) << start;
                         var invertedRunMask = ~runMask;
                         entitiesMask &= invertedRunMask;
-                        disabledEntitiesMask &= invertedRunMask;
 
                         if (HasDefaultValue) {
                             componentSegment.AsSpan(baseSegmentEntityIdx + start, count).Fill(DefaultValue);
@@ -1257,7 +1128,6 @@ namespace FFS.Libraries.StaticEcs {
                         while (start <= endIncluded) {
                             var invertedBlockEntityMask = ~blockEntityMask;
                             entitiesMask &= invertedBlockEntityMask;
-                            disabledEntitiesMask &= invertedBlockEntityMask;
 
                             #if FFS_ECS_DEBUG
                             Data.Instance.SetCurrentQueryEntity(entity.IdWithOffset);
@@ -1363,7 +1233,7 @@ namespace FFS.Libraries.StaticEcs {
                 DefaultValue = defaultValue;
                 HasDefaultValue = hasDefaultValue;
 
-                Masks = new ComponentMasks(componentId, isTag, hooks.HasDisable);
+                Masks = new ComponentMasks(componentId, isTag);
                 #if FFS_ECS_DEBUG
                 IsInternal = hooks.IsInternal;
                 #endif
@@ -1474,9 +1344,6 @@ namespace FFS.Libraries.StaticEcs {
                     if (IsTag) {
                         builder.AppendLine(TypeName);
                     } else {
-                        if (Masks.HasDisable && HasDisabled(entity)) {
-                            builder.Append("[Disabled] ");
-                        }
                         builder.Append(TypeName);
                         builder.Append(" ( ");
                         builder.Append(Read(entity));
@@ -1542,29 +1409,16 @@ namespace FFS.Libraries.StaticEcs {
 
             #region QUERY
             [MethodImpl(AggressiveInlining)]
-            internal readonly ulong EnabledMask(uint segmentIdx, int segmentBlockIdx) => Masks.EnabledMask(segmentIdx, segmentBlockIdx);
+            internal readonly ulong EnabledMask(uint segmentIdx, int segmentBlockIdx) => Masks.Mask(segmentIdx, segmentBlockIdx);
 
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong DisabledMask(uint segmentIdx, int segmentBlockIdx) => Masks.DisabledMask(segmentIdx, segmentBlockIdx);
-
-            [MethodImpl(AggressiveInlining)]
-            internal readonly ulong AnyMask(uint segmentIdx, int segmentBlockIdx) => Masks.AnyMask(segmentIdx, segmentBlockIdx);
             
             #if FFS_ECS_DEBUG
             [MethodImpl(AggressiveInlining)]
             internal void BlockDelete(int val) => Masks.BlockDelete(val);
 
             [MethodImpl(AggressiveInlining)]
-            internal void BlockDeleteDisable(int val) => Masks.BlockDeleteDisable(val);
-
-            [MethodImpl(AggressiveInlining)]
-            internal void BlockDeleteEnable(int val) => Masks.BlockDeleteEnable(val);
-
-            [MethodImpl(AggressiveInlining)]
             internal void BlockAdd(int val) => Masks.BlockAdd(val);
 
-            [MethodImpl(AggressiveInlining)]
-            internal void BlockAddEnable(int val) => Masks.BlockAddEnable(val);
             #endif
             #endregion
 
@@ -1572,7 +1426,6 @@ namespace FFS.Libraries.StaticEcs {
             [MethodImpl(AggressiveInlining)]
             internal void WriteChunk(ref BinaryPackWriter writer, uint chunkIdx) {
                 writer.WriteBool(IsTag);
-                writer.WriteBool(Masks.HasDisable);
 
                 ref var heuristic = ref Masks.HeuristicChunks[chunkIdx];
                 var notEmptyBlocks = heuristic.NotEmptyBlocks.Value;
@@ -1628,9 +1481,6 @@ namespace FFS.Libraries.StaticEcs {
                             var entitiesMask = masks![blockIdx];
 
                             writer.WriteUlong(entitiesMask);
-                            if (Masks.HasDisable) {
-                                writer.WriteUlong(masks[blockIdx + Const.BLOCKS_IN_SEGMENT]);
-                            }
 
                             var chunkBlockEntityId = (uint)((segmentIdx << Const.ENTITIES_IN_SEGMENT_SHIFT) +
                                                             (blockIdx << Const.ENTITIES_IN_BLOCK_SHIFT));
@@ -1687,7 +1537,6 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 if (isTag != IsTag) throw new StaticEcsException($"isTag != IsTag");
                 #endif
-                var hadDisable = reader.ReadBool();
 
                 ref var heuristic = ref Masks.HeuristicChunks[chunkIdx];
                 var notEmptyBlocks = reader.ReadUlong();
@@ -1748,14 +1597,7 @@ namespace FFS.Libraries.StaticEcs {
                             }
 
                             var entitiesMask = reader.ReadUlong();
-                            ulong disabledEntitiesMask = 0;
-                            if (hadDisable) {
-                                disabledEntitiesMask = reader.ReadUlong();
-                            }
                             masks![blockIdx] = entitiesMask;
-                            if (Masks.HasDisable) {
-                                masks[blockIdx + Const.BLOCKS_IN_SEGMENT] = disabledEntitiesMask;
-                            }
 
                             var chunkBlockEntityId = (uint)((segmentIdx << Const.ENTITIES_IN_SEGMENT_SHIFT) +
                                                             (blockIdx << Const.ENTITIES_IN_BLOCK_SHIFT));
@@ -1781,8 +1623,7 @@ namespace FFS.Libraries.StaticEcs {
                                         entityId = (uint)(chunkBlockEntityId + bitIdx);
                                         var mask = 1UL << bitIdx;
                                         if ((entitiesMask & mask) != 0) {
-                                            var disabled = (disabledEntitiesMask & mask) != 0;
-                                            components[componentOffset + bitIdx].Read(ref reader, entity, oldVersion, disabled);
+                                            components[componentOffset + bitIdx].Read(ref reader, entity, oldVersion);
                                         }
                                         else {
                                             reader.SkipNext(oneSize);
@@ -1807,8 +1648,7 @@ namespace FFS.Libraries.StaticEcs {
                                     entityId = chunkBlockEntityId + runStart;
 
                                     do {
-                                        var disabled = (disabledEntitiesMask & isolatedBit) != 0;
-                                        components[componentIdx].Read(ref reader, entity, oldVersion, disabled);
+                                        components[componentIdx].Read(ref reader, entity, oldVersion);
                                         isolatedBit <<= 1;
                                         componentIdx++;
                                         entityId++;
@@ -1850,12 +1690,7 @@ namespace FFS.Libraries.StaticEcs {
                 #if FFS_ECS_DEBUG
                 if (size > short.MaxValue) throw new StaticEcsException($"Size of component {typeof(T)} more than {short.MaxValue} bytes");
                 #endif
-                if (Masks.HasDisable && HasDisabled(entity)) {
-                    writer.WriteUshortAt(offset, (ushort)(size | ComponentSerializerUtils.DisabledBit));
-                }
-                else {
-                    writer.WriteUshortAt(offset, (ushort)size);
-                }
+                writer.WriteUshortAt(offset, (ushort)size);
 
                 if (deleteComponent) {
                     Delete(entity);
@@ -1872,12 +1707,12 @@ namespace FFS.Libraries.StaticEcs {
                     return;
                 }
 
-                var disabled = (reader.ReadUshort() & ComponentSerializerUtils.DisabledBit) == ComponentSerializerUtils.DisabledBit;
+                reader.ReadUshort();
                 var oldVersion = reader.ReadByte();
 
                 var component = default(T);
                 if (HasRead) {
-                    component.Read(ref reader, entity, oldVersion, disabled);
+                    component.Read(ref reader, entity, oldVersion);
                 } else if (Unmanaged && oldVersion == Version) {
                     reader.ForceReadUnmanaged(out component);
                 }
@@ -1890,10 +1725,6 @@ namespace FFS.Libraries.StaticEcs {
                 }
                 #endif
                 Set(entity, component, false);
-
-                if (Masks.HasDisable && disabled) {
-                    Disable(entity);
-                }
             }
             #endregion
 
@@ -2007,12 +1838,6 @@ namespace FFS.Libraries.StaticEcs {
 
 
             [MethodImpl(AggressiveInlining)]
-            internal static ToggleResult _Enable(uint eid) => Instance.Enable(new Entity(eid));
-
-            [MethodImpl(AggressiveInlining)]
-            internal static ToggleResult _Disable(uint eid) => Instance.Disable(new Entity(eid));
-
-            [MethodImpl(AggressiveInlining)]
             internal static bool _Delete(uint eid, HookReason reason) => Instance.Delete(new Entity(eid), reason);
 
             [MethodImpl(AggressiveInlining)]
@@ -2042,18 +1867,15 @@ namespace FFS.Libraries.StaticEcs {
     /// <param name="reader">Binary reader positioned at the start of the component's serialized data.</param>
     /// <param name="entity">The entity this component was saved on.</param>
     /// <param name="version">The schema version byte that was stored during serialization.</param>
-    /// <param name="disabled">Whether the component was in the disabled state when serialized.</param>
-    public delegate void EcsComponentDeleteMigrationReader(ref BinaryPackReader reader, World.Entity entity, byte version, bool disabled);
+    public delegate void EcsComponentDeleteMigrationReader(ref BinaryPackReader reader, World.Entity entity, byte version);
     
     internal static class ComponentSerializerUtils {
-        internal const int DisabledBit = 0b_10000000_00000000;
-        internal const int DisabledBitInv = ~DisabledBit;
         
         [MethodImpl(AggressiveInlining)]
         internal static void SkipOneComponent(this ref BinaryPackReader reader) {
             var isTag = reader.ReadBool();
             if (!isTag) {
-                var size = reader.ReadUshort() & DisabledBitInv;
+                var size = reader.ReadUshort();
                 reader.SkipNext((uint) size); 
             }
         }
@@ -2062,12 +1884,12 @@ namespace FFS.Libraries.StaticEcs {
         internal static void DeleteOneComponentMigration(this ref BinaryPackReader reader, World.Entity entity, EcsComponentDeleteMigrationReader migration) {
             var isTag = reader.ReadBool();
             if (!isTag) {
-                var disabled = (reader.ReadUshort() & DisabledBit) == DisabledBit;
+                reader.ReadUshort();
                 var oldVersion = reader.ReadByte();
-                migration(ref reader, entity, oldVersion, disabled);
+                migration(ref reader, entity, oldVersion);
             }
             else {
-                migration(ref reader, entity, 0, false);
+                migration(ref reader, entity, 0);
             }
         }
         
@@ -2110,7 +1932,7 @@ namespace FFS.Libraries.StaticEcs {
                                 entityId = (uint)(segmentBlockEntityBase + (blockIdx << Const.ENTITIES_IN_BLOCK_SHIFT) + runStart);
 
                                 do {
-                                    migration(ref reader, entity, 0, false);
+                                    migration(ref reader, entity, 0);
                                     isolatedBit <<= 1;
                                     entityId++;
                                 } while ((entitiesMask & isolatedBit) != 0);
@@ -2135,7 +1957,6 @@ namespace FFS.Libraries.StaticEcs {
                     var blockIdx = (byte)(chunkBlockIdx & Const.BLOCKS_IN_SEGMENT_MASK);
                     var segmentIdx = (chunkIdx << Const.SEGMENTS_IN_CHUNK_SHIFT) + (chunkBlockIdx >> Const.BLOCKS_IN_SEGMENT_SHIFT);
                     var entitiesMask = reader.ReadUlong();
-                    var disabledEntitiesMask = reader.ReadUlong();
 
                     var chunkBlockEntityId = (uint)((segmentIdx << Const.ENTITIES_IN_SEGMENT_SHIFT) +
                                                     (blockIdx << Const.ENTITIES_IN_BLOCK_SHIFT));
@@ -2153,8 +1974,7 @@ namespace FFS.Libraries.StaticEcs {
                             entityId = (uint)(chunkBlockEntityId + bitIdx);
                             var mask = 1UL << bitIdx;
                             if ((entitiesMask & mask) != 0) {
-                                var disabled = (disabledEntitiesMask & mask) != 0;
-                                migration(ref reader, entity, oldVersion, disabled);
+                                migration(ref reader, entity, oldVersion);
                             }
                             else {
                                 reader.SkipNext(oneSize);
@@ -2173,8 +1993,7 @@ namespace FFS.Libraries.StaticEcs {
                             entityId = chunkBlockEntityId + runStart;
 
                             do {
-                                var disabled = (disabledEntitiesMask & isolatedBit) != 0;
-                                migration(ref reader, entity, oldVersion, disabled);
+                                migration(ref reader, entity, oldVersion);
                                 isolatedBit <<= 1;
                                 entityId++;
                             } while ((entitiesMask & isolatedBit) != 0);

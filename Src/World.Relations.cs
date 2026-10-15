@@ -93,7 +93,7 @@ namespace FFS.Libraries.StaticEcs {
         #if NET5_0_OR_GREATER
         [UnconditionalSuppressMessage("AOT", "IL2091", Justification = "Link type metadata is preserved by the registration path.")]
         #endif
-        public struct Link<TLinkType> : ILinkComponent, IMultiComponent, IComponentHookOverride, IDisableable, IEquatable<Link<TLinkType>>
+        public struct Link<TLinkType> : ILinkComponent, IMultiComponent, IComponentHookOverride, IEquatable<Link<TLinkType>>
             where TLinkType : unmanaged, ILinkType {
 
             #if UNITY_2022_1_OR_NEWER
@@ -144,7 +144,7 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             [MethodImpl(AggressiveInlining)]
-            public void CopyTo(World.Entity self, World.Entity other, bool disabled) {
+            public void CopyTo(World.Entity self, World.Entity other) {
                 var linkType = default(TLinkType);
                 linkType.CopyTo(self, other, _value);
             }
@@ -155,7 +155,7 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             [MethodImpl(AggressiveInlining)]
-            public void Read(ref BinaryPackReader reader, World.Entity self, byte version, bool disabled) {
+            public void Read(ref BinaryPackReader reader, World.Entity self, byte version) {
                 _value = reader.ReadEntityGID();
             }
 
@@ -239,7 +239,7 @@ namespace FFS.Libraries.StaticEcs {
         #if NET5_0_OR_GREATER
         [UnconditionalSuppressMessage("AOT", "IL2091", Justification = "Link type metadata is preserved by the registration path.")]
         #endif
-        public struct Links<TLinkType> : ILinksComponent, IComponentInternal, IComponentStrategyOverride, IDisableable, IEquatable<Links<TLinkType>> where TLinkType : unmanaged, ILinksType {
+        public struct Links<TLinkType> : ILinksComponent, IComponentInternal, IComponentStrategyOverride, IEquatable<Links<TLinkType>> where TLinkType : unmanaged, ILinksType {
 
             #if UNITY_2022_1_OR_NEWER
             [UnityEngine.Scripting.Preserve]
@@ -1073,7 +1073,7 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             [MethodImpl(AggressiveInlining)]
-            public void CopyTo(World.Entity self, World.Entity other, bool disabled) {
+            public void CopyTo(World.Entity self, World.Entity other) {
                 ref var storage = ref World.Resources<World.WorldScope, MultiValueStorage<Link<TLinkType>>>.Value;
                 if (storage.HasOnCopy) {
                     ref var dst = ref World.Components<Links<TLinkType>>.Instance.Add(other);
@@ -1095,7 +1095,7 @@ namespace FFS.Libraries.StaticEcs {
 
                     var srcValues = storage.Segments[SegmentIdx];
                     for (var i = Offset; i < Offset + Count; i++) {
-                        srcValues[i].CopyTo(self, other, disabled);
+                        srcValues[i].CopyTo(self, other);
                     }
                 }
             }
@@ -1109,7 +1109,7 @@ namespace FFS.Libraries.StaticEcs {
             }
 
             [MethodImpl(AggressiveInlining)]
-            public void Read(ref BinaryPackReader reader, World.Entity self, byte version, bool disabled) {
+            public void Read(ref BinaryPackReader reader, World.Entity self, byte version) {
                 Count = reader.ReadUshort();
                 var entityId = self.IdWithOffset - Const.ENTITY_ID_OFFSET;
                 var segmentIdx = entityId >> Const.ENTITIES_IN_SEGMENT_SHIFT;

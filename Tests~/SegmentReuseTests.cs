@@ -16,21 +16,6 @@ namespace FFS.Libraries.StaticEcs.Tests {
         }
 
         [Fact]
-        public void DisabledBitsDoNotSurviveSegmentReuse() {
-            var e = W.NewEntity<Default>();
-            for (var i = 0; i < 20; i++) {
-                e.Set(new Hp { Value = i });
-                e.Disable<Hp>();
-                Assert.True(e.HasDisabled<Hp>());
-                e.Delete<Hp>();
-                e.Set(new Hp { Value = i });
-                Assert.True(e.HasEnabled<Hp>());
-                Assert.Equal(1, W.With<Hp>().Count());
-                e.Delete<Hp>();
-            }
-        }
-
-        [Fact]
         public void ChurnAcrossManySegmentsKeepsDataAndQueriesExact() {
             const int n = 3000;
             var entities = new W.Entity[n];

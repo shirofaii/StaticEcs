@@ -388,8 +388,6 @@ namespace FFS.Libraries.StaticEcs {
         private readonly unsafe delegate*<uint, IComponentOrTag, void> _setRaw;
         private readonly unsafe delegate*<uint, IComponentOrTag, void> _setRawDirect;
         private readonly unsafe delegate*<uint, bool> _add;
-        private readonly unsafe delegate*<uint, ToggleResult> _enable;
-        private readonly unsafe delegate*<uint, ToggleResult> _disable;
         private readonly unsafe delegate*<uint, HookReason, bool> _delete;
         private readonly unsafe delegate*<uint, uint, bool> _copy;
         private readonly unsafe delegate*<uint, uint, bool> _move;
@@ -471,8 +469,6 @@ namespace FFS.Libraries.StaticEcs {
                 &World.Components<TComponent>._SetRaw,
                 &World.Components<TComponent>._SetRawDirect,
                 &World.Components<TComponent>._Add,
-                &World.Components<TComponent>._Enable,
-                &World.Components<TComponent>._Disable,
                 &World.Components<TComponent>._Delete,
                 &World.Components<TComponent>._Copy,
                 &World.Components<TComponent>._Move,
@@ -505,8 +501,6 @@ namespace FFS.Libraries.StaticEcs {
             delegate*<uint, IComponentOrTag, void> setRaw,
             delegate*<uint, IComponentOrTag, void> setRawDirect,
             delegate*<uint, bool> add,
-            delegate*<uint, ToggleResult> enable,
-            delegate*<uint, ToggleResult> disable,
             delegate*<uint, HookReason, bool> delete,
             delegate*<uint, uint, bool> copy,
             delegate*<uint, uint, bool> move,
@@ -536,8 +530,6 @@ namespace FFS.Libraries.StaticEcs {
             _setRaw = setRaw;
             _setRawDirect = setRawDirect;
             _add = add;
-            _enable = enable;
-            _disable = disable;
             _delete = delete;
             _copy = copy;
             _move = move;
@@ -620,36 +612,10 @@ namespace FFS.Libraries.StaticEcs {
         /// </summary>
         /// <param name="segmentIdx">Segment index (entityId >> ENTITIES_IN_SEGMENT_SHIFT).</param>
         /// <param name="blockIdx">Block index within the segment (0..3).</param>
-        /// <returns>Bitmask where set bits indicate entities with this component enabled.</returns>
+        /// <returns>Bitmask where set bits indicate entities with this component.</returns>
         [MethodImpl(AggressiveInlining)]
-        public ulong EnabledMask(uint segmentIdx, int blockIdx) {
-            return _masks.EnabledMask(segmentIdx, blockIdx);
-        }
-
-        /// <summary>
-        /// Returns the 64-bit bitmask of entities that have this component in the <b>disabled</b>
-        /// state within the specified segment and block. Disabled components exist on the entity
-        /// but are excluded from standard queries.
-        /// </summary>
-        /// <param name="segmentIdx">Segment index.</param>
-        /// <param name="blockIdx">Block index within the segment (0..3).</param>
-        /// <returns>Bitmask where set bits indicate entities with this component disabled.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public ulong DisabledMask(uint segmentIdx, int blockIdx) {
-            return _masks.DisabledMask(segmentIdx, blockIdx);
-        }
-
-        /// <summary>
-        /// Returns the 64-bit bitmask of entities that have this component in <b>any</b> state
-        /// (enabled or disabled) within the specified segment and block.
-        /// Equivalent to <c>EnabledMask | DisabledMask</c>.
-        /// </summary>
-        /// <param name="segmentIdx">Segment index.</param>
-        /// <param name="blockIdx">Block index within the segment (0..3).</param>
-        /// <returns>Bitmask where set bits indicate entities that have this component (any state).</returns>
-        [MethodImpl(AggressiveInlining)]
-        public ulong AnyMask(uint segmentIdx, int blockIdx) {
-            return _masks.AnyMask(segmentIdx, blockIdx);
+        public ulong Mask(uint segmentIdx, int blockIdx) {
+            return _masks.Mask(segmentIdx, blockIdx);
         }
 
         /// <summary>
@@ -789,52 +755,6 @@ namespace FFS.Libraries.StaticEcs {
         [MethodImpl(AggressiveInlining)]
         public bool Has(uint entityId) {
             return _masks.Has(entityId);
-        }
-
-        /// <summary>
-        /// Checks whether an entity has this component in the <b>enabled</b> state.
-        /// Enabled components participate in standard queries.
-        /// </summary>
-        /// <param name="entityId">Raw entity ID.</param>
-        /// <returns><c>true</c> if the entity has this component and it is enabled.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public bool HasEnabled(uint entityId) {
-            return _masks.HasEnabled(entityId);
-        }
-
-        /// <summary>
-        /// Checks whether an entity has this component in the <b>disabled</b> state.
-        /// Disabled components are excluded from standard queries but retain their data.
-        /// </summary>
-        /// <param name="entityId">Raw entity ID.</param>
-        /// <returns><c>true</c> if the entity has this component and it is disabled.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public bool HasDisabled(uint entityId) {
-            return _masks.HasDisabled(entityId);
-        }
-
-        /// <summary>
-        /// Enables a previously disabled component on an entity. The component data is preserved.
-        /// After enabling, the entity will appear in standard queries filtering for this component.
-        /// </summary>
-        /// <param name="entityId">Raw entity ID.</param>
-        /// <returns>A <see cref="ToggleResult"/> indicating what happened.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public ToggleResult Enable(uint entityId) {
-            unsafe { return _enable(entityId); }
-        }
-
-        /// <summary>
-        /// Disables an enabled component on an entity without removing it. The component data
-        /// is preserved but the entity will no longer appear in standard queries filtering for
-        /// this component. Useful for temporarily "hiding" a component (e.g. pausing a behavior)
-        /// without the cost of removing and re-adding.
-        /// </summary>
-        /// <param name="entityId">Raw entity ID.</param>
-        /// <returns>A <see cref="ToggleResult"/> indicating what happened.</returns>
-        [MethodImpl(AggressiveInlining)]
-        public ToggleResult Disable(uint entityId) {
-            unsafe { return _disable(entityId); }
         }
 
         /// <summary>
